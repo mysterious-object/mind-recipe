@@ -1,0 +1,36 @@
+name: Mind Nav Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+env:
+  MIND_NAV_STAGING_API_URL: https://staging-api.mindnav.142.93.201.156.sslip.io
+
+jobs:
+  apk:
+    name: Build downloadable staging APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.0'
+          channel: stable
+          cache: true
+      - run: flutter pub get
+        working-directory: flutter
+      - run: flutter build apk --release --target-platform android-arm64 --dart-define=MIND_NAV_API_BASE=${MIND_NAV_STAGING_API_URL}
+        working-directory: flutter
+      - name: Verify APK exists
+        run: test -s flutter/build/app/outputs/flutter-apk/app-release.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mind-nav-android-apk
+          path: flutter/build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+          retention-days: 14
