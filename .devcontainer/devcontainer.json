@@ -1,0 +1,21 @@
+{
+  "name": "Mind Nav",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+  "features": {
+    "ghcr.io/devcontainers/features/flutter:1": {"version": "3.47"},
+    "ghcr.io/devcontainers/features/android:2": {"version": "latest", "installNdk": true},
+    "ghcr.io/devcontainers/features/java:1": {"version": "17"},
+    "ghcr.io/devcontainers/features/python:1": {"version": "3.12"},
+    "ghcr.io/devcontainers/features/node:1": {"version": "22"}
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": ["Dart-Code.flutter", "Dart-Code.dart-code", "ms-python.python"]
+    }
+  },
+  "forwardPorts": [8000],
+  "postCreateCommand": "flutter pub get --directory flutter && python3 -m pip install --user -e 'backend[dev]'",
+  "remoteEnv": {
+    "MIND_NAV_API_BASE": "https://staging-api.mindnav.142.93.201.156.sslip.io"
+  }
+}

@@ -1,0 +1,518 @@
+import 'dart:convert';
+
+import 'package:flutter/foundation.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:http/http.dart' as http;
+
+const mindNavApiBase = String.fromEnvironment(
+  'MIND_NAV_API_BASE',
+  defaultValue: 'https://staging-api.mindnav.142.93.201.156.sslip.io',
+);
+
+class AccountSession {
+  const AccountSession({
+    required this.token,
+    required this.displayName,
+    required this.email,
+  });
+  final String token;
+  final String displayName;
+  final String email;
+}
+
+class MindNavApiClient {
+  MindNavApiClient({http.Client? client}) : _client = client ?? http.Client();
+  final http.Client _client;
+
+  Future<AccountSession> register({
+    required String name,
+    required String email,
+    required String password,
+  }) => _authenticate('/v1/auth/register', {
+    'display_name': name,
+    'email': email,
+    'password': password,
+  });
+
+  Future<AccountSession> login({
+    required String email,
+    required String password,
+  }) => _authenticate('/v1/auth/login', {'email': email, 'password': password});
+
+  Future<AccountSession> _authenticate(
+    String path,
+    Map<String, String> body,
+  ) async {
+    final response = await _client
+        .post(
+          Uri.parse('$mindNavApiBase$path'),
+          headers: const {'content-type': 'application/json'},
+          body: jsonEncode(body),
+        )
+        .timeout(const Duration(seconds: 12));
+    Map<String, dynamic> decoded;
+    try {
+      decoded = jsonDecode(response.body) as Map<String, dynamic>;
+    } on FormatException {
+      throw const ApiException(
+        'The account service returned an invalid response.',
+      );
+    }
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      final detail = decoded['detail'];
+      final message = detail is String
+          ? detail
+          : response.statusCode == 422
+          ? 'Check the highlighted account fields and try again.'
+          : 'Unable to continue.';
+      throw ApiException(message);
+    }
+    final user = decoded['user'] as Map<String, dynamic>;
+    return AccountSession(
+      token: decoded['access_token'] as String,
+      displayName: user['display_name'] as String,
+      email: user['email'] as String,
+    );
+  }
+
+  Map<String, String> _memberHeaders(String token, {bool json = false}) => {
+    if (json) 'content-type': 'application/json',
+    if (token.isNotEmpty) 'authorization': 'Bearer $token',
+    if (token.isEmpty) 'x-mind-nav-user': 'local-device-member',
+    'x-mind-nav-role': 'member',
+  };
+
+  Future<bool> aiAvailable() async {
+    try {
+      final response = await _client
+          .get(Uri.parse('$mindNavApiBase/v1/assistant/status'))
+          .timeout(const Duration(seconds: 4));
+      if (response.statusCode != 200) return false;
+      return (jsonDecode(response.body) as Map<String, dynamic>)['available'] ==
+          true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<AiReply> reflect({
+    required String token,
+    required String providerKey,
+    required String text,
+    required Map<String, dynamic> context,
+    bool externalResearchOptIn = false,
+  }) async {
+    final response = await _client
+        .post(
+          Uri.parse('$mindNavApiBase/v1/assistant/respond'),
+          headers: {
+            'content-type': 'application/json',
+            if (token.isNotEmpty) 'authorization': 'Bearer $token',
+            if (providerKey.isNotEmpty) 'x-mind-nav-provider-key': providerKey,
+          },
+          body: jsonEncode({
+            'text': text,
+            'provider': 'openrouter',
+            'privacy_mode': 'cloud_byok',
+            'cloud_opt_in': true,
+            'external_research_opt_in': externalResearchOptIn,
+            'context': context,
+          }),
+        )
+        .timeout(const Duration(seconds: 30));
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw const ApiException('Mind Nav AI is temporarily unavailable.');
+    }
+    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+    return AiReply(
+      mode: decoded['mode'] as String,
+      message: decoded['message'] as String,
+      provider: decoded['provider']?.toString(),
+      model: decoded['model']?.toString(),
+    );
+  }
+
+  Future<Map<String, dynamic>> getTrends(String memberId) async {
+    final response = await _client
+        .get(Uri.parse('$mindNavApiBase/v1/trends/$memberId'))
+        .timeout(const Duration(seconds: 5));
+    if (response.statusCode != 200) return {};
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  Future<List<dynamic>> detectPatterns(String memberId) async {
+    final response = await _client
+        .get(Uri.parse('$mindNavApiBase/v1/patterns/$memberId'))
+        .timeout(const Duration(seconds: 5));
+    if (response.statusCode != 200) return [];
+    return jsonDecode(response.body) as List<dynamic>;
+  }
+
+  Future<List<dynamic>> fetchConsents(String id) async {
+    final r = await _client
+        .get(Uri.parse('$mindNavApiBase/v1/consents/$id'))
+        .timeout(const Duration(seconds: 5));
+    if (r.statusCode != 200) return [];
+    return (jsonDecode(r.body) as List<dynamic>);
+  }
+
+  Future<List<dynamic>> fetchAudit(String id) async {
+    final r = await _client
+        .get(Uri.parse('$mindNavApiBase/v1/audit/$id?limit=20'))
+        .timeout(const Duration(seconds: 5));
+    if (r.statusCode != 200) return [];
+    return (jsonDecode(r.body) as List<dynamic>);
+  }
+
+  Future<void> grantConsent({
+    required String practitionerId,
+    required String memberId,
+  }) async {
+    final now = DateTime.now().toUtc().toIso8601String();
+    final exp = DateTime.now()
+        .add(const Duration(days: 30))
+        .toUtc()
+        .toIso8601String();
+    await _client
+        .post(
+          Uri.parse('$mindNavApiBase/v1/consents'),
+          headers: {'content-type': 'application/json'},
+          body: jsonEncode({
+            'recipient_practitioner_id': practitionerId,
+            'categories': ['checkins', 'trends'],
+            'purpose': 'Wellness coordination',
+            'starts_at': now,
+            'expires_at': exp,
+          }),
+        )
+        .timeout(const Duration(seconds: 5));
+  }
+
+  Future<List<Map<String, dynamic>>> fetchToolbox({
+    required String token,
+  }) async {
+    final response = await _client
+        .get(
+          Uri.parse('$mindNavApiBase/v1/toolbox'),
+          headers: _memberHeaders(token),
+        )
+        .timeout(const Duration(seconds: 8));
+    if (response.statusCode != 200) {
+      throw const ApiException('Could not load your toolbox.');
+    }
+    return (jsonDecode(response.body) as List<dynamic>)
+        .cast<Map<String, dynamic>>();
+  }
+
+  Future<Map<String, dynamic>> createToolboxItem({
+    required String token,
+    required String name,
+    required String description,
+    required String category,
+    required String source,
+  }) async {
+    final response = await _client
+        .post(
+          Uri.parse('$mindNavApiBase/v1/toolbox'),
+          headers: _memberHeaders(token, json: true),
+          body: jsonEncode({
+            'name': name,
+            'description': description,
+            'category': category,
+            'source': source,
+          }),
+        )
+        .timeout(const Duration(seconds: 8));
+    if (response.statusCode != 201) {
+      throw const ApiException('Could not save that practice.');
+    }
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> createAiToolboxItem({
+    required String token,
+    required String description,
+    required String providerKey,
+  }) async {
+    final response = await _client
+        .post(
+          Uri.parse('$mindNavApiBase/v1/toolbox/ai-create'),
+          headers: {
+            ..._memberHeaders(token, json: true),
+            if (providerKey.isNotEmpty) 'x-mind-nav-provider-key': providerKey,
+          },
+          body: jsonEncode({'description': description}),
+        )
+        .timeout(const Duration(seconds: 30));
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to create AI toolbox item: ${response.body}');
+    }
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> setToolboxFavorite({
+    required String token,
+    required String itemId,
+    required bool favorite,
+  }) async {
+    final response = await _client
+        .patch(
+          Uri.parse('$mindNavApiBase/v1/toolbox/$itemId/favorite'),
+          headers: _memberHeaders(token, json: true),
+          body: jsonEncode({'favorite': favorite}),
+        )
+        .timeout(const Duration(seconds: 8));
+    if (response.statusCode != 200) {
+      throw const ApiException('Could not update that favorite.');
+    }
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> recordToolboxPractice({
+    required String token,
+    required String itemId,
+    required int effectiveness,
+    required String context,
+  }) async {
+    final response = await _client
+        .post(
+          Uri.parse('$mindNavApiBase/v1/toolbox/$itemId/practice'),
+          headers: _memberHeaders(token, json: true),
+          body: jsonEncode({
+            'tool_id': itemId,
+            'effectiveness': effectiveness,
+            if (context.isNotEmpty) 'context': context,
+          }),
+        )
+        .timeout(const Duration(seconds: 8));
+    if (response.statusCode != 200) {
+      throw const ApiException('Could not save that practice record.');
+    }
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  Future<void> deleteToolboxItem({
+    required String token,
+    required String itemId,
+  }) async {
+    final response = await _client
+        .delete(
+          Uri.parse('$mindNavApiBase/v1/toolbox/$itemId'),
+          headers: _memberHeaders(token),
+        )
+        .timeout(const Duration(seconds: 8));
+    if (response.statusCode != 204) {
+      throw const ApiException('Could not remove that practice.');
+    }
+  }
+
+  Future<Map<String, dynamic>> synthesizeVoice(
+    String text, {
+    double speed = 1.0,
+    String voice = 'mind_nav_companion',
+  }) async {
+    final response = await _client
+        .post(
+          Uri.parse('$mindNavApiBase/v1/voice/synthesize'),
+          headers: const {'content-type': 'application/json'},
+          body: jsonEncode({'text': text, 'speed': speed, 'voice': voice}),
+        )
+        .timeout(const Duration(seconds: 35));
+    if (response.statusCode != 200) {
+      throw const ApiException('Mind Nav voice is temporarily unavailable.');
+    }
+    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+    if (decoded['success'] != true) {
+      throw ApiException(
+        decoded['error']?.toString() ??
+            'Mind Nav voice is temporarily unavailable.',
+      );
+    }
+    return decoded;
+  }
+}
+
+class AiReply {
+  const AiReply({
+    required this.mode,
+    required this.message,
+    this.provider,
+    this.model,
+  });
+  final String mode;
+  final String message;
+  final String? provider;
+  final String? model;
+  bool get isCloudAi => mode == 'cloud_ai';
+}
+
+class ApiException implements Exception {
+  const ApiException(this.message);
+  final String message;
+  @override
+  String toString() => message;
+}
+
+class SecureAppState extends ChangeNotifier {
+  static const _storage = FlutterSecureStorage();
+  static const _tokenKey = 'mind_nav_session_token';
+  static const _nameKey = 'mind_nav_display_name';
+  static const _emailKey = 'mind_nav_email';
+  static const _providerKey = 'mind_nav_openrouter_key';
+  static const _assistantActivityKey = 'mind_nav_assistant_activity';
+
+  AccountSession? session;
+  String openRouterKey = '';
+  bool loaded = false;
+  bool managedAiAvailable = false;
+  String _activityDate = '';
+  int _navigationSessions = 0;
+  int _messagesSent = 0;
+  int _aiReflections = 0;
+  DateTime? _lastAssistantActivityAt;
+
+  bool get hasProviderKey => openRouterKey.trim().isNotEmpty;
+  bool get aiAvailable => managedAiAvailable || hasProviderKey;
+  bool get hasAssistantActivityToday =>
+      navigationSessions > 0 || messagesSent > 0 || aiReflections > 0;
+  int get navigationSessions =>
+      _activityDate == _todayKey() ? _navigationSessions : 0;
+  int get messagesSent => _activityDate == _todayKey() ? _messagesSent : 0;
+  int get aiReflections => _activityDate == _todayKey() ? _aiReflections : 0;
+  DateTime? get lastAssistantActivityAt =>
+      _activityDate == _todayKey() ? _lastAssistantActivityAt : null;
+
+  void setManagedAiAvailable(bool value) {
+    managedAiAvailable = value;
+    notifyListeners();
+  }
+
+  Future<void> load() async {
+    try {
+      final values = await Future.wait([
+        _storage.read(key: _tokenKey),
+        _storage.read(key: _nameKey),
+        _storage.read(key: _emailKey),
+        _storage.read(key: _providerKey),
+        _storage.read(key: _assistantActivityKey),
+      ]);
+      if ((values[0] ?? '').isNotEmpty) {
+        session = AccountSession(
+          token: values[0]!,
+          displayName: values[1] ?? 'Navigator',
+          email: values[2] ?? '',
+        );
+      }
+      openRouterKey = values[3] ?? '';
+      if ((values[4] ?? '').isNotEmpty) {
+        final activity = jsonDecode(values[4]!) as Map<String, dynamic>;
+        _activityDate = activity['date']?.toString() ?? '';
+        _navigationSessions = activity['navigation_sessions'] as int? ?? 0;
+        _messagesSent = activity['messages_sent'] as int? ?? 0;
+        _aiReflections = activity['ai_reflections'] as int? ?? 0;
+        _lastAssistantActivityAt = DateTime.tryParse(
+          activity['last_activity_at']?.toString() ?? '',
+        );
+      }
+    } catch (_) {
+      // Secure storage can be unavailable in some test harnesses. The app stays fail-closed.
+    }
+    loaded = true;
+    notifyListeners();
+  }
+
+  Future<void> recordAssistantMessage({required bool startsSession}) async {
+    _rollActivityDayIfNeeded();
+    if (startsSession) _navigationSessions++;
+    _messagesSent++;
+    _lastAssistantActivityAt = DateTime.now();
+    notifyListeners();
+    await _persistAssistantActivity();
+  }
+
+  Future<void> recordAiReflection() async {
+    _rollActivityDayIfNeeded();
+    _aiReflections++;
+    _lastAssistantActivityAt = DateTime.now();
+    notifyListeners();
+    await _persistAssistantActivity();
+  }
+
+  void _rollActivityDayIfNeeded() {
+    final today = _todayKey();
+    if (_activityDate == today) return;
+    _activityDate = today;
+    _navigationSessions = 0;
+    _messagesSent = 0;
+    _aiReflections = 0;
+    _lastAssistantActivityAt = null;
+  }
+
+  Future<void> _persistAssistantActivity() async {
+    try {
+      await _storage.write(
+        key: _assistantActivityKey,
+        value: jsonEncode({
+          'date': _activityDate,
+          'navigation_sessions': _navigationSessions,
+          'messages_sent': _messagesSent,
+          'ai_reflections': _aiReflections,
+          'last_activity_at': _lastAssistantActivityAt?.toIso8601String(),
+        }),
+      );
+    } catch (_) {
+      // The in-memory counters remain usable if secure storage is unavailable.
+    }
+  }
+
+  static String _todayKey() {
+    final now = DateTime.now();
+    return '${now.year.toString().padLeft(4, '0')}-'
+        '${now.month.toString().padLeft(2, '0')}-'
+        '${now.day.toString().padLeft(2, '0')}';
+  }
+
+  Future<void> setSession(AccountSession value) async {
+    session = value;
+    await _storage.write(key: _tokenKey, value: value.token);
+    await _storage.write(key: _nameKey, value: value.displayName);
+    await _storage.write(key: _emailKey, value: value.email);
+    notifyListeners();
+  }
+
+  void useLocalDemo() {
+    session = const AccountSession(
+      token: '',
+      displayName: 'Local Navigator',
+      email: 'Local demo',
+    );
+    notifyListeners();
+  }
+
+  Future<void> saveProviderKey(String value) async {
+    openRouterKey = value.trim();
+    if (openRouterKey.isEmpty) {
+      await _storage.delete(key: _providerKey);
+    } else {
+      await _storage.write(key: _providerKey, value: openRouterKey);
+    }
+    notifyListeners();
+  }
+
+  Future<void> signOut() async {
+    session = null;
+    _activityDate = '';
+    _navigationSessions = 0;
+    _messagesSent = 0;
+    _aiReflections = 0;
+    _lastAssistantActivityAt = null;
+    await Future.wait([
+      _storage.delete(key: _tokenKey),
+      _storage.delete(key: _nameKey),
+      _storage.delete(key: _emailKey),
+      _storage.delete(key: _assistantActivityKey),
+    ]);
+    notifyListeners();
+  }
+}

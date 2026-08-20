@@ -1,0 +1,71 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: mind-nav-api
+  namespace: mind-nav
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mind-nav-api
+  namespace: mind-nav
+spec:
+  selector:
+    app: mind-nav-api
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mind-nav-api
+  namespace: mind-nav
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: mind-nav-api
+  template:
+    metadata:
+      labels:
+        app: mind-nav-api
+    spec:
+      serviceAccountName: mind-nav-api
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: api
+          image: REPLACE_WITH_IMMUTABLE_IMAGE
+          imagePullPolicy: IfNotPresent
+          ports: [{name: http, containerPort: 8080}]
+          env:
+            - name: MIND_NAV_ENV
+              value: production
+          envFrom:
+            - secretRef:
+                name: mind-nav-runtime
+          resources:
+            requests: {cpu: 100m, memory: 256Mi}
+            limits: {cpu: "1", memory: 768Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          readinessProbe:
+            httpGet: {path: /healthz, port: http}
+          livenessProbe:
+            httpGet: {path: /healthz, port: http}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: mind-nav-api
+  namespace: mind-nav
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels: {app: mind-nav-api}

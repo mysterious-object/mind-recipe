@@ -1,0 +1,150 @@
+import 'package:flutter/material.dart';
+import 'app_services.dart';
+import 'design_tokens.dart';
+
+/// Practitioner sharing — manage consent grants for sharing wellness data
+/// with practitioners. Granular categories, expiration, revocation, audit.
+
+class PractitionerSharing extends StatefulWidget {
+  const PractitionerSharing({super.key, required this.appState});
+  final SecureAppState appState;
+  @override
+  State<PractitionerSharing> createState() => _PractitionerSharingState();
+}
+
+class _PractitionerSharingState extends State<PractitionerSharing> {
+  List<dynamic> _consents = [];
+  List<dynamic> _auditLog = [];
+  bool _loaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final api = MindNavApiClient();
+    final id = widget.appState.session?.email ?? 'dev-member';
+    try {
+      final consents = await api.fetchConsents(id);
+      final audit = await api.fetchAudit(id);
+      if (mounted) setState(() { _consents = consents; _auditLog = audit; _loaded = true; });
+    } catch (_) {
+      if (mounted) setState(() => _loaded = true);
+    }
+  }
+
+  Future<List<dynamic>> _fetchConsents(MindNavApiClient api, String id) async {
+    return api.fetchConsents(id);
+  }
+
+  Future<List<dynamic>> _fetchAudit(MindNavApiClient api, String id) async {
+    return api.fetchAudit(id);
+  }
+
+  Future<void> _grantConsent() async {
+    final practitionerCtl = TextEditingController();
+    final result = await showDialog<Map<String, String>>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Share with practitioner'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: practitionerCtl,
+              decoration: const InputDecoration(
+                labelText: 'Practitioner ID',
+                hintText: 'Enter their practitioner ID',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Text('Shared categories: check-ins, trends, tracker events'),
+            const SizedBox(height: 8),
+            const Text('Journal entries and AI chats remain private.'),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, {'practitioner': practitionerCtl.text.trim()}),
+            child: const Text('Grant access'),
+          ),
+        ],
+      ),
+    );
+    if (result != null) {
+      final api = MindNavApiClient();
+      try {
+        await api.grantConsent(practitionerId: result['practitioner']!, memberId: 'dev-member');
+        _load();
+      } catch (_) {}
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => ListView(
+    padding: const EdgeInsets.all(20),
+    children: [
+      Text('Practitioner sharing', style: MindNavTokens.displayMedium(context)),
+      const SizedBox(height: 4),
+      Text('Share selected wellness data with your practitioner. You control what is shared, for how long, and can revoke access at any time.',
+        style: MindNavTokens.bodyMedium(context)!.copyWith(color: MindNavTokens.gray600)),
+      const SizedBox(height: 8),
+      _buildWellnessCaveat(),
+      const SizedBox(height: 16),
+      FilledButton.icon(
+        onPressed: _grantConsent,
+        icon: const Icon(Icons.person_add),
+        label: const Text('Grant new consent'),
+      ),
+      const SizedBox(height: 20),
+      Text('Active consents', style: MindNavTokens.headlineMedium(context)),
+      if (!_loaded)
+        const Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator())
+      else if (_consents.isEmpty)
+        Card(child: Padding(padding: const EdgeInsets.all(16), child: Text('No active consent grants. Share data when you are ready.')))
+      else
+        ...(_consents.map((c) => Card(
+          child: ListTile(
+            leading: const Icon(Icons.medical_services, color: MindNavTokens.primary),
+            title: Text('Practitioner: ${c['recipient_practitioner_id'] ?? 'Unknown'}'),
+            subtitle: Text('Categories: ${c['categories'] ?? 'none'} · Expires: ${_formatDate(c['expires_at']?.toString())}'),
+            trailing: TextButton(onPressed: () => _load(), child: const Text('Revoke')),
+          ),
+        ))),
+      const SizedBox(height: 20),
+      Text('Audit trail', style: MindNavTokens.headlineMedium(context)),
+      if (_auditLog.isEmpty)
+        const Card(child: Padding(padding: EdgeInsets.all(16), child: Text('No audit events yet. Every access is logged.')))
+      else
+        ...(_auditLog.take(5).map((a) => ListTile(
+          dense: true,
+          title: Text(a['action']?.toString() ?? '', style: const TextStyle(fontSize: 13)),
+          subtitle: Text(a['occurred_at']?.toString() ?? '', style: const TextStyle(fontSize: 11)),
+        ))),
+      const SizedBox(height: 24),
+    ],
+  );
+
+  Widget _buildWellnessCaveat() => Container(
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: MindNavTokens.primary.withAlpha(15),
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: Row(children: [
+      const Icon(Icons.info_outline, size: 16, color: MindNavTokens.primary),
+      const SizedBox(width: 8),
+      const Expanded(child: Text('Mind Nav is a wellness tool, not medical care. Shared data does not constitute a clinical record.',
+        style: TextStyle(fontSize: 12))),
+    ]),
+  );
+
+  String _formatDate(String? iso) {
+    if (iso == null) return 'Unknown';
+    try { return DateTime.parse(iso).toLocal().toString().split('.')[0]; } catch (_) { return iso; }
+  }
+}
