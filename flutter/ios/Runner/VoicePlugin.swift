@@ -33,8 +33,8 @@ class VoicePlugin: NSObject, FlutterPlugin, FlutterStreamHandler, SFSpeechRecogn
                 result(false)
                 return
             }
-            let rate = (args["rate"] as? Double ?? 0.5) as Float
-            let pitch = (args["pitch"] as? Double ?? 1.0) as Float
+            let rate = Float(args["rate"] as? Double ?? 0.5)
+            let pitch = Float(args["pitch"] as? Double ?? 1.0)
             speakText(text: text, rate: rate, pitch: pitch)
             result(true)
         case "stopSpeaking":
@@ -109,11 +109,13 @@ class VoicePlugin: NSObject, FlutterPlugin, FlutterStreamHandler, SFSpeechRecogn
         tts?.speak(utterance)
     }
     
-    func onListen(arguments: Any?, eventSink: FlutterEventSink?) {
-        self.eventSink = eventSink
+    func onListen(withArguments arguments: Any?, eventSink events: @escaping FlutterEventSink) -> FlutterError? {
+        self.eventSink = events
+        return nil
     }
     
-    func onCancel(arguments: Any?) {
+    func onCancel(withArguments arguments: Any?) -> FlutterError? {
         self.eventSink = nil
+        return nil
     }
 }
