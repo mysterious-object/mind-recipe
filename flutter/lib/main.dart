@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -694,11 +696,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
     OnDeviceStatus.checking,
   );
   bool _modelActionInProgress = false;
+  Timer? _progressTimer;
 
   @override
   void initState() {
     super.initState();
     _refreshPrivateModel();
+    _progressTimer = Timer.periodic(const Duration(milliseconds: 500), (_) {
+      if (!mounted) return;
+      // Poll while auto-downloading in background so progress bar shows
+      if (_privateModel.status == OnDeviceStatus.downloading ||
+          _privateModel.status == OnDeviceStatus.verifying ||
+          _privateModel.status == OnDeviceStatus.notInstalled ||
+          _privateModel.status == OnDeviceStatus.checking) {
+        _refreshPrivateModel();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _progressTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _refreshPrivateModel() async {
