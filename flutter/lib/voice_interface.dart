@@ -8,6 +8,15 @@ import 'package:path_provider/path_provider.dart';
 
 import 'app_services.dart';
 
+Future<void> _voiceLog(String msg) async {
+  try {
+    final dir = await getExternalStorageDirectory() ?? await getApplicationDocumentsDirectory();
+    final file = File('${dir.path}/mindnav_debug.log');
+    final timestamp = DateTime.now().toIso8601String();
+    await file.writeAsString('$timestamp [VOICE] $msg\n', mode: FileMode.append);
+  } catch (_) {}
+}
+
 /// Voice interface for Mind Nav — native recognition and interruptible audio.
 class VoiceInterface {
   static final VoiceInterface _instance = VoiceInterface._();
@@ -92,22 +101,27 @@ class VoiceInterface {
     final epoch = ++_speechEpoch;
     _isSpeaking = true;
     try {
+      await _voiceLog('speakAndWait called len=${text.length}');
       final rendered = await MindNavApiClient().synthesizeVoice(
         text,
         speed: 0.97,
       );
-      if (_speechEpoch != epoch) return false;
+      if (_speechEpoch != epoch) { await _voiceLog('epoch mismatch after synthesize'); return false; }
       final audio = rendered['audio_base64']?.toString();
-      if (audio == null || audio.isEmpty) return false;
+      if (audio == null || audio.isEmpty) { await _voiceLog('no audio_base64 in response'); return false; }
+      await _voiceLog('audio received base64_len=${audio.length}');
       final folder = await getTemporaryDirectory();
       final file = File('${folder.path}/mind_nav_companion.mp3');
       await file.writeAsBytes(base64Decode(audio), flush: true);
-      if (_speechEpoch != epoch) return false;
-      return await _channel.invokeMethod<bool>('playAudioAndWait', {
+      if (_speechEpoch != epoch) { await _voiceLog('epoch mismatch after write'); return false; }
+      final played = await _channel.invokeMethod<bool>('playAudioAndWait', {
             'path': file.path,
           }) ??
           false;
+      await _voiceLog('playAudioAndWait result=$played');
+      return played;
     } catch (error) {
+      await _voiceLog('ERROR: $error');
       debugPrint('Mind Nav voice rendering error: $error');
       return false;
     } finally {

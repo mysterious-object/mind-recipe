@@ -11,6 +11,7 @@ import 'dart:io';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:llama_cpp_dart/llama_cpp_dart.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -83,13 +84,13 @@ class OnDeviceModelManifest {
 /// Mobile-first reasoning model. It is deliberately downloaded only after an
 /// explicit member action; it is never bundled in the app.
 final mindNavPrivateModel = OnDeviceModelManifest(
-  id: 'mind-nav-private-reasoning-qwen3-4b-q4km',
-  version: '2026.08.20-qwen3-4b-q4km',
+  id: 'mind-nav-private-reasoning-qwen3-1.7b-q4km',
+  version: '2026.08.20-qwen3-1.7b-q4km',
   downloadUri: Uri.parse(
-    'https://huggingface.co/ggml-org/Qwen3-4B-GGUF/resolve/main/Qwen3-4B-Q4_K_M.gguf',
+    'https://huggingface.co/ggml-org/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q4_K_M.gguf',
   ),
-  sha256: 'ab27b9bfa375a178d6cba48f3ad892b94b7739659dcc7aae8058ce0ffed6b328',
-  sizeBytes: 2497280640,
+  sha256: 'd2387ca2dbfee2ffabce7120d3770dadca0b293052bc2f0e138fdc940d9bc7b5',
+  sizeBytes: 1282439264,
   license: 'Apache-2.0',
 );
 
@@ -145,12 +146,19 @@ class OnDeviceInference implements LocalInference {
       }
       if (!await file.exists() || await file.length() == 0) {
         _disposeEngine();
-        return _set(
-          const LocalInferenceSnapshot(
-            OnDeviceStatus.notInstalled,
-            detail: 'Private model is not installed on this device.',
-          ),
+        final snapshot = const LocalInferenceSnapshot(
+          OnDeviceStatus.notInstalled,
+          detail: 'Private model is not installed on this device.',
         );
+        _set(snapshot);
+        // Background auto-download so PRIVATE is ready by first launch —
+        // matches other companies' bootstrap: small APK + Wi-Fi asset fetch.
+        Future.delayed(const Duration(seconds: 2), () {
+          if (_snapshot.status == OnDeviceStatus.notInstalled) {
+            installModel().catchError((_) {});
+          }
+        });
+        return snapshot;
       }
       final device = await MindNavDeviceHarness().capabilities();
       if (device.totalMemoryMiB != null &&
@@ -201,11 +209,14 @@ class OnDeviceInference implements LocalInference {
     try {
       if (await temporary.exists()) await temporary.delete();
       final client = HttpClient()..autoUncompress = true;
+      client.connectionTimeout = const Duration(seconds: 30);
       final request = await client.getUrl(mindNavPrivateModel.downloadUri);
       request.followRedirects = true;
-      request.maxRedirects = 5;
+      request.maxRedirects = 8;
+      request.headers.set('User-Agent', 'MindNav/1.0 (Flutter; +https://mindnav.app)');
+      request.headers.set('Accept', '*/*');
       final response = await request.close().timeout(
-        const Duration(minutes: 12),
+        const Duration(minutes: 30),
       );
       if (response.statusCode != HttpStatus.ok) {
         client.close(force: true);
@@ -318,8 +329,8 @@ class OnDeviceInference implements LocalInference {
       ..mainGpu = -1;
     final context = ContextParams()
       ..nCtx = 2048
-      ..nBatch = 384
-      ..nUbatch = 384
+      ..nBatch = 512
+      ..nUbatch = 512
       ..nThreads = 6
       ..nThreadsBatch = 6
       ..nPredict = 220

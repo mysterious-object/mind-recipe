@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'app_services.dart';
@@ -15,6 +16,8 @@ import 'mind_nav_agent.dart';
 import 'on_device_inference.dart';
 import 'voice_interface.dart';
 import 'conversation_viz.dart';
+
+const _voiceConversationKey = 'mind_nav_voice_conversation_enabled';
 
 class MindNavChatExperience extends StatefulWidget {
   const MindNavChatExperience({
@@ -78,6 +81,14 @@ class _MindNavChatExperienceState extends State<MindNavChatExperience>
     _startActivityTimer();
     _localInference = widget.localInference ?? OnDeviceInference();
     unawaited(_refreshLocalStatus());
+    unawaited(_loadVoiceConversationPreference());
+  }
+
+  Future<void> _loadVoiceConversationPreference() async {
+    try {
+      final value = await const FlutterSecureStorage().read(key: _voiceConversationKey);
+      if (mounted && value == 'true') setState(() => _voiceConversationEnabled = true);
+    } catch (_) {}
   }
 
   Future<void> _refreshLocalStatus() async {
@@ -447,6 +458,9 @@ class _MindNavChatExperienceState extends State<MindNavChatExperience>
   Future<void> _toggleVoiceConversation() async {
     final enabled = !_voiceConversationEnabled;
     setState(() => _voiceConversationEnabled = enabled);
+    try {
+      await const FlutterSecureStorage().write(key: _voiceConversationKey, value: enabled.toString());
+    } catch (_) {}
     if (!enabled) {
       await VoiceInterface().stopSpeaking();
       if (_isListening) await VoiceInterface().stopListening();
