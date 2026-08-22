@@ -704,10 +704,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _refreshPrivateModel();
     _progressTimer = Timer.periodic(const Duration(milliseconds: 500), (_) {
       if (!mounted) return;
-      // Poll while auto-downloading in background so progress bar shows
+      // While downloading/verifying, just repaint progress from the
+      // singleton — calling refreshStatus would risk resetting `downloading`
+      // → `notInstalled` while .partial is still growing (tab-switch bug).
       if (_privateModel.status == OnDeviceStatus.downloading ||
-          _privateModel.status == OnDeviceStatus.verifying ||
-          _privateModel.status == OnDeviceStatus.notInstalled ||
+          _privateModel.status == OnDeviceStatus.verifying) {
+        if (mounted) setState(() {});
+        return;
+      }
+      if (_privateModel.status == OnDeviceStatus.notInstalled ||
           _privateModel.status == OnDeviceStatus.checking) {
         _refreshPrivateModel();
       }

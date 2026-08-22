@@ -136,6 +136,13 @@ class OnDeviceInference implements LocalInference {
   @override
   Future<LocalInferenceSnapshot> refreshStatus() async {
     if (_refreshing) return _snapshot;
+    // Do not clobber an active download/verify — the UI timer polls this
+    // every 500ms and would otherwise reset `downloading` → `notInstalled`
+    // while the .partial file is still being written (tab switch bug).
+    if (_snapshot.status == OnDeviceStatus.downloading ||
+        _snapshot.status == OnDeviceStatus.verifying) {
+      return _snapshot;
+    }
     _refreshing = true;
     try {
       final file = await _modelFile();
@@ -143,6 +150,13 @@ class OnDeviceInference implements LocalInference {
       final stalePartialReceipt = await _verificationReceipt(partial);
       if (!await partial.exists() && await stalePartialReceipt.exists()) {
         await stalePartialReceipt.delete();
+      }
+      // If a .partial exists with bytes, we are mid-download — report downloading
+      // so the progress bar survives tab switches / PageView rebuilds.
+      if (await partial.exists() && await partial.length() > 0) {
+        // Keep the existing snapshot if it already reflects downloading
+        if (_snapshot.status == OnDeviceStatus.downloading) return _snapshot;
+        return _set(const LocalInferenceSnapshot(OnDeviceStatus.downloading));
       }
       if (!await file.exists() || await file.length() == 0) {
         _disposeEngine();
@@ -203,11 +217,27 @@ class OnDeviceInference implements LocalInference {
     // Connectivity policy is owned by the caller; this method remains explicit
     // about the requested cellular permission for the future scheduler.
     _set(const LocalInferenceSnapshot(OnDeviceStatus.downloading));
-    _downloadProgress = 0;
     final destination = await _modelFile();
     final temporary = File('${destination.path}.partial');
+    // Resume support: keep .partial and use Range header so tab switches
+    // or brief backgrounding don't discard 1+ GB already fetched.
+    var resumeOffset = 0;
+    if (await temporary.exists()) {
+      resumeOffset = await temporary.length();
+      // If partial is already complete size, don't re-download — go to verify
+      if (resumeOffset >= mindNavPrivateModel.sizeBytes) {
+        _downloadProgress = 1.0;
+      } else if (resumeOffset > 0) {
+        _downloadProgress = resumeOffset / mindNavPrivateModel.sizeBytes;
+      } else {
+        _downloadProgress = 0;
+      }
+    } else {
+      _downloadProgress = 0;
+    }
+    // If we are resuming, keep the file; otherwise start fresh
+    var isResume = resumeOffset > 0 && resumeOffset < mindNavPrivateModel.sizeBytes;
     try {
-      if (await temporary.exists()) await temporary.delete();
       final client = HttpClient()..autoUncompress = true;
       client.connectionTimeout = const Duration(seconds: 30);
       final request = await client.getUrl(mindNavPrivateModel.downloadUri);
@@ -215,18 +245,31 @@ class OnDeviceInference implements LocalInference {
       request.maxRedirects = 8;
       request.headers.set('User-Agent', 'MindNav/1.0 (Flutter; +https://mindnav.app)');
       request.headers.set('Accept', '*/*');
+      if (isResume) {
+        request.headers.set('Range', 'bytes=$resumeOffset-');
+      }
       final response = await request.close().timeout(
         const Duration(minutes: 30),
       );
-      if (response.statusCode != HttpStatus.ok) {
+      // 206 = Partial Content (resume), 200 = OK (fresh)
+      if (response.statusCode != HttpStatus.ok &&
+          response.statusCode != HttpStatus.partialContent) {
         client.close(force: true);
         throw HttpException('Model download returned ${response.statusCode}.');
       }
-      final expected = response.contentLength > 0
-          ? response.contentLength
+      // If server ignored Range and returned 200, restart from 0
+      if (isResume && response.statusCode == HttpStatus.ok) {
+        await temporary.delete();
+        resumeOffset = 0;
+        _downloadProgress = 0;
+        isResume = false;
+      }
+      final contentLen = response.contentLength;
+      final expected = contentLen > 0
+          ? (isResume ? resumeOffset + contentLen : contentLen)
           : mindNavPrivateModel.sizeBytes;
-      var received = 0;
-      final sink = temporary.openWrite();
+      var received = resumeOffset;
+      final sink = temporary.openWrite(mode: isResume ? FileMode.append : FileMode.write);
       await for (final bytes in response) {
         received += bytes.length;
         sink.add(bytes);
