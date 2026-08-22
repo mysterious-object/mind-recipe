@@ -43,7 +43,7 @@ class VoicePlugin: NSObject, FlutterPlugin, FlutterStreamHandler, SFSpeechRecogn
             playAudio(path: path, wait: call.method == "playAudioAndWait", result: result)
         case "speakWithSystemTts", "speakWithSystemTtsAndWait", "speak":
             let args = call.arguments as? [String: Any]
-            speakText(text: args?["text"] as? String ?? "", rate: Float(args?["rate"] as? Double ?? 0.5), result: result)
+            speakText(text: args?["text"] as? String ?? "", rate: Float(args?["rate"] as? Double ?? 0.5), language: args?["language"] as? String ?? "en-GB", result: result)
         case "stopSpeaking":
             tts.stopSpeaking(at: .immediate)
             stopAudioPlayback()
@@ -148,12 +148,12 @@ class VoicePlugin: NSObject, FlutterPlugin, FlutterStreamHandler, SFSpeechRecogn
         if let callback = audioResult { audioResult = nil; callback(flag) }
     }
 
-    private func speakText(text: String, rate: Float, result: @escaping FlutterResult) {
+    private func speakText(text: String, rate: Float, language: String, result: @escaping FlutterResult) {
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { result(FlutterError(code: "EMPTY_TEXT", message: "No text to speak", details: nil)); return }
         tts.stopSpeaking(at: .immediate)
         if let callback = ttsResult { ttsResult = nil; callback(false) }
         let utterance = AVSpeechUtterance(string: text)
-        utterance.voice = AVSpeechSynthesisVoice(language: "en-US")
+        utterance.voice = AVSpeechSynthesisVoice(language: language) ?? AVSpeechSynthesisVoice(language: "en-GB")
         utterance.rate = min(max(rate, AVSpeechUtteranceMinimumSpeechRate), AVSpeechUtteranceMaximumSpeechRate)
         ttsResult = result
         tts.speak(utterance)

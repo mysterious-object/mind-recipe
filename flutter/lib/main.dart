@@ -1009,86 +1009,83 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     : _privateModel.detail ?? 'Choose a verified model below. Nothing downloads until you choose Install.',
               ),
             ),
-            if (!_privateModel.isReady)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Available private models',
-                      style: TextStyle(fontWeight: FontWeight.w700),
-                    ),
-                    const SizedBox(height: 8),
-                    ...mindNavPrivateModelChoices.map(
-                      (choice) => InkWell(
-                        borderRadius: BorderRadius.circular(12),
-                        onTap: _modelActionInProgress
-                            ? null
-                            : () => setState(
-                                () => _selectedPrivateChoice = choice,
-                              ),
-                        child: Container(
-                          width: double.infinity,
-                          margin: const EdgeInsets.only(bottom: 8),
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            border: Border.all(
-                              color: Theme.of(context).colorScheme.primary,
-                            ),
-                            borderRadius: BorderRadius.circular(12),
-                            color:
-                                choice.manifest.id ==
-                                    _selectedPrivateChoice.manifest.id
-                                ? Theme.of(context).colorScheme.primaryContainer
-                                      .withOpacity(0.34)
-                                : null,
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Available private models',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 8),
+                  ...mindNavPrivateModelChoices.map(
+                    (choice) => InkWell(
+                      borderRadius: BorderRadius.circular(12),
+                      onTap: _modelActionInProgress
+                          ? null
+                          : () =>
+                                setState(() => _selectedPrivateChoice = choice),
+                      child: Container(
+                        width: double.infinity,
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: Theme.of(context).colorScheme.primary,
                           ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      choice.name,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w700,
-                                      ),
+                          borderRadius: BorderRadius.circular(12),
+                          color:
+                              choice.manifest.id ==
+                                  _selectedPrivateChoice.manifest.id
+                              ? Theme.of(context).colorScheme.primaryContainer
+                                    .withOpacity(0.34)
+                              : null,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    choice.name,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w700,
                                     ),
                                   ),
-                                  if (choice.recommended)
-                                    const Chip(label: Text('Recommended')),
-                                  Radio<OnDeviceModelChoice>(
-                                    value: choice,
-                                    groupValue: _selectedPrivateChoice,
-                                    onChanged: _modelActionInProgress
-                                        ? null
-                                        : (value) => setState(
-                                            () =>
-                                                _selectedPrivateChoice = value!,
-                                          ),
-                                  ),
-                                ],
-                              ),
-                              Text(choice.quality),
-                              const SizedBox(height: 3),
-                              Text(
-                                '${choice.bestFor}\n${choice.memoryNote}',
-                                style: Theme.of(context).textTheme.bodySmall,
-                              ),
-                            ],
-                          ),
+                                ),
+                                if (choice.recommended)
+                                  const Chip(label: Text('Recommended')),
+                                Radio<OnDeviceModelChoice>(
+                                  value: choice,
+                                  groupValue: _selectedPrivateChoice,
+                                  onChanged: _modelActionInProgress
+                                      ? null
+                                      : (value) => setState(
+                                          () => _selectedPrivateChoice = value!,
+                                        ),
+                                ),
+                              ],
+                            ),
+                            Text(choice.quality),
+                            const SizedBox(height: 3),
+                            Text(
+                              '${choice.bestFor}\n${choice.memoryNote}',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ],
                         ),
                       ),
                     ),
-                    Text(
-                      'Every option listed here is downloaded only after you tap Install and is verified before it can run.',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ],
-                ),
+                  ),
+                  Text(
+                    'Every option listed here is downloaded only after you tap Install and is verified before it can run.',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
               ),
+            ),
             if (_modelActionInProgress ||
                 _privateModel.status == OnDeviceStatus.downloading ||
                 _privateModel.status == OnDeviceStatus.verifying)
@@ -1115,7 +1112,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
             const Divider(height: 1),
             ButtonBar(
               children: [
-                if (_privateModel.isReady)
+                if (_privateModel.isReady &&
+                    _selectedPrivateChoice.manifest.id !=
+                        OnDeviceInference().activeModel.id)
+                  FilledButton.icon(
+                    onPressed: _modelActionInProgress
+                        ? null
+                        : _installPrivateModel,
+                    icon: const Icon(Icons.swap_horiz_rounded),
+                    label: Text('Switch to ${_selectedPrivateChoice.name}'),
+                  )
+                else if (_privateModel.isReady)
                   TextButton.icon(
                     onPressed: _modelActionInProgress
                         ? null

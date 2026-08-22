@@ -78,7 +78,7 @@ class VoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamHandler
         textToSpeech = TextToSpeech(binding.applicationContext) { status ->
             ttsReady = status == TextToSpeech.SUCCESS
             if (ttsReady) {
-                textToSpeech?.language = Locale.US
+                textToSpeech?.language = Locale.UK
                 textToSpeech?.setSpeechRate(0.95f)
                 Log.i(LOG_TAG, "system TTS ready")
             } else {
@@ -119,11 +119,13 @@ class VoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamHandler
             "speakWithSystemTts" -> speakWithSystemTts(
                 call.argument<String>("text") ?: "",
                 call.argument<Double>("rate")?.toFloat() ?: 0.95f,
+                call.argument<String>("language") ?: "en-GB",
                 result
             )
             "speakWithSystemTtsAndWait" -> speakWithSystemTts(
                 call.argument<String>("text") ?: "",
                 call.argument<Double>("rate")?.toFloat() ?: 0.95f,
+                call.argument<String>("language") ?: "en-GB",
                 result
             )
             "getLanguages" -> result.success(listOf("en-US", "en-GB", "es-ES", "fr-FR", "de-DE"))
@@ -325,7 +327,7 @@ class VoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamHandler
         completeAudioPlayback(false)
     }
 
-    private fun speakWithSystemTts(text: String, rate: Float, result: Result) {
+    private fun speakWithSystemTts(text: String, rate: Float, language: String, result: Result) {
         if (text.isBlank()) {
             result.error("EMPTY_TEXT", "No text to speak", null)
             return
@@ -355,7 +357,9 @@ class VoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamHandler
                 }
             })
             tts.setSpeechRate(rate.coerceIn(0.5f, 2.0f))
-            tts.language = Locale.US
+            val locale = Locale.forLanguageTag(language)
+            tts.language = if (tts.isLanguageAvailable(locale) >= TextToSpeech.LANG_AVAILABLE) locale else Locale.UK
+            tts.voices?.firstOrNull { it.locale.language == "en" && it.locale.country == "GB" }?.let { tts.voice = it }
             val speakResult = tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, utteranceId)
             if (speakResult == TextToSpeech.ERROR) {
                 completeTtsPlayback(false)

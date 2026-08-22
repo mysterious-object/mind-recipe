@@ -10,10 +10,15 @@ import 'app_services.dart';
 
 Future<void> _voiceLog(String msg) async {
   try {
-    final dir = await getExternalStorageDirectory() ?? await getApplicationDocumentsDirectory();
+    final dir =
+        await getExternalStorageDirectory() ??
+        await getApplicationDocumentsDirectory();
     final file = File('${dir.path}/mindnav_debug.log');
     final timestamp = DateTime.now().toIso8601String();
-    await file.writeAsString('$timestamp [VOICE] $msg\n', mode: FileMode.append);
+    await file.writeAsString(
+      '$timestamp [VOICE] $msg\n',
+      mode: FileMode.append,
+    );
   } catch (_) {}
 }
 
@@ -127,7 +132,8 @@ class VoiceInterface {
             await _voiceLog('epoch mismatch after write');
             return false;
           }
-          final played = await _channel.invokeMethod<bool>('playAudioAndWait', {
+          final played =
+              await _channel.invokeMethod<bool>('playAudioAndWait', {
                 'path': file.path,
               }) ??
               false;
@@ -135,19 +141,23 @@ class VoiceInterface {
           if (played) return true;
           await _voiceLog('cloud play failed, falling back to system TTS');
         } else {
-          await _voiceLog('no audio_base64 in response, falling back to system TTS');
+          await _voiceLog(
+            'no audio_base64 in response, falling back to system TTS',
+          );
         }
       } catch (error) {
-        await _voiceLog('cloud voice failed: $error, falling back to system TTS');
+        await _voiceLog(
+          'cloud voice failed: $error, falling back to system TTS',
+        );
       }
       // 2. Offline fallback — Android TextToSpeech (no network, works after
       // verifying or when staging API is unreachable)
       if (_speechEpoch != epoch) return false;
       await _voiceLog('trying system TTS offline len=${text.length}');
-      final ok = await _channel.invokeMethod<bool>('speakWithSystemTtsAndWait', {
-        'text': text,
-        'rate': 0.95,
-      });
+      final ok = await _channel.invokeMethod<bool>(
+        'speakWithSystemTtsAndWait',
+        {'text': text, 'rate': 0.95, 'language': 'en-GB'},
+      );
       await _voiceLog('system TTS result=$ok');
       return ok ?? false;
     } catch (error) {
