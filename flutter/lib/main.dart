@@ -280,11 +280,17 @@ class _MemberHomeState extends State<MemberHome> {
             ],
           ),
           body: SafeArea(
-            child: Stack(
+            child: Column(
               children: [
-                Positioned.fill(child: MindNavGpuField(progress: progress)),
-                Positioned.fill(child: MindNavFxBackdrop(progress: progress)),
-                PageView(
+                const PrivateModelDownloadBanner(),
+                Expanded(
+                  child: Stack(
+                    children: [
+                      Positioned.fill(
+                          child: MindNavGpuField(progress: progress)),
+                      Positioned.fill(
+                          child: MindNavFxBackdrop(progress: progress)),
+                      PageView(
                   controller: pageController,
                   physics: MediaQuery.disableAnimationsOf(context)
                       ? const NeverScrollableScrollPhysics()
@@ -301,6 +307,9 @@ class _MemberHomeState extends State<MemberHome> {
               ],
             ),
           ),
+        ],
+      ),
+          ),
           bottomNavigationBar: MindNavPageRail(
             labels: labels,
             icons: icons,
@@ -311,6 +320,132 @@ class _MemberHomeState extends State<MemberHome> {
           ),
         );
       },
+    );
+  }
+}
+
+/// Persistent banner for the 1.2 GB private model so progress is visible
+/// on every tab (Today, Toolbox, Profile, etc.), not just the Profile screen.
+/// Fixes the tab-switch bug where the LinearProgressIndicator disappeared.
+class PrivateModelDownloadBanner extends StatefulWidget {
+  const PrivateModelDownloadBanner({super.key});
+  @override
+  State<PrivateModelDownloadBanner> createState() =>
+      _PrivateModelDownloadBannerState();
+}
+
+class _PrivateModelDownloadBannerState
+    extends State<PrivateModelDownloadBanner> {
+  LocalInferenceSnapshot _snap =
+      const LocalInferenceSnapshot(OnDeviceStatus.checking);
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _snap = OnDeviceInference().snapshot;
+    _timer = Timer.periodic(const Duration(milliseconds: 400), (_) {
+      if (!mounted) return;
+      final cur = OnDeviceInference().snapshot;
+      // Only repaint when status/progress actually changes to avoid spamming
+      if (cur.status != _snap.status ||
+          (cur.status == OnDeviceStatus.downloading &&
+              OnDeviceInference().downloadProgress !=
+                  (_snap.status == OnDeviceStatus.downloading
+                      ? OnDeviceInference().downloadProgress
+                      : -1))) {
+        setState(() => _snap = cur);
+      } else if (cur.status == OnDeviceStatus.downloading ||
+          cur.status == OnDeviceStatus.verifying) {
+        // Still need to tick for progress bar animation
+        setState(() => _snap = cur);
+      } else if (cur.status == OnDeviceStatus.notInstalled ||
+          cur.status == OnDeviceStatus.checking) {
+        // Keep polling for auto-start (refreshStatus is safe now — it won't
+        // clobber downloading) so banner appears as soon as download begins
+        setState(() => _snap = cur);
+      }
+    });
+    // Also seed once from refreshStatus in case a .partial already exists
+    OnDeviceInference().refreshStatus().then((s) {
+      if (mounted) setState(() => _snap = s);
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDownloading = _snap.status == OnDeviceStatus.downloading;
+    final isVerifying = _snap.status == OnDeviceStatus.verifying;
+    if (!isDownloading && !isVerifying) return const SizedBox.shrink();
+    final progress = OnDeviceInference().downloadProgress;
+    final percent = isDownloading
+        ? (progress * 100).clamp(0, 100).toStringAsFixed(0)
+        : null;
+    return Material(
+      elevation: 6,
+      color: Theme.of(context).colorScheme.surface.withOpacity(0.98),
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 8, 14, 10),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.4,
+                      value: isVerifying ? null : progress,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      isDownloading
+                          ? 'Downloading private model $percent% — stays active when switching tabs'
+                          : 'Verifying private model…',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13.5,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    isDownloading ? '${(progress * 1282).toStringAsFixed(0)} MB / 1282 MB' : '',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Theme.of(context).textTheme.bodySmall?.color
+                          ?.withOpacity(0.7),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              LinearProgressIndicator(value: isDownloading ? progress : null),
+              const SizedBox(height: 4),
+              Text(
+                'Keep the app open on Wi-Fi. You can use any tab while it downloads.',
+                style: TextStyle(
+                  fontSize: 11.5,
+                  color: Theme.of(context).textTheme.bodySmall?.color
+                      ?.withOpacity(0.68),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
