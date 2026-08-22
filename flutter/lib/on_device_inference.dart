@@ -187,7 +187,9 @@ class OnDeviceInference implements LocalInference {
         );
       }
       _set(const LocalInferenceSnapshot(OnDeviceStatus.verifying));
+      await _inferLog('verifying ${file.path}');
       if (!await _matchesManifest(file)) {
+        await _inferLog('verify failed: hash mismatch');
         _disposeEngine();
         return _set(
           const LocalInferenceSnapshot(
@@ -196,7 +198,9 @@ class OnDeviceInference implements LocalInference {
           ),
         );
       }
+      await _inferLog('verify ok, loading engine');
       if (_engine == null) await _loadEngine(file);
+      await _inferLog('engine loaded, ready');
       return _set(const LocalInferenceSnapshot(OnDeviceStatus.ready));
     } catch (error) {
       _disposeEngine();
@@ -278,6 +282,7 @@ class OnDeviceInference implements LocalInference {
       await sink.close();
       client.close(force: true);
       _set(const LocalInferenceSnapshot(OnDeviceStatus.verifying));
+      await _inferLog('verifying download ${temporary.path} (${await temporary.length()} bytes, expect ${mindNavPrivateModel.sizeBytes})');
       if (!await _matchesManifest(temporary)) {
         throw const FileSystemException(
           'Downloaded model did not match the signed manifest.',
@@ -394,8 +399,10 @@ class OnDeviceInference implements LocalInference {
         verbose: const bool.fromEnvironment('MIND_NAV_LOCAL_VERBOSE'),
       ),
     );
-    await parent.init().timeout(const Duration(seconds: 90));
+    await _inferLog('loading engine for ${file.path} (${await file.length()} bytes)');
+    await parent.init().timeout(const Duration(seconds: 150));
     _engine = parent;
+    await _inferLog('engine ready');
   }
 
   void _disposeEngine() {

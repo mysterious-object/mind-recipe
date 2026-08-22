@@ -413,7 +413,7 @@ class _PrivateModelDownloadBannerState
                     child: Text(
                       isDownloading
                           ? 'Downloading private model $percent% — stays active when switching tabs'
-                          : 'Verifying private model…',
+                          : 'Verifying 1.2 GB model — hashing (~20 s) then starting engine…',
                       style: const TextStyle(
                         fontWeight: FontWeight.w700,
                         fontSize: 13.5,
@@ -435,7 +435,9 @@ class _PrivateModelDownloadBannerState
               LinearProgressIndicator(value: isDownloading ? progress : null),
               const SizedBox(height: 4),
               Text(
-                'Keep the app open on Wi-Fi. You can use any tab while it downloads.',
+                isDownloading
+                    ? 'Keep the app open on Wi-Fi. You can use any tab while it downloads.'
+                    : 'This is normal after a 1.2 GB download — please wait ~30 s. If stuck over 2 min, try Remove and reinstall.',
                 style: TextStyle(
                   fontSize: 11.5,
                   color: Theme.of(context).textTheme.bodySmall?.color
