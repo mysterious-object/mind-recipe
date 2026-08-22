@@ -96,30 +96,58 @@ class VoiceInterface {
 
   /// Renders the current Mind Nav companion voice, then plays the completed
   /// audio through the same interruption-safe recorded-audio path.
+  /// If the cloud voice is unavailable (offline, 1.2 GB model verifying, or
+  /// API error), falls back to the offline system TTS so read-aloud still
+  /// works without the staging API.
   Future<bool> speakAndWait(String text) async {
     if (_isSpeaking) await stopSpeaking();
     final epoch = ++_speechEpoch;
     _isSpeaking = true;
     try {
       await _voiceLog('speakAndWait called len=${text.length}');
-      final rendered = await MindNavApiClient().synthesizeVoice(
-        text,
-        speed: 0.97,
-      );
-      if (_speechEpoch != epoch) { await _voiceLog('epoch mismatch after synthesize'); return false; }
-      final audio = rendered['audio_base64']?.toString();
-      if (audio == null || audio.isEmpty) { await _voiceLog('no audio_base64 in response'); return false; }
-      await _voiceLog('audio received base64_len=${audio.length}');
-      final folder = await getTemporaryDirectory();
-      final file = File('${folder.path}/mind_nav_companion.mp3');
-      await file.writeAsBytes(base64Decode(audio), flush: true);
-      if (_speechEpoch != epoch) { await _voiceLog('epoch mismatch after write'); return false; }
-      final played = await _channel.invokeMethod<bool>('playAudioAndWait', {
-            'path': file.path,
-          }) ??
-          false;
-      await _voiceLog('playAudioAndWait result=$played');
-      return played;
+      // 1. Try cloud companion voice first
+      try {
+        final rendered = await MindNavApiClient().synthesizeVoice(
+          text,
+          speed: 0.97,
+        );
+        if (_speechEpoch != epoch) {
+          await _voiceLog('epoch mismatch after synthesize');
+          return false;
+        }
+        final audio = rendered['audio_base64']?.toString();
+        if (audio != null && audio.isNotEmpty) {
+          await _voiceLog('audio received base64_len=${audio.length}');
+          final folder = await getTemporaryDirectory();
+          final file = File('${folder.path}/mind_nav_companion.mp3');
+          await file.writeAsBytes(base64Decode(audio), flush: true);
+          if (_speechEpoch != epoch) {
+            await _voiceLog('epoch mismatch after write');
+            return false;
+          }
+          final played = await _channel.invokeMethod<bool>('playAudioAndWait', {
+                'path': file.path,
+              }) ??
+              false;
+          await _voiceLog('playAudioAndWait result=$played');
+          if (played) return true;
+          await _voiceLog('cloud play failed, falling back to system TTS');
+        } else {
+          await _voiceLog('no audio_base64 in response, falling back to system TTS');
+        }
+      } catch (error) {
+        await _voiceLog('cloud voice failed: $error, falling back to system TTS');
+      }
+      // 2. Offline fallback — Android TextToSpeech (no network, works after
+      // verifying or when staging API is unreachable)
+      if (_speechEpoch != epoch) return false;
+      await _voiceLog('trying system TTS offline len=${text.length}');
+      final ok = await _channel.invokeMethod<bool>('speakWithSystemTtsAndWait', {
+        'text': text,
+        'rate': 0.95,
+      });
+      await _voiceLog('system TTS result=$ok');
+      return ok ?? false;
     } catch (error) {
       await _voiceLog('ERROR: $error');
       debugPrint('Mind Nav voice rendering error: $error');

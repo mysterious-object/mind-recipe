@@ -14,8 +14,12 @@ import android.os.SystemClock
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
+import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
 import android.util.Log
 import io.flutter.embedding.engine.plugins.FlutterPlugin
+import java.util.Locale
+import java.util.UUID
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
 import io.flutter.plugin.common.EventChannel
@@ -42,6 +46,9 @@ class VoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamHandler
     private var speechRecognizer: SpeechRecognizer? = null
     private var mediaPlayer: MediaPlayer? = null
     private var pendingAudioResult: Result? = null
+    private var textToSpeech: TextToSpeech? = null
+    private var pendingTtsResult: Result? = null
+    private var ttsReady = false
     private var eventSink: EventChannel.EventSink? = null
     private var listeningResult: Result? = null
     private var pendingLanguage = "en-US"
@@ -68,6 +75,16 @@ class VoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamHandler
         eventChannel = EventChannel(binding.binaryMessenger, "mindnav.dev/voice_stream")
         methodChannel.setMethodCallHandler(this)
         eventChannel.setStreamHandler(this)
+        textToSpeech = TextToSpeech(binding.applicationContext) { status ->
+            ttsReady = status == TextToSpeech.SUCCESS
+            if (ttsReady) {
+                textToSpeech?.language = Locale.US
+                textToSpeech?.setSpeechRate(0.95f)
+                Log.i(LOG_TAG, "system TTS ready")
+            } else {
+                Log.w(LOG_TAG, "system TTS not ready status=$status")
+            }
+        }
     }
 
     override fun onMethodCall(call: MethodCall, result: Result) {
@@ -94,10 +111,21 @@ class VoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamHandler
             }
             "stopSpeaking" -> {
                 stopAudioPlayback()
+                stopTtsPlayback()
                 result.success(true)
             }
             "playAudio" -> playAudio(call.argument<String>("path") ?: "", false, result)
             "playAudioAndWait" -> playAudio(call.argument<String>("path") ?: "", true, result)
+            "speakWithSystemTts" -> speakWithSystemTts(
+                call.argument<String>("text") ?: "",
+                call.argument<Double>("rate")?.toFloat() ?: 0.95f,
+                result
+            )
+            "speakWithSystemTtsAndWait" -> speakWithSystemTts(
+                call.argument<String>("text") ?: "",
+                call.argument<Double>("rate")?.toFloat() ?: 0.95f,
+                result
+            )
             "getLanguages" -> result.success(listOf("en-US", "en-GB", "es-ES", "fr-FR", "de-DE"))
             else -> result.notImplemented()
         }
@@ -294,6 +322,64 @@ class VoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamHandler
         completeAudioPlayback(false)
     }
 
+    private fun speakWithSystemTts(text: String, rate: Float, result: Result) {
+        if (text.isBlank()) {
+            result.error("EMPTY_TEXT", "No text to speak", null)
+            return
+        }
+        val tts = textToSpeech
+        if (tts == null || !ttsReady) {
+            Log.w(LOG_TAG, "system TTS not ready, cannot speak offline")
+            result.error("TTS_NOT_READY", "System TTS not ready", null)
+            return
+        }
+        try {
+            stopAudioPlayback()
+            stopTtsPlayback()
+            val utteranceId = UUID.randomUUID().toString()
+            pendingTtsResult = result
+            tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                override fun onStart(utteranceId: String?) {}
+                override fun onDone(doneId: String?) {
+                    if (doneId == utteranceId) completeTtsPlayback(true)
+                }
+                @Deprecated("Deprecated in Java")
+                override fun onError(utteranceId: String?) {
+                    if (utteranceId == utteranceId) completeTtsPlayback(false)
+                }
+                override fun onError(utteranceId: String?, errorCode: Int) {
+                    if (utteranceId == utteranceId) completeTtsPlayback(false)
+                }
+            })
+            tts.setSpeechRate(rate.coerceIn(0.5f, 2.0f))
+            tts.language = Locale.US
+            val speakResult = tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, utteranceId)
+            if (speakResult == TextToSpeech.ERROR) {
+                completeTtsPlayback(false)
+            }
+            // For non-wait callers, we already set pending, but if they used
+            // speakWithSystemTts (without wait) we still wait for completion
+            // to keep epoch handling consistent.
+        } catch (e: Exception) {
+            Log.e(LOG_TAG, "system TTS speak failed: ${e.message}")
+            completeTtsPlayback(false)
+        }
+    }
+
+    private fun completeTtsPlayback(completed: Boolean) {
+        val result = pendingTtsResult ?: return
+        pendingTtsResult = null
+        voiceHandler.post { result.success(completed) }
+    }
+
+    private fun stopTtsPlayback() {
+        try {
+            textToSpeech?.stop()
+        } catch (_: Exception) {}
+        // If a TTS utterance was pending, complete it as cancelled
+        if (pendingTtsResult != null) completeTtsPlayback(false)
+    }
+
     override fun onListen(arguments: Any?, events: EventChannel.EventSink?) { eventSink = events }
     override fun onCancel(arguments: Any?) { eventSink = null }
 
@@ -317,6 +403,10 @@ class VoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamHandler
         detachActivity()
         releaseRecognizer()
         stopAudioPlayback()
+        stopTtsPlayback()
+        textToSpeech?.shutdown()
+        textToSpeech = null
+        ttsReady = false
         methodChannel.setMethodCallHandler(null)
         eventChannel.setStreamHandler(null)
         context = null
