@@ -2,6 +2,8 @@ name: Mind Nav Android APK
 
 on:
   workflow_dispatch:
+  pull_request:
+    branches: ['main']
   push:
     branches: ['codex/mobile-build-*']
     tags: ['v*']
