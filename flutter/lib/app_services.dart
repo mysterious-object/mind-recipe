@@ -361,11 +361,15 @@ class SecureAppState extends ChangeNotifier {
   static const _emailKey = 'mind_nav_email';
   static const _providerKey = 'mind_nav_openrouter_key';
   static const _assistantActivityKey = 'mind_nav_assistant_activity';
+  static const _cloudAiEnabledKey = 'mind_nav_cloud_ai_enabled';
+  static const _publicResearchEnabledKey = 'mind_nav_public_research_enabled';
 
   AccountSession? session;
   String openRouterKey = '';
   bool loaded = false;
   bool managedAiAvailable = false;
+  bool cloudAiEnabled = true;
+  bool publicResearchEnabled = false;
   String _activityDate = '';
   int _navigationSessions = 0;
   int _messagesSent = 0;
@@ -396,6 +400,8 @@ class SecureAppState extends ChangeNotifier {
         _storage.read(key: _emailKey),
         _storage.read(key: _providerKey),
         _storage.read(key: _assistantActivityKey),
+        _storage.read(key: _cloudAiEnabledKey),
+        _storage.read(key: _publicResearchEnabledKey),
       ]);
       if ((values[0] ?? '').isNotEmpty) {
         session = AccountSession(
@@ -415,6 +421,8 @@ class SecureAppState extends ChangeNotifier {
           activity['last_activity_at']?.toString() ?? '',
         );
       }
+      cloudAiEnabled = values[5] != 'false';
+      publicResearchEnabled = values[6] == 'true';
     } catch (_) {
       // Secure storage can be unavailable in some test harnesses. The app stays fail-closed.
     }
@@ -498,6 +506,18 @@ class SecureAppState extends ChangeNotifier {
       await _storage.write(key: _providerKey, value: openRouterKey);
     }
     notifyListeners();
+  }
+
+  Future<void> setCloudAiEnabled(bool value) async {
+    cloudAiEnabled = value;
+    notifyListeners();
+    await _storage.write(key: _cloudAiEnabledKey, value: '$value');
+  }
+
+  Future<void> setPublicResearchEnabled(bool value) async {
+    publicResearchEnabled = value;
+    notifyListeners();
+    await _storage.write(key: _publicResearchEnabledKey, value: '$value');
   }
 
   Future<void> signOut() async {

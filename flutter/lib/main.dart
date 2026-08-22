@@ -145,7 +145,7 @@ class _MemberHomeState extends State<MemberHome> {
     'Mind Recipe',
     'Progress',
     'Booking',
-    'Profile',
+    'Settings',
   ];
   final icons = const [
     Icons.navigation,
@@ -154,7 +154,7 @@ class _MemberHomeState extends State<MemberHome> {
     Icons.menu_book,
     Icons.insights,
     Icons.calendar_month,
-    Icons.person,
+    Icons.settings,
   ];
   late final PageController pageController;
   late final ScrollController railController;
@@ -287,28 +287,30 @@ class _MemberHomeState extends State<MemberHome> {
                   child: Stack(
                     children: [
                       Positioned.fill(
-                          child: MindNavGpuField(progress: progress)),
+                        child: MindNavGpuField(progress: progress),
+                      ),
                       Positioned.fill(
-                          child: MindNavFxBackdrop(progress: progress)),
+                        child: MindNavFxBackdrop(progress: progress),
+                      ),
                       PageView(
-                  controller: pageController,
-                  physics: MediaQuery.disableAnimationsOf(context)
-                      ? const NeverScrollableScrollPhysics()
-                      : const BouncingScrollPhysics(),
-                  onPageChanged: (value) {
-                    setState(() {
-                      previousIndex = index;
-                      index = value;
-                    });
-                    revealTab(value);
-                  },
-                  children: screens,
+                        controller: pageController,
+                        physics: MediaQuery.disableAnimationsOf(context)
+                            ? const NeverScrollableScrollPhysics()
+                            : const BouncingScrollPhysics(),
+                        onPageChanged: (value) {
+                          setState(() {
+                            previousIndex = index;
+                            index = value;
+                          });
+                          revealTab(value);
+                        },
+                        children: screens,
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
-          ),
-        ],
-      ),
           ),
           bottomNavigationBar: MindNavPageRail(
             labels: labels,
@@ -324,8 +326,8 @@ class _MemberHomeState extends State<MemberHome> {
   }
 }
 
-/// Persistent banner for the 1.2 GB private model so progress is visible
-/// on every tab (Today, Toolbox, Profile, etc.), not just the Profile screen.
+/// Persistent banner for the selected private model so progress is visible
+/// on every tab (Today, Toolbox, Settings, etc.), not just the Settings tab.
 /// Fixes the tab-switch bug where the LinearProgressIndicator disappeared.
 class PrivateModelDownloadBanner extends StatefulWidget {
   const PrivateModelDownloadBanner({super.key});
@@ -336,8 +338,9 @@ class PrivateModelDownloadBanner extends StatefulWidget {
 
 class _PrivateModelDownloadBannerState
     extends State<PrivateModelDownloadBanner> {
-  LocalInferenceSnapshot _snap =
-      const LocalInferenceSnapshot(OnDeviceStatus.checking);
+  LocalInferenceSnapshot _snap = const LocalInferenceSnapshot(
+    OnDeviceStatus.checking,
+  );
   Timer? _timer;
 
   @override
@@ -388,7 +391,7 @@ class _PrivateModelDownloadBannerState
         ? (progress * 100).clamp(0, 100).toStringAsFixed(0)
         : null;
     final downloadedMb = OnDeviceInference().downloadedBytes / (1024 * 1024);
-    final totalMb = mindNavPrivateModel.sizeBytes / (1024 * 1024);
+    final totalMb = OnDeviceInference().activeModel.sizeBytes / (1024 * 1024);
     final rate = OnDeviceInference().downloadBytesPerSecond;
     final remaining = OnDeviceInference().estimatedDownloadRemaining;
     final transferDetail = rate > 0
@@ -420,7 +423,7 @@ class _PrivateModelDownloadBannerState
                     child: Text(
                       isDownloading
                           ? 'Downloading private model $percent% — stays active when switching tabs'
-                          : 'Verifying 1.2 GB model — hashing (~20 s) then starting engine…',
+                          : 'Verifying download and starting private AI…',
                       style: const TextStyle(
                         fontWeight: FontWeight.w700,
                         fontSize: 13.5,
@@ -429,7 +432,9 @@ class _PrivateModelDownloadBannerState
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    isDownloading ? '${downloadedMb.toStringAsFixed(0)} / ${totalMb.toStringAsFixed(0)} MB' : '',
+                    isDownloading
+                        ? '${downloadedMb.toStringAsFixed(0)} / ${totalMb.toStringAsFixed(0)} MB'
+                        : '',
                     style: TextStyle(
                       fontSize: 11,
                       color: Theme.of(context).textTheme.bodySmall?.color
@@ -444,7 +449,7 @@ class _PrivateModelDownloadBannerState
               Text(
                 isDownloading
                     ? '$transferDetail. Keep the app open on Wi-Fi; you can use any tab while it downloads.'
-                    : 'This is normal after a 1.2 GB download — please wait ~30 s. If stuck over 2 min, try Remove and reinstall.',
+                    : 'Verification has a four-minute safety limit. If it cannot finish, you can retry from Settings.',
                 style: TextStyle(
                   fontSize: 11.5,
                   color: Theme.of(context).textTheme.bodySmall?.color
@@ -459,7 +464,8 @@ class _PrivateModelDownloadBannerState
   }
 
   String _formatRemaining(Duration value) {
-    if (value.inHours >= 1) return '${value.inHours}h ${(value.inMinutes % 60)}m';
+    if (value.inHours >= 1)
+      return '${value.inHours}h ${(value.inMinutes % 60)}m';
     if (value.inMinutes >= 1) return '${value.inMinutes} min';
     return '${value.inSeconds.clamp(1, 59)} sec';
   }
@@ -846,6 +852,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     OnDeviceStatus.checking,
   );
   bool _modelActionInProgress = false;
+  OnDeviceModelChoice _selectedPrivateChoice = mindNavPrivateModelChoices.last;
   Timer? _progressTimer;
 
   @override
@@ -877,14 +884,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _refreshPrivateModel() async {
     final snapshot = await OnDeviceInference().refreshStatus();
-    if (mounted) setState(() => _privateModel = snapshot);
+    if (mounted) {
+      final active = OnDeviceInference().activeModel.id;
+      setState(() {
+        _privateModel = snapshot;
+        _selectedPrivateChoice = mindNavPrivateModelChoices.firstWhere(
+          (choice) => choice.manifest.id == active,
+          orElse: () => _selectedPrivateChoice,
+        );
+      });
+    }
   }
 
   Future<void> _installPrivateModel() async {
     setState(() => _modelActionInProgress = true);
     var installed = false;
     try {
-      await OnDeviceInference().installModel();
+      await OnDeviceInference().installModel(
+        model: _selectedPrivateChoice.manifest,
+      );
       installed = true;
     } catch (_) {
       // Preserve the safe failure detail from OnDeviceInference below.
@@ -947,7 +965,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     padding: const EdgeInsets.all(20),
     children: [
       const Text(
-        'Privacy & profile',
+        'Settings',
         style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
       ),
       Card(
@@ -1003,42 +1021,64 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     const SizedBox(height: 8),
                     ...mindNavPrivateModelChoices.map(
-                      (choice) => Container(
-                        width: double.infinity,
-                        margin: const EdgeInsets.only(bottom: 8),
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          border: Border.all(
-                            color: Theme.of(context).colorScheme.primary,
+                      (choice) => InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: _modelActionInProgress
+                            ? null
+                            : () => setState(
+                                () => _selectedPrivateChoice = choice,
+                              ),
+                        child: Container(
+                          width: double.infinity,
+                          margin: const EdgeInsets.only(bottom: 8),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            border: Border.all(
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                            color:
+                                choice.manifest.id ==
+                                    _selectedPrivateChoice.manifest.id
+                                ? Theme.of(context).colorScheme.primaryContainer
+                                      .withOpacity(0.34)
+                                : null,
                           ),
-                          borderRadius: BorderRadius.circular(12),
-                          color: Theme.of(context).colorScheme.primaryContainer
-                              .withOpacity(0.34),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    choice.name,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w700,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      choice.name,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                      ),
                                     ),
                                   ),
-                                ),
-                                if (choice.recommended)
-                                  const Chip(label: Text('Recommended')),
-                              ],
-                            ),
-                            Text(choice.quality),
-                            const SizedBox(height: 3),
-                            Text(
-                              '${choice.bestFor}\n${choice.memoryNote}',
-                              style: Theme.of(context).textTheme.bodySmall,
-                            ),
-                          ],
+                                  if (choice.recommended)
+                                    const Chip(label: Text('Recommended')),
+                                  Radio<OnDeviceModelChoice>(
+                                    value: choice,
+                                    groupValue: _selectedPrivateChoice,
+                                    onChanged: _modelActionInProgress
+                                        ? null
+                                        : (value) => setState(
+                                            () =>
+                                                _selectedPrivateChoice = value!,
+                                          ),
+                                  ),
+                                ],
+                              ),
+                              Text(choice.quality),
+                              const SizedBox(height: 3),
+                              Text(
+                                '${choice.bestFor}\n${choice.memoryNote}',
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
@@ -1098,9 +1138,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ? null
                         : _installPrivateModel,
                     icon: const Icon(Icons.download_rounded),
-                    label: const Text('Install Private Balanced'),
+                    label: Text('Install ${_selectedPrivateChoice.name}'),
                   ),
               ],
+            ),
+          ],
+        ),
+      ),
+      Card(
+        child: Column(
+          children: [
+            SwitchListTile(
+              title: const Text('Cloud AI'),
+              subtitle: const Text(
+                'Allow requests to your selected AI provider. Journal entries are never included.',
+              ),
+              value: widget.appState.cloudAiEnabled,
+              onChanged: widget.appState.aiAvailable
+                  ? widget.appState.setCloudAiEnabled
+                  : null,
+            ),
+            const Divider(height: 1),
+            SwitchListTile(
+              title: const Text('Use public research sources'),
+              subtitle: const Text(
+                'Allow public-source research only for the request you send.',
+              ),
+              value: widget.appState.publicResearchEnabled,
+              onChanged: widget.appState.aiAvailable
+                  ? widget.appState.setPublicResearchEnabled
+                  : null,
             ),
           ],
         ),
@@ -1185,9 +1252,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         icon: const Icon(Icons.logout),
         label: const Text('Sign out'),
       ),
-  ],
-);
-
+    ],
+  );
 }
 
 String _formatModelTime(Duration value) {
