@@ -26,6 +26,10 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Mind Nav uses the microphone only when you choose to speak a response.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Mind Nav converts the response you choose to speak into text for your conversation.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

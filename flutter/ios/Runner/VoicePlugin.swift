@@ -2,120 +2,165 @@ import Flutter
 import AVFoundation
 import Speech
 
-class VoicePlugin: NSObject, FlutterPlugin, FlutterStreamHandler, SFSpeechRecognizerDelegate {
+/// Mirrors the Android bridge: calls complete with a final transcript or
+/// playback result, rather than asking Flutter to infer completion from events.
+class VoicePlugin: NSObject, FlutterPlugin, FlutterStreamHandler, SFSpeechRecognizerDelegate, AVSpeechSynthesizerDelegate, AVAudioPlayerDelegate {
     private var speechRecognizer: SFSpeechRecognizer?
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     private var recognitionTask: SFSpeechRecognitionTask?
-    private var audioEngine = AVAudioEngine()
+    private let audioEngine = AVAudioEngine()
     private var eventSink: FlutterEventSink?
-    private var tts: AVSpeechSynthesizer?
-    
+    private let tts = AVSpeechSynthesizer()
+    private var audioPlayer: AVAudioPlayer?
+    private var listeningResult: FlutterResult?
+    private var ttsResult: FlutterResult?
+    private var audioResult: FlutterResult?
+    private var latestTranscript: String?
+
     public static func register(with registrar: FlutterPluginRegistrar) {
         let methodChannel = FlutterMethodChannel(name: "mindnav.dev/voice", binaryMessenger: registrar.messenger())
         let eventChannel = FlutterEventChannel(name: "mindnav.dev/voice_stream", binaryMessenger: registrar.messenger())
         let instance = VoicePlugin()
+        instance.tts.delegate = instance
         registrar.addMethodCallDelegate(instance, channel: methodChannel)
         eventChannel.setStreamHandler(instance)
     }
-    
+
     func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
         switch call.method {
         case "isAvailable":
-            result(SFSpeechRecognizer.authorizationStatus() == .authorized)
+            // Permission is requested by startListening. Returning false here
+            // would prevent Flutter from ever reaching that first prompt.
+            result(SFSpeechRecognizer(locale: Locale(identifier: "en-US")) != nil)
         case "startListening":
-            startListening(result: result)
+            let args = call.arguments as? [String: Any]
+            startListening(language: args?["language"] as? String ?? "en-US", result: result)
         case "stopListening":
-            stopListening()
+            completeListening(latestTranscript)
             result(true)
-        case "speak":
-            guard let args = call.arguments as? [String: Any],
-                  let text = args["text"] as? String else {
-                result(false)
-                return
-            }
-            let rate = Float(args["rate"] as? Double ?? 0.5)
-            let pitch = Float(args["pitch"] as? Double ?? 1.0)
-            speakText(text: text, rate: rate, pitch: pitch)
-            result(true)
+        case "playAudio", "playAudioAndWait":
+            let path = (call.arguments as? [String: Any])?["path"] as? String ?? ""
+            playAudio(path: path, wait: call.method == "playAudioAndWait", result: result)
+        case "speakWithSystemTts", "speakWithSystemTtsAndWait", "speak":
+            let args = call.arguments as? [String: Any]
+            speakText(text: args?["text"] as? String ?? "", rate: Float(args?["rate"] as? Double ?? 0.5), result: result)
         case "stopSpeaking":
-            tts?.stopSpeaking(at: .immediate)
+            tts.stopSpeaking(at: .immediate)
+            stopAudioPlayback()
             result(true)
-        case "getLanguages":
-            result(["en-US", "en-GB", "es-ES", "fr-FR", "de-DE"])
-        default:
-            result(FlutterMethodNotImplemented)
+        case "getLanguages": result(["en-US", "en-GB", "es-ES", "fr-FR", "de-DE"])
+        default: result(FlutterMethodNotImplemented)
         }
     }
-    
-    private func startListening(result: @escaping FlutterResult) {
-        SFSpeechRecognizer.requestAuthorization { [weak self] status in
-            guard status == .authorized else {
-                result(false)
-                return
-            }
-            
-            DispatchQueue.main.async {
-                self?.performSpeechRecognition()
-                result(true)
-            }
-        }
-    }
-    
-    private func performSpeechRecognition() {
-        let inputNode = audioEngine.inputNode
-        
-        recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
-        guard let recognitionRequest = recognitionRequest else { return }
-        
-        recognitionRequest.shouldReportPartialResults = true
-        
-        speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
-        recognitionTask = speechRecognizer?.recognitionTask(with: recognitionRequest) { [weak self] result, error in
-            if let result = result {
+
+    private func startListening(language: String, result: @escaping FlutterResult) {
+        guard listeningResult == nil else { result(FlutterError(code: "ALREADY_LISTENING", message: "Mind Nav is already listening.", details: nil)); return }
+        let requestMicrophone: () -> Void = { [weak self] in
+            AVAudioSession.sharedInstance().requestRecordPermission { granted in
                 DispatchQueue.main.async {
-                    self?.eventSink?(result.bestTranscription.formattedString)
+                    if granted {
+                        self?.beginRecognition(language: language, result: result)
+                    } else {
+                        result(nil)
+                    }
                 }
             }
-            if error != nil || (result?.isFinal ?? false) {
-                self?.audioEngine.stop()
-                inputNode.removeTap(onBus: 0)
-                self?.recognitionRequest = nil
-                self?.recognitionTask = nil
+        }
+        if SFSpeechRecognizer.authorizationStatus() == .authorized { requestMicrophone(); return }
+        SFSpeechRecognizer.requestAuthorization { status in
+            DispatchQueue.main.async {
+                if status == .authorized {
+                    requestMicrophone()
+                } else {
+                    result(nil)
+                }
             }
         }
-        
-        let recordingFormat = inputNode.outputFormat(forBus: 0)
-        inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { buffer, _ in
-            self.recognitionRequest?.append(buffer)
+    }
+
+    private func beginRecognition(language: String, result: @escaping FlutterResult) {
+        stopRecognitionEngine()
+        listeningResult = result
+        latestTranscript = nil
+        speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: language))
+        guard let recognizer = speechRecognizer, recognizer.isAvailable else { completeListening(nil); return }
+        let request = SFSpeechAudioBufferRecognitionRequest()
+        request.shouldReportPartialResults = true
+        recognitionRequest = request
+        let inputNode = audioEngine.inputNode
+        recognitionTask = recognizer.recognitionTask(with: request) { [weak self] recognition, error in
+            guard let self else { return }
+            if let text = recognition?.bestTranscription.formattedString, !text.isEmpty {
+                self.latestTranscript = text
+                self.eventSink?(["state": recognition?.isFinal == true ? "processing" : "partial", "text": text])
+            }
+            if error != nil || recognition?.isFinal == true { self.completeListening(self.latestTranscript) }
         }
-        
-        audioEngine.prepare()
-        try? audioEngine.start()
+        let format = inputNode.outputFormat(forBus: 0)
+        inputNode.installTap(onBus: 0, bufferSize: 1024, format: format) { [weak self] buffer, _ in self?.recognitionRequest?.append(buffer) }
+        do {
+            try AVAudioSession.sharedInstance().setCategory(.record, mode: .measurement, options: .duckOthers)
+            try AVAudioSession.sharedInstance().setActive(true, options: .notifyOthersOnDeactivation)
+            audioEngine.prepare()
+            try audioEngine.start()
+            eventSink?(["state": "ready"])
+        } catch { completeListening(nil) }
     }
-    
-    private func stopListening() {
-        audioEngine.stop()
+
+    private func completeListening(_ transcript: String?) {
+        guard let callback = listeningResult else { return }
+        listeningResult = nil
+        stopRecognitionEngine()
+        callback(transcript)
+    }
+
+    private func stopRecognitionEngine() {
         recognitionRequest?.endAudio()
+        audioEngine.stop()
+        audioEngine.inputNode.removeTap(onBus: 0)
+        recognitionTask?.cancel()
+        recognitionTask = nil
+        recognitionRequest = nil
     }
-    
-    private func speakText(text: String, rate: Float, pitch: Float) {
-        tts = AVSpeechSynthesizer()
+
+    private func playAudio(path: String, wait: Bool, result: @escaping FlutterResult) {
+        guard FileManager.default.fileExists(atPath: path) else { result(FlutterError(code: "FILE_NOT_FOUND", message: "Audio file not found", details: nil)); return }
+        stopAudioPlayback()
+        do {
+            let player = try AVAudioPlayer(contentsOf: URL(fileURLWithPath: path))
+            audioPlayer = player
+            player.delegate = self
+            if wait { audioResult = result }
+            player.prepareToPlay()
+            player.play()
+            if !wait { result(true) }
+        } catch { result(FlutterError(code: "PLAY_ERROR", message: error.localizedDescription, details: nil)) }
+    }
+
+    private func stopAudioPlayback() {
+        audioPlayer?.stop()
+        audioPlayer = nil
+        if let callback = audioResult { audioResult = nil; callback(false) }
+    }
+
+    func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
+        audioPlayer = nil
+        if let callback = audioResult { audioResult = nil; callback(flag) }
+    }
+
+    private func speakText(text: String, rate: Float, result: @escaping FlutterResult) {
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { result(FlutterError(code: "EMPTY_TEXT", message: "No text to speak", details: nil)); return }
+        tts.stopSpeaking(at: .immediate)
+        if let callback = ttsResult { ttsResult = nil; callback(false) }
         let utterance = AVSpeechUtterance(string: text)
         utterance.voice = AVSpeechSynthesisVoice(language: "en-US")
-        utterance.rate = rate
-        utterance.pitchMultiplier = pitch
-        utterance.preUtteranceDelay = 0.1
-        utterance.postUtteranceDelay = 0.1
-        tts?.speak(utterance)
+        utterance.rate = min(max(rate, AVSpeechUtteranceMinimumSpeechRate), AVSpeechUtteranceMaximumSpeechRate)
+        ttsResult = result
+        tts.speak(utterance)
     }
-    
-    func onListen(withArguments arguments: Any?, eventSink events: @escaping FlutterEventSink) -> FlutterError? {
-        self.eventSink = events
-        return nil
-    }
-    
-    func onCancel(withArguments arguments: Any?) -> FlutterError? {
-        self.eventSink = nil
-        return nil
-    }
+
+    func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) { if let callback = ttsResult { ttsResult = nil; callback(true) } }
+    func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) { if let callback = ttsResult { ttsResult = nil; callback(false) } }
+    func onListen(withArguments arguments: Any?, eventSink events: @escaping FlutterEventSink) -> FlutterError? { eventSink = events; return nil }
+    func onCancel(withArguments arguments: Any?) -> FlutterError? { eventSink = nil; return nil }
 }

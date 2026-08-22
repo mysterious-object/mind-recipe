@@ -81,6 +81,27 @@ class OnDeviceModelManifest {
   final String license;
 }
 
+/// A member-facing description of the private model. Keeping this separate
+/// from the download manifest lets the setup screen explain the trade-offs
+/// without implying that a model is installed before its checksum verifies.
+class OnDeviceModelChoice {
+  const OnDeviceModelChoice({
+    required this.manifest,
+    required this.name,
+    required this.quality,
+    required this.bestFor,
+    required this.memoryNote,
+    this.recommended = false,
+  });
+
+  final OnDeviceModelManifest manifest;
+  final String name;
+  final String quality;
+  final String bestFor;
+  final String memoryNote;
+  final bool recommended;
+}
+
 /// Mobile-first reasoning model. It is deliberately downloaded only after an
 /// explicit member action; it is never bundled in the app.
 final mindNavPrivateModel = OnDeviceModelManifest(
@@ -93,6 +114,20 @@ final mindNavPrivateModel = OnDeviceModelManifest(
   sizeBytes: 1282439264,
   license: 'Apache-2.0',
 );
+
+/// This build ships one fully validated private model. The catalog is still
+/// explicit so that adding another verified option does not silently change a
+/// member's installed model or its quality/privacy trade-off.
+final mindNavPrivateModelChoices = <OnDeviceModelChoice>[
+  OnDeviceModelChoice(
+    manifest: mindNavPrivateModel,
+    name: 'Private Balanced',
+    quality: 'Strong everyday reflection',
+    bestFor: 'Most conversations; a good balance of nuance and speed.',
+    memoryNote: '1.2 GB download · needs 8 GB device memory',
+    recommended: true,
+  ),
+];
 
 /// Computes the digest outside Flutter's UI isolate. A complete model check is
 /// intentionally required before a model can run, but it must never freeze the
@@ -118,6 +153,17 @@ class OnDeviceInference implements LocalInference {
 
   double _downloadProgress = 0;
   double get downloadProgress => _downloadProgress;
+  int _downloadedBytes = 0;
+  int get downloadedBytes => _downloadedBytes;
+  int _downloadBytesPerSecond = 0;
+  int get downloadBytesPerSecond => _downloadBytesPerSecond;
+  Duration? get estimatedDownloadRemaining => _downloadBytesPerSecond <= 0
+      ? null
+      : Duration(
+          seconds: ((mindNavPrivateModel.sizeBytes - _downloadedBytes) /
+                  _downloadBytesPerSecond)
+              .ceil(),
+        );
   static const _minimumMemoryMiB = 8192;
 
   Future<File> _modelFile() async {
@@ -165,13 +211,6 @@ class OnDeviceInference implements LocalInference {
           detail: 'Private model is not installed on this device.',
         );
         _set(snapshot);
-        // Background auto-download so PRIVATE is ready by first launch —
-        // matches other companies' bootstrap: small APK + Wi-Fi asset fetch.
-        Future.delayed(const Duration(seconds: 2), () {
-          if (_snapshot.status == OnDeviceStatus.notInstalled) {
-            installModel().catchError((_) {});
-          }
-        });
         return snapshot;
       }
       final device = await MindNavDeviceHarness().capabilities();
@@ -239,6 +278,8 @@ class OnDeviceInference implements LocalInference {
     } else {
       _downloadProgress = 0;
     }
+    _downloadedBytes = resumeOffset;
+    _downloadBytesPerSecond = 0;
     // If we are resuming, keep the file; otherwise start fresh
     var isResume = resumeOffset > 0 && resumeOffset < mindNavPrivateModel.sizeBytes;
     try {
@@ -273,11 +314,22 @@ class OnDeviceInference implements LocalInference {
           ? (isResume ? resumeOffset + contentLen : contentLen)
           : mindNavPrivateModel.sizeBytes;
       var received = resumeOffset;
+      var lastSampleBytes = received;
+      var lastSampleAt = DateTime.now();
       final sink = temporary.openWrite(mode: isResume ? FileMode.append : FileMode.write);
       await for (final bytes in response) {
         received += bytes.length;
         sink.add(bytes);
         _downloadProgress = received / expected;
+        _downloadedBytes = received;
+        final now = DateTime.now();
+        final elapsedMs = now.difference(lastSampleAt).inMilliseconds;
+        if (elapsedMs >= 750) {
+          _downloadBytesPerSecond =
+              ((received - lastSampleBytes) * 1000 / elapsedMs).round();
+          lastSampleBytes = received;
+          lastSampleAt = now;
+        }
       }
       await sink.close();
       client.close(force: true);
@@ -346,6 +398,8 @@ class OnDeviceInference implements LocalInference {
     final receipt = await _verificationReceipt(file);
     if (await receipt.exists()) await receipt.delete();
     _downloadProgress = 0;
+    _downloadedBytes = 0;
+    _downloadBytesPerSecond = 0;
     _set(const LocalInferenceSnapshot(OnDeviceStatus.notInstalled));
   }
 

@@ -43,7 +43,7 @@ class VoiceInterface {
 
   Future<String?> startListening({
     String language = 'en-US',
-    Duration silenceTimeout = const Duration(seconds: 6),
+    Duration silenceTimeout = const Duration(seconds: 3),
   }) async {
     if (_isListening) return null;
     _isListening = true;
@@ -107,10 +107,12 @@ class VoiceInterface {
       await _voiceLog('speakAndWait called len=${text.length}');
       // 1. Try cloud companion voice first
       try {
-        final rendered = await MindNavApiClient().synthesizeVoice(
-          text,
-          speed: 0.97,
-        );
+        // Read-aloud must feel immediate.  The network voice is a nice-to-have;
+        // do not make a member wait through its much longer API timeout before
+        // falling back to the operating system voice.
+        final rendered = await MindNavApiClient()
+            .synthesizeVoice(text, speed: 0.97)
+            .timeout(const Duration(seconds: 4));
         if (_speechEpoch != epoch) {
           await _voiceLog('epoch mismatch after synthesize');
           return false;

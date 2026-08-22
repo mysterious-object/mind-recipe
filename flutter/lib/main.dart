@@ -387,6 +387,13 @@ class _PrivateModelDownloadBannerState
     final percent = isDownloading
         ? (progress * 100).clamp(0, 100).toStringAsFixed(0)
         : null;
+    final downloadedMb = OnDeviceInference().downloadedBytes / (1024 * 1024);
+    final totalMb = mindNavPrivateModel.sizeBytes / (1024 * 1024);
+    final rate = OnDeviceInference().downloadBytesPerSecond;
+    final remaining = OnDeviceInference().estimatedDownloadRemaining;
+    final transferDetail = rate > 0
+        ? '${(rate / (1024 * 1024)).toStringAsFixed(1)} MB/s${remaining == null ? '' : ' · about ${_formatRemaining(remaining)} left'}'
+        : 'Calculating download time…';
     return Material(
       elevation: 6,
       color: Theme.of(context).colorScheme.surface.withOpacity(0.98),
@@ -422,7 +429,7 @@ class _PrivateModelDownloadBannerState
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    isDownloading ? '${(progress * 1282).toStringAsFixed(0)} MB / 1282 MB' : '',
+                    isDownloading ? '${downloadedMb.toStringAsFixed(0)} / ${totalMb.toStringAsFixed(0)} MB' : '',
                     style: TextStyle(
                       fontSize: 11,
                       color: Theme.of(context).textTheme.bodySmall?.color
@@ -436,7 +443,7 @@ class _PrivateModelDownloadBannerState
               const SizedBox(height: 4),
               Text(
                 isDownloading
-                    ? 'Keep the app open on Wi-Fi. You can use any tab while it downloads.'
+                    ? '$transferDetail. Keep the app open on Wi-Fi; you can use any tab while it downloads.'
                     : 'This is normal after a 1.2 GB download — please wait ~30 s. If stuck over 2 min, try Remove and reinstall.',
                 style: TextStyle(
                   fontSize: 11.5,
@@ -449,6 +456,12 @@ class _PrivateModelDownloadBannerState
         ),
       ),
     );
+  }
+
+  String _formatRemaining(Duration value) {
+    if (value.inHours >= 1) return '${value.inHours}h ${(value.inMinutes % 60)}m';
+    if (value.inMinutes >= 1) return '${value.inMinutes} min';
+    return '${value.inSeconds.clamp(1, 59)} sec';
   }
 }
 
@@ -975,18 +988,88 @@ class _ProfileScreenState extends State<ProfileScreen> {
               subtitle: Text(
                 _privateModel.isReady
                     ? 'Ready for private guidance. This route stays on your device.'
-                    : _privateModel.detail ?? 'Install the 1.2 GB private reasoning model. Keep at least 2.5 GB free so it can run reliably.',
+                    : _privateModel.detail ?? 'Choose a verified model below. Nothing downloads until you choose Install.',
               ),
             ),
+            if (!_privateModel.isReady)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Available private models',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 8),
+                    ...mindNavPrivateModelChoices.map(
+                      (choice) => Container(
+                        width: double.infinity,
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                          color: Theme.of(context).colorScheme.primaryContainer
+                              .withOpacity(0.34),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    choice.name,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                                if (choice.recommended)
+                                  const Chip(label: Text('Recommended')),
+                              ],
+                            ),
+                            Text(choice.quality),
+                            const SizedBox(height: 3),
+                            Text(
+                              '${choice.bestFor}\n${choice.memoryNote}',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    Text(
+                      'Every option listed here is downloaded only after you tap Install and is verified before it can run.',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
             if (_modelActionInProgress ||
                 _privateModel.status == OnDeviceStatus.downloading ||
                 _privateModel.status == OnDeviceStatus.verifying)
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                child: LinearProgressIndicator(
-                  value: _privateModel.status == OnDeviceStatus.downloading
-                      ? OnDeviceInference().downloadProgress
-                      : null,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    LinearProgressIndicator(
+                      value: _privateModel.status == OnDeviceStatus.downloading
+                          ? OnDeviceInference().downloadProgress
+                          : null,
+                    ),
+                    const SizedBox(height: 7),
+                    Text(
+                      _privateModel.status == OnDeviceStatus.downloading
+                          ? '${(OnDeviceInference().downloadProgress * 100).toStringAsFixed(0)}% · ${OnDeviceInference().downloadedBytes ~/ (1024 * 1024)} MB downloaded${OnDeviceInference().estimatedDownloadRemaining == null ? '' : ' · about ${_formatModelTime(OnDeviceInference().estimatedDownloadRemaining!)} left'}'
+                          : 'Checking the model’s integrity, then preparing private AI…',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
                 ),
               ),
             const Divider(height: 1),
@@ -1015,7 +1098,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ? null
                         : _installPrivateModel,
                     icon: const Icon(Icons.download_rounded),
-                    label: const Text('Install private model'),
+                    label: const Text('Install Private Balanced'),
                   ),
               ],
             ),
@@ -1102,8 +1185,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
         icon: const Icon(Icons.logout),
         label: const Text('Sign out'),
       ),
-    ],
-  );
+  ],
+);
+
+}
+
+String _formatModelTime(Duration value) {
+  if (value.inHours > 0) return '${value.inHours}h ${(value.inMinutes % 60)}m';
+  if (value.inMinutes > 0) return '${value.inMinutes} min';
+  return '${value.inSeconds.clamp(1, 59)} sec';
 }
 
 class PractitionerHome extends StatelessWidget {
