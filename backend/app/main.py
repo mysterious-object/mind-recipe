@@ -8,12 +8,13 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Query, Response, st
 
 from .auth import auth_store, issue_token, verify_token
 from .wellness_assistant import managed_provider_available, respond, get_provider_status
-from .mind_nav_agent import agent
+from .navigator_agent import agent
 from .config import settings
 from .models import (
     AiRequest, AiResponse, AuditEvent, AuthLogin, AuthRegister, AuthToken, AuthUser,
     CheckInInput, CheckInRecord, ConsentGrant, ConsentInput, Role,
-    JournalEntry, JournalEntryInput, ToolboxItemInput, ToolboxItem, ToolboxPracticeInput,
+    JournalEntry, JournalEntryInput, RecipePracticeItemInput, RecipePracticeItem, RecipePracticePracticeInput,
+    CurriculumProgress, CurriculumProgressInput,
     TrackerEventInput, TrackerEvent, AppointmentInput, Appointment,
     NotificationPreferenceInput, NotificationPreference, AccountExport,
 )
@@ -22,22 +23,22 @@ from .sqlite_store import store
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     if not settings.development and not settings.production_ready:
-        raise RuntimeError("production requires a PostgreSQL MIND_NAV_DATABASE_URL")
+        raise RuntimeError("production requires a PostgreSQL MIND_RECIPE_DATABASE_URL")
     yield
 
 
-app = FastAPI(title="Mind Nav API", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="Mind Recipe API", version="0.1.0", lifespan=lifespan)
 
 
 def actor(
     authorization: Optional[str] = Header(default=None),
-    x_mind_nav_user: Optional[str] = Header(default=None),
-    x_mind_nav_role: Role = Header(default=Role.member),
+    x_mind_recipe_user: Optional[str] = Header(default=None),
+    x_mind_recipe_role: Role = Header(default=Role.member),
 ) -> Tuple[str, Role]:
     if authorization and authorization.lower().startswith("bearer "):
         return verify_token(authorization[7:].strip()), Role.member
     if settings.development:
-        return x_mind_nav_user or "dev-member", x_mind_nav_role
+        return x_mind_recipe_user or "dev-member", x_mind_recipe_role
     raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="authenticated bearer identity required")
 
 
@@ -179,10 +180,21 @@ def practitioner_checkins(member_id: str, identity: Tuple[str, Role] = Depends(a
 async def assistant(
     payload: AiRequest,
     identity: Tuple[str, Role] = Depends(actor),
-    x_mind_nav_provider_key: Optional[str] = Header(default=None),
+    x_mind_recipe_provider_key: Optional[str] = Header(default=None),
 ) -> AiResponse:
     actor_id, _ = identity
-    result = await respond(payload, x_mind_nav_provider_key)
+    # Curriculum progress is authoritative server-side context. Navigator can
+    # keep up across devices without trusting a client-supplied member id or
+    # requiring the app to resend durable learning history on every turn.
+    assistant_context = dict(payload.context)
+    assistant_context["member_id"] = actor_id
+    progress = store.get_curriculum_progress(actor_id)
+    if progress is not None:
+        assistant_context["curriculum_progress"] = progress
+    result = await respond(
+        payload.model_copy(update={"context": assistant_context}),
+        x_mind_recipe_provider_key,
+    )
     audit(actor_id, "ai_process", "assistant_session", result.mode)
     return result
 
@@ -198,81 +210,115 @@ def detect_patterns(member_id: str) -> list[dict[str, object]]:
     return store.detect_patterns(member_id)
 
 
-@app.get("/v1/toolbox", response_model=List[ToolboxItem])
-def list_toolbox(identity: Tuple[str, Role] = Depends(actor)) -> List[ToolboxItem]:
+@app.get("/v1/recipes/practices", response_model=List[RecipePracticeItem])
+def list_recipe_practice(identity: Tuple[str, Role] = Depends(actor)) -> List[RecipePracticeItem]:
     member_id, role = identity
     if role != Role.member:
         raise HTTPException(status_code=403, detail="member role required")
-    return [ToolboxItem(**item) for item in store.get_toolbox_items(member_id)]
+    return [RecipePracticeItem(**item) for item in store.get_recipe_practice_items(member_id)]
 
 
-@app.post("/v1/toolbox", response_model=ToolboxItem, status_code=status.HTTP_201_CREATED)
-def create_toolbox_item(
-    payload: ToolboxItemInput,
+@app.get("/v1/recipes/progress", response_model=CurriculumProgress)
+def get_curriculum_progress(identity: Tuple[str, Role] = Depends(actor)) -> CurriculumProgress:
+    member_id, role = identity
+    if role != Role.member:
+        raise HTTPException(status_code=403, detail="member role required")
+    progress = store.get_curriculum_progress(member_id)
+    if progress is None:
+        progress = {
+            "member_id": member_id,
+            "curriculum_version": "2026.08.24",
+            "completed_lesson_ids": [],
+            "completed_practice_ids": [],
+            "current_lesson_id": "lesson-1",
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+    return CurriculumProgress(**progress)
+
+
+@app.put("/v1/recipes/progress", response_model=CurriculumProgress)
+def put_curriculum_progress(
+    payload: CurriculumProgressInput,
     identity: Tuple[str, Role] = Depends(actor),
-) -> ToolboxItem:
+) -> CurriculumProgress:
     member_id, role = identity
     if role != Role.member:
         raise HTTPException(status_code=403, detail="member role required")
-    item = ToolboxItem(
+    merged = store.merge_curriculum_progress(
+        member_id,
+        {**payload.model_dump(), "updated_at": payload.updated_at.isoformat()},
+    )
+    audit(member_id, "update", "curriculum_progress", payload.curriculum_version)
+    return CurriculumProgress(**merged)
+
+
+@app.post("/v1/recipes/practices", response_model=RecipePracticeItem, status_code=status.HTTP_201_CREATED)
+def create_recipe_practice_item(
+    payload: RecipePracticeItemInput,
+    identity: Tuple[str, Role] = Depends(actor),
+) -> RecipePracticeItem:
+    member_id, role = identity
+    if role != Role.member:
+        raise HTTPException(status_code=403, detail="member role required")
+    item = RecipePracticeItem(
         **payload.model_dump(),
         member_id=member_id,
         discovered_at=datetime.now(timezone.utc),
     )
-    store.add_toolbox_item(item)
-    audit(member_id, "create", "toolbox_item", str(item.id))
+    store.add_recipe_practice_item(item)
+    audit(member_id, "create", "recipe_practice_item", str(item.id))
     return item
 
 
-@app.patch("/v1/toolbox/{item_id}/favorite", response_model=ToolboxItem)
-def favorite_toolbox_item(
+@app.patch("/v1/recipes/practices/{item_id}/favorite", response_model=RecipePracticeItem)
+def favorite_recipe_practice_item(
     item_id: str,
     payload: dict,
     identity: Tuple[str, Role] = Depends(actor),
-) -> ToolboxItem:
+) -> RecipePracticeItem:
     member_id, _ = identity
-    item = store.set_toolbox_favorite(member_id, item_id, bool(payload.get("favorite")))
+    item = store.set_recipe_practice_favorite(member_id, item_id, bool(payload.get("favorite")))
     if not item:
-        raise HTTPException(status_code=404, detail="toolbox item not found")
-    audit(member_id, "favorite", "toolbox_item", item_id)
-    return ToolboxItem(**item)
+        raise HTTPException(status_code=404, detail="recipe practice not found")
+    audit(member_id, "favorite", "recipe_practice_item", item_id)
+    return RecipePracticeItem(**item)
 
 
-@app.post("/v1/toolbox/{item_id}/practice", response_model=ToolboxItem)
-def practice_toolbox_item(
+@app.post("/v1/recipes/practices/{item_id}/practice", response_model=RecipePracticeItem)
+def practice_recipe_practice_item(
     item_id: str,
-    payload: ToolboxPracticeInput,
+    payload: RecipePracticePracticeInput,
     identity: Tuple[str, Role] = Depends(actor),
-) -> ToolboxItem:
+) -> RecipePracticeItem:
     member_id, _ = identity
     if str(payload.tool_id) != item_id:
         raise HTTPException(status_code=400, detail="tool id does not match route")
-    item = store.record_toolbox_practice(
+    item = store.record_recipe_practice_practice(
         member_id, item_id, payload.effectiveness, payload.context,
     )
     if not item:
-        raise HTTPException(status_code=404, detail="toolbox item not found")
-    audit(member_id, "practice", "toolbox_item", item_id)
-    return ToolboxItem(**item)
+        raise HTTPException(status_code=404, detail="recipe practice not found")
+    audit(member_id, "practice", "recipe_practice_item", item_id)
+    return RecipePracticeItem(**item)
 
 
-@app.delete("/v1/toolbox/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_toolbox_item(
+@app.delete("/v1/recipes/practices/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_recipe_practice_item(
     item_id: str,
     identity: Tuple[str, Role] = Depends(actor),
 ) -> Response:
     member_id, _ = identity
-    if not store.delete_toolbox_item(member_id, item_id):
-        raise HTTPException(status_code=404, detail="toolbox item not found")
-    audit(member_id, "delete", "toolbox_item", item_id)
+    if not store.delete_recipe_practice_item(member_id, item_id):
+        raise HTTPException(status_code=404, detail="recipe practice not found")
+    audit(member_id, "delete", "recipe_practice_item", item_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@app.post("/v1/toolbox/ai-create")
-async def ai_create_toolbox_item(
+@app.post("/v1/recipes/practices/ai-create")
+async def ai_create_recipe_practice_item(
     payload: dict,
     identity: Tuple[str, Role] = Depends(actor),
-    x_mind_nav_provider_key: Optional[str] = Header(default=None),
+    x_mind_recipe_provider_key: Optional[str] = Header(default=None),
 ) -> dict[str, object]:
     """Create and persist a bounded personalized wellness practice."""
     member_id, role = identity
@@ -298,7 +344,7 @@ async def ai_create_toolbox_item(
         cloud_opt_in=True,
         context={"member_id": member_id},
     )
-    ai_response = await respond(ai_request, x_mind_nav_provider_key)
+    ai_response = await respond(ai_request, x_mind_recipe_provider_key)
     if ai_response.mode == "cloud_ai":
         guidance = ai_response.message
     else:
@@ -315,17 +361,17 @@ async def ai_create_toolbox_item(
         "Reflection" if any(word in lowered for word in ("journal", "reflect", "thought")) else
         "Grounding"
     )
-    item = ToolboxItem(
+    item = RecipePracticeItem(
         name=description[:80].strip().capitalize(),
         description=guidance,
         category=category,
-        source="mind-nav-created",
+        source="navigator-created",
         member_id=member_id,
         discovered_at=datetime.now(timezone.utc),
     )
-    store.add_toolbox_item(item)
-    audit(member_id, "ai_create", "toolbox_item", str(item.id))
-    return {"success": True, "toolbox_item": item.model_dump(mode="json")}
+    store.add_recipe_practice_item(item)
+    audit(member_id, "ai_create", "recipe_practice_item", str(item.id))
+    return {"success": True, "recipe_practice_item": item.model_dump(mode="json")}
 
 
 @app.get("/v1/audit/{actor_id}")
@@ -407,7 +453,7 @@ async def voice_synthesize(payload: dict) -> dict[str, object]:
     
     text = payload.get("text", "")
     speed = payload.get("speed", 1.0)
-    voice = payload.get("voice", "mind_nav_companion")
+    voice = payload.get("voice", "navigator_companion")
     
     if not text:
         return {"error": "No text provided"}

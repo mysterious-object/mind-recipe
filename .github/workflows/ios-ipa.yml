@@ -1,4 +1,4 @@
-name: Mind Nav iOS IPA (unsigned)
+name: Mind Recipe iOS IPA (unsigned)
 
 on:
   workflow_dispatch:
@@ -41,13 +41,13 @@ jobs:
           cd flutter
           mkdir -p Payload
           cp -R build/ios/iphoneos/Runner.app Payload/
-          zip -r mind-nav-ios-unsigned.ipa Payload
-          ls -lh mind-nav-ios-unsigned.ipa
-          unzip -l mind-nav-ios-unsigned.ipa | head -n 20
+          zip -r mind-recipe-ios-unsigned.ipa Payload
+          ls -lh mind-recipe-ios-unsigned.ipa
+          unzip -l mind-recipe-ios-unsigned.ipa | head -n 20
 
       - uses: actions/upload-artifact@v4
         with:
-          name: mind-nav-ios-unsigned-ipa
-          path: flutter/mind-nav-ios-unsigned.ipa
+          name: mind-recipe-ios-unsigned-ipa
+          path: flutter/mind-recipe-ios-unsigned.ipa
           if-no-files-found: error
           retention-days: 14

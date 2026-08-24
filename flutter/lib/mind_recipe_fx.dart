@@ -3,9 +3,9 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
-/// Mind Nav visual tokens adapted from an internal effects system.
+/// Mind Recipe visual tokens adapted from an internal effects system.
 
-abstract final class MindNavFxPalette {
+abstract final class MindRecipeFxPalette {
   static const primary = Color(0xff00e5cc);
   static const secondary = Color(0xff7c3aed);
   static const livingGreen = Color(0xff00e68a);
@@ -18,16 +18,16 @@ abstract final class MindNavFxPalette {
 /// GPU field used on native mobile instead of embedding a browser WebGL view.
 /// It preserves the fluid shader language while staying inside Flutter's
 /// renderer and gracefully disappears if shader compilation is unavailable.
-class MindNavGpuField extends StatefulWidget {
-  const MindNavGpuField({super.key, required this.progress});
+class MindRecipeGpuField extends StatefulWidget {
+  const MindRecipeGpuField({super.key, required this.progress});
 
   final double progress;
 
   @override
-  State<MindNavGpuField> createState() => _MindNavGpuFieldState();
+  State<MindRecipeGpuField> createState() => _MindRecipeGpuFieldState();
 }
 
-class _MindNavGpuFieldState extends State<MindNavGpuField>
+class _MindRecipeGpuFieldState extends State<MindRecipeGpuField>
     with SingleTickerProviderStateMixin {
   late final AnimationController controller;
   ui.FragmentProgram? program;
@@ -39,7 +39,7 @@ class _MindNavGpuFieldState extends State<MindNavGpuField>
       vsync: this,
       duration: const Duration(seconds: 18),
     );
-    ui.FragmentProgram.fromAsset('shaders/mind_nav_field.frag')
+    ui.FragmentProgram.fromAsset('shaders/mind_recipe_field.frag')
         .then((loaded) {
           if (mounted) setState(() => program = loaded);
         })
@@ -75,7 +75,7 @@ class _MindNavGpuFieldState extends State<MindNavGpuField>
         child: AnimatedBuilder(
           animation: controller,
           builder: (context, _) => CustomPaint(
-            painter: _MindNavGpuPainter(
+            painter: _MindRecipeGpuPainter(
               program: loaded,
               time: controller.value * 18,
               progress: widget.progress,
@@ -89,8 +89,8 @@ class _MindNavGpuFieldState extends State<MindNavGpuField>
   }
 }
 
-class _MindNavGpuPainter extends CustomPainter {
-  const _MindNavGpuPainter({
+class _MindRecipeGpuPainter extends CustomPainter {
+  const _MindRecipeGpuPainter({
     required this.program,
     required this.time,
     required this.progress,
@@ -116,7 +116,7 @@ class _MindNavGpuPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _MindNavGpuPainter oldDelegate) =>
+  bool shouldRepaint(covariant _MindRecipeGpuPainter oldDelegate) =>
       oldDelegate.time != time ||
       oldDelegate.progress != progress ||
       oldDelegate.dark != dark ||
@@ -125,11 +125,11 @@ class _MindNavGpuPainter extends CustomPainter {
 
 /// Lightweight, Flutter-native visual effects driven by navigation progress.
 ///
-/// Mind Nav FX intentionally has no continuous ticker. It morphs while the user
+/// Mind Recipe FX intentionally has no continuous ticker. It morphs while the user
 /// swipes or changes pages, which keeps idle battery use at zero and makes the
 /// experience compatible with reduced-motion preferences.
-class MindNavFxBackdrop extends StatelessWidget {
-  const MindNavFxBackdrop({super.key, required this.progress});
+class MindRecipeFxBackdrop extends StatelessWidget {
+  const MindRecipeFxBackdrop({super.key, required this.progress});
 
   final double progress;
 
@@ -140,10 +140,10 @@ class MindNavFxBackdrop extends StatelessWidget {
     return IgnorePointer(
       child: RepaintBoundary(
         child: CustomPaint(
-          painter: _MindNavFxPainter(
+          painter: _MindRecipeFxPainter(
             progress: progress,
             primary: scheme.primary,
-            secondary: MindNavFxPalette.secondary,
+            secondary: scheme.secondary,
             dark: dark,
           ),
           size: Size.infinite,
@@ -153,8 +153,8 @@ class MindNavFxBackdrop extends StatelessWidget {
   }
 }
 
-class MindNavPageRail extends StatelessWidget {
-  const MindNavPageRail({
+class MindRecipePageRail extends StatelessWidget {
+  const MindRecipePageRail({
     super.key,
     required this.labels,
     required this.icons,
@@ -203,9 +203,9 @@ class MindNavPageRail extends StatelessWidget {
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
                       colors: [
-                        MindNavFxPalette.primary,
-                        MindNavFxPalette.livingGreen,
-                        MindNavFxPalette.secondary,
+                        MindRecipeFxPalette.primary,
+                        MindRecipeFxPalette.livingGreen,
+                        MindRecipeFxPalette.secondary,
                       ],
                     ),
                     borderRadius: BorderRadius.circular(999),
@@ -302,8 +302,8 @@ class MindNavPageRail extends StatelessWidget {
   }
 }
 
-class MindNavPageTitle extends StatelessWidget {
-  const MindNavPageTitle({
+class MindRecipePageTitle extends StatelessWidget {
+  const MindRecipePageTitle({
     super.key,
     required this.title,
     required this.forward,
@@ -337,8 +337,8 @@ class MindNavPageTitle extends StatelessWidget {
   }
 }
 
-class _MindNavFxPainter extends CustomPainter {
-  const _MindNavFxPainter({
+class _MindRecipeFxPainter extends CustomPainter {
+  const _MindRecipeFxPainter({
     required this.progress,
     required this.primary,
     required this.secondary,
@@ -354,7 +354,7 @@ class _MindNavFxPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     if (size.isEmpty) return;
     final phase = progress * 0.72;
-    final nativePrimary = Color.lerp(MindNavFxPalette.primary, primary, 0.18)!;
+    final nativePrimary = Color.lerp(MindRecipeFxPalette.primary, primary, 0.18)!;
     final opacityScale = dark ? 1.0 : 0.62;
     final firstCenter = Offset(
       size.width * (0.82 + math.sin(phase) * 0.12),
@@ -416,9 +416,9 @@ class _MindNavFxPainter extends CustomPainter {
       Paint()
         ..shader = const LinearGradient(
           colors: [
-            MindNavFxPalette.primary,
-            MindNavFxPalette.livingGreen,
-            MindNavFxPalette.secondary,
+            MindRecipeFxPalette.primary,
+            MindRecipeFxPalette.livingGreen,
+            MindRecipeFxPalette.secondary,
           ],
         ).createShader(Rect.fromLTWH(0, 0, size.width, 1))
         ..style = PaintingStyle.stroke
@@ -435,9 +435,9 @@ class _MindNavFxPainter extends CustomPainter {
     // A deterministic, low-count mobile interpretation of ShapableMatter's
     // nebula mode. Position changes only during pagination—no idle ticker.
     const palette = [
-      MindNavFxPalette.primary,
-      MindNavFxPalette.livingGreen,
-      MindNavFxPalette.secondary,
+      MindRecipeFxPalette.primary,
+      MindRecipeFxPalette.livingGreen,
+      MindRecipeFxPalette.secondary,
       Color(0xff00b399),
     ];
     for (var i = 0; i < 28; i++) {
@@ -470,9 +470,9 @@ class _MindNavFxPainter extends CustomPainter {
     double opacityScale,
   ) {
     const colors = [
-      MindNavFxPalette.primary,
-      MindNavFxPalette.livingGreen,
-      MindNavFxPalette.secondary,
+      MindRecipeFxPalette.primary,
+      MindRecipeFxPalette.livingGreen,
+      MindRecipeFxPalette.secondary,
     ];
     for (var i = 0; i < colors.length; i++) {
       final verticalShift = math.sin(phase + i * 1.7) * 34;
@@ -497,7 +497,7 @@ class _MindNavFxPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _MindNavFxPainter oldDelegate) =>
+  bool shouldRepaint(covariant _MindRecipeFxPainter oldDelegate) =>
       oldDelegate.progress != progress ||
       oldDelegate.primary != primary ||
       oldDelegate.secondary != secondary ||

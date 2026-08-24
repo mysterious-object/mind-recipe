@@ -1,4 +1,4 @@
-name: Mind Nav checks
+name: Mind Recipe checks
 
 on:
   push:

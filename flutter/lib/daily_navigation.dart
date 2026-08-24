@@ -84,7 +84,7 @@ class _DailyNavigationState extends State<DailyNavigation> {
 
   String get _stepSubtitle {
     return switch (_current) {
-      NavStep.greeting => 'Mind Nav is here for you — no test, no performance, and you can redirect at any time.',
+      NavStep.greeting => 'Mind Recipe is here for you — no test, no performance, and you can redirect at any time.',
       NavStep.consent => 'Your data is private. Cloud AI requires your explicit consent each session.',
       NavStep.emotion => 'Select the emotions most present for you right now.',
       NavStep.body => 'Where do you notice sensations in your body?',
@@ -92,7 +92,7 @@ class _DailyNavigationState extends State<DailyNavigation> {
       NavStep.journal => 'Anything you\'d like to reflect on? This is private and never shared.',
       NavStep.recommendation => 'Describe what your green zone means today.',
       NavStep.action => 'What small wellness action can you take today?',
-      NavStep.followUp => 'Mind Nav will be here when you return.',
+      NavStep.followUp => 'Mind Recipe will be here when you return.',
       NavStep.complete => 'Your navigation is recorded. None of this is a diagnosis.',
     };
   }
@@ -119,9 +119,9 @@ class _DailyNavigationState extends State<DailyNavigation> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(_stepTitle, style: MindNavTokens.displayMedium(context)),
+                  Text(_stepTitle, style: MindRecipeTokens.displayMedium(context)),
                   const SizedBox(height: 8),
-                  Text(_stepSubtitle, style: MindNavTokens.bodyMedium(context).copyWith(
+                  Text(_stepSubtitle, style: MindRecipeTokens.bodyMedium(context).copyWith(
                     color: isDark ? Colors.white70 : Colors.black54,
                   )),
                   const SizedBox(height: 24),
@@ -229,23 +229,23 @@ class _GreetingStep extends StatelessWidget {
   final VoidCallback onContinue;
   @override
   Widget build(BuildContext context) => Semantics(
-    label: 'Mind Nav greeting. Tap to begin your daily navigation.',
+    label: 'Mind Recipe greeting. Tap to begin your daily navigation.',
     child: Card(
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
           children: [
-            Icon(Icons.navigation_rounded, size: 64, color: MindNavTokens.primary),
+            Icon(Icons.navigation_rounded, size: 64, color: MindRecipeTokens.primary),
             const SizedBox(height: 16),
-            Text('Welcome to Mind Nav',
-              style: MindNavTokens.headlineMedium(context),
+            Text('Welcome to Mind Recipe',
+              style: MindRecipeTokens.headlineMedium(context),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 12),
             Text(
               'This is a wellness tool, not therapy or medical care. '
               'You can skip any question, correct anything, and leave at any time.',
-              style: MindNavTokens.bodyMedium(context),
+              style: MindRecipeTokens.bodyMedium(context),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
@@ -283,7 +283,7 @@ class _ConsentStep extends StatelessWidget {
                 value: consentGiven,
                 onChanged: (v) => onChanged(v, cloudOptIn),
                 title: const Text('I understand this is a wellness tool'),
-                subtitle: const Text('Mind Nav does not diagnose, prescribe, or provide emergency care.'),
+                subtitle: const Text('Mind Recipe does not diagnose, prescribe, or provide emergency care.'),
               ),
               Divider(height: 1, color: Theme.of(context).dividerColor),
               SwitchListTile.adaptive(
@@ -335,8 +335,8 @@ class _ChipSelector extends StatelessWidget {
               if (v) { updated.add(option); } else { updated.remove(option); }
               onChanged(updated);
             },
-            selectedColor: MindNavTokens.primary.withAlpha(40),
-            checkmarkColor: MindNavTokens.primary,
+            selectedColor: MindRecipeTokens.primary.withAlpha(40),
+            checkmarkColor: MindRecipeTokens.primary,
           );
         }).toList(),
       ),
@@ -355,10 +355,10 @@ class _ActivationSlider extends StatelessWidget {
     child: Column(
       children: [
         Text('$value',
-          style: MindNavTokens.displayMedium(context).copyWith(
-            color: value < -2 ? MindNavTokens.warning :
-                   value > 2 ? MindNavTokens.success :
-                   MindNavTokens.primary,
+          style: MindRecipeTokens.displayMedium(context).copyWith(
+            color: value < -2 ? MindRecipeTokens.warning :
+                   value > 2 ? MindRecipeTokens.success :
+                   MindRecipeTokens.primary,
           ),
         ),
         Slider(
@@ -456,7 +456,7 @@ class _ActionSelector extends StatelessWidget {
           value: a,
           groupValue: value,
           onChanged: (v) => onChanged(v ?? ''),
-          activeColor: MindNavTokens.primary,
+          activeColor: MindRecipeTokens.primary,
         ))),
       ],
     ),
@@ -483,7 +483,7 @@ class _FollowUpStep extends StatelessWidget {
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
-            Text('Today\'s Navigation', style: MindNavTokens.headlineLarge(context)),
+            Text('Today\'s Navigation', style: MindRecipeTokens.headlineLarge(context)),
             const SizedBox(height: 16),
             _RowItem('Emotion', emotion.isNotEmpty ? emotion : 'Not recorded'),
             _RowItem('Activation', '$activation'),
@@ -491,8 +491,8 @@ class _FollowUpStep extends StatelessWidget {
             _RowItem('Action', action.isNotEmpty ? action : 'Not selected'),
             _RowItem('Journal', 'Private — stored locally only'),
             const SizedBox(height: 12),
-            Text('You can return to Mind Nav anytime. Your responses are stored on this device only.',
-              style: MindNavTokens.bodySmall(context),
+            Text('You can return to Mind Recipe anytime. Your responses are stored on this device only.',
+              style: MindRecipeTokens.bodySmall(context),
               textAlign: TextAlign.center,
             ),
           ],
@@ -512,8 +512,8 @@ class _RowItem extends StatelessWidget {
     child: Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: MindNavTokens.bodyMedium(context).copyWith(fontWeight: FontWeight.w600)),
-        Text(value, style: MindNavTokens.bodyMedium(context)),
+        Text(label, style: MindRecipeTokens.bodyMedium(context).copyWith(fontWeight: FontWeight.w600)),
+        Text(value, style: MindRecipeTokens.bodyMedium(context)),
       ],
     ),
   );
@@ -529,20 +529,20 @@ class _CompleteStep extends StatelessWidget {
         padding: const EdgeInsets.all(24),
         child: Column(
           children: [
-            Icon(Icons.check_circle, size: 64, color: MindNavTokens.success),
+            Icon(Icons.check_circle, size: 64, color: MindRecipeTokens.success),
             const SizedBox(height: 16),
             Text('Navigation complete',
-              style: MindNavTokens.headlineMedium(context),
+              style: MindRecipeTokens.headlineMedium(context),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 12),
-            Text('Your responses are saved locally. Mind Nav is a wellness tool — nothing here is a diagnosis or clinical record.',
-              style: MindNavTokens.bodyMedium(context),
+            Text('Your responses are saved locally. Mind Recipe is a wellness tool — nothing here is a diagnosis or clinical record.',
+              style: MindRecipeTokens.bodyMedium(context),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
             Text('You can view your progress in the Today tab.',
-              style: MindNavTokens.bodySmall(context),
+              style: MindRecipeTokens.bodySmall(context),
               textAlign: TextAlign.center,
             ),
           ],

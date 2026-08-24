@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 
@@ -9,18 +8,17 @@ import 'package:path_provider/path_provider.dart';
 
 import 'app_services.dart';
 import 'check_in_state.dart';
-import 'cinematic_experience.dart';
-import 'mind_nav_fx.dart';
-import 'mind_nav_device_harness.dart';
-import 'mind_nav_agent.dart';
+import 'mind_recipe_fx.dart';
+import 'mind_recipe_device_harness.dart';
+import 'navigator_agent.dart';
 import 'on_device_inference.dart';
 import 'voice_interface.dart';
 import 'conversation_viz.dart';
 
-const _voiceConversationKey = 'mind_nav_voice_conversation_enabled';
+const _voiceConversationKey = 'mind_recipe_voice_conversation_enabled';
 
-class MindNavChatExperience extends StatefulWidget {
-  const MindNavChatExperience({
+class NavigatorChatExperience extends StatefulWidget {
+  const NavigatorChatExperience({
     super.key,
     required this.state,
     required this.onChanged,
@@ -32,16 +30,17 @@ class MindNavChatExperience extends StatefulWidget {
 
   final CheckInState state;
   final VoidCallback onChanged;
-  final MindNavApiClient api;
+  final MindRecipeApiClient api;
   final SecureAppState appState;
   final List<ChatMessage> messages;
   final LocalInference? localInference;
 
   @override
-  State<MindNavChatExperience> createState() => _MindNavChatExperienceState();
+  State<NavigatorChatExperience> createState() =>
+      _NavigatorChatExperienceState();
 }
 
-class _MindNavChatExperienceState extends State<MindNavChatExperience>
+class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
     with SingleTickerProviderStateMixin {
   final composer = TextEditingController();
   final scrollController = ScrollController();
@@ -55,7 +54,7 @@ class _MindNavChatExperienceState extends State<MindNavChatExperience>
   double _lastMessageSide = 0.5;
   double _smoothActivity = 0.0;
   late final LocalInference _localInference;
-  final MindNavAgent _agent = const MindNavAgent();
+  final NavigatorAgent _agent = const NavigatorAgent();
   LocalInferenceSnapshot _localSnapshot = const LocalInferenceSnapshot(
     OnDeviceStatus.checking,
   );
@@ -65,7 +64,7 @@ class _MindNavChatExperienceState extends State<MindNavChatExperience>
       final dir =
           await getExternalStorageDirectory() ??
           await getApplicationDocumentsDirectory();
-      final file = File('${dir.path}/mindnav_debug.log');
+      final file = File('${dir.path}/mindrecipe_debug.log');
       final timestamp = DateTime.now().toIso8601String();
       await file.writeAsString('$timestamp $msg\n', mode: FileMode.append);
     } catch (_) {}
@@ -150,7 +149,7 @@ class _MindNavChatExperienceState extends State<MindNavChatExperience>
     );
     widget.onChanged();
     _scrollToEnd();
-    unawaited(MindNavDeviceHarness().acknowledgeTurn());
+    unawaited(MindRecipeDeviceHarness().acknowledgeTurn());
 
     // Private inference is the primary route. It does not require cloud
     // consent, a provider key, or sending conversation context off device.
@@ -598,11 +597,11 @@ class _PresenceHeader extends StatelessWidget {
       color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.82),
       borderRadius: BorderRadius.circular(28),
       border: Border.all(
-        color: MindNavFxPalette.primary.withValues(alpha: 0.34),
+        color: MindRecipeFxPalette.primary.withValues(alpha: 0.34),
       ),
       boxShadow: [
         BoxShadow(
-          color: MindNavFxPalette.primary.withValues(alpha: 0.12),
+          color: MindRecipeFxPalette.primary.withValues(alpha: 0.12),
           blurRadius: 26,
         ),
       ],
@@ -615,9 +614,13 @@ class _PresenceHeader extends StatelessWidget {
             scale: 0.94 + math.sin(animation.value * math.pi * 2) * 0.04,
             child: child,
           ),
-          child: const CinematicPresence(
-            size: 58,
-            icon: Icons.navigation_rounded,
+          child: ClipOval(
+            child: Image.asset(
+              'assets/branding/navigator-compass.png',
+              width: 58,
+              height: 58,
+              fit: BoxFit.cover,
+            ),
           ),
         ),
         const SizedBox(width: 13),
@@ -626,7 +629,7 @@ class _PresenceHeader extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'MIND NAV',
+                'NAVIGATOR',
                 style: TextStyle(
                   fontWeight: FontWeight.w900,
                   letterSpacing: 2.2,
@@ -650,7 +653,7 @@ class _PresenceHeader extends StatelessWidget {
           decoration: BoxDecoration(
             color:
                 ((localReady || cloudAvailable)
-                        ? MindNavFxPalette.livingGreen
+                        ? MindRecipeFxPalette.livingGreen
                         : Colors.orange)
                     .withValues(alpha: 0.14),
             borderRadius: BorderRadius.circular(99),
@@ -700,7 +703,7 @@ class _ChatBubble extends StatelessWidget {
                   colors: [
                     Theme.of(context).colorScheme.surface
                         .withValues(alpha: 0.96),
-                    MindNavFxPalette.secondary.withValues(alpha: 0.10),
+                    MindRecipeFxPalette.secondary.withValues(alpha: 0.10),
                   ],
                 ),
           color: status
@@ -716,14 +719,14 @@ class _ChatBubble extends StatelessWidget {
           border: Border.all(
             color: status
                 ? Theme.of(context).colorScheme.outlineVariant
-                : MindNavFxPalette.primary.withValues(alpha: 0.20),
+                : MindRecipeFxPalette.primary.withValues(alpha: 0.20),
           ),
           boxShadow: [
             BoxShadow(
               color:
                   (member
-                          ? MindNavFxPalette.secondary
-                          : MindNavFxPalette.primary)
+                          ? MindRecipeFxPalette.secondary
+                          : MindRecipeFxPalette.primary)
                       .withValues(alpha: 0.11),
               blurRadius: 20,
               offset: const Offset(0, 7),
@@ -738,7 +741,7 @@ class _ChatBubble extends StatelessWidget {
                   ? 'SYSTEM'
                   : member
                   ? 'YOU'
-                  : 'MIND NAV',
+                  : 'NAVIGATOR',
               style: TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.w900,
@@ -823,7 +826,7 @@ class _ThinkingBubble extends StatelessWidget {
             child: CircularProgressIndicator(strokeWidth: 2),
           ),
           SizedBox(width: 10),
-          Text('Mind Nav is responding…'),
+          Text('Navigator is responding…'),
         ],
       ),
     ),
@@ -865,7 +868,7 @@ class _Composer extends StatelessWidget {
       color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.94),
       border: Border(
         top: BorderSide(
-          color: MindNavFxPalette.primary.withValues(alpha: 0.22),
+          color: MindRecipeFxPalette.primary.withValues(alpha: 0.22),
         ),
       ),
     ),
@@ -884,7 +887,7 @@ class _Composer extends StatelessWidget {
                 onSubmitted: (_) => onSend(),
                 decoration: InputDecoration(
                   hintText: canSend
-                      ? 'Tell Mind Nav what is present…'
+                      ? 'Tell Navigator what is present…'
                       : 'Install private AI or connect cloud AI',
                   filled: true,
                   border: OutlineInputBorder(
@@ -898,7 +901,7 @@ class _Composer extends StatelessWidget {
             IconButton.filled(
               onPressed: canSend && !sending ? onSend : null,
               icon: const Icon(Icons.arrow_upward_rounded),
-              tooltip: 'Send to Mind Nav',
+              tooltip: 'Send to Navigator',
             ),
             const SizedBox(width: 4),
             IconButton(
@@ -910,7 +913,7 @@ class _Composer extends StatelessWidget {
               ),
               tooltip: isSpeaking
                   ? 'Interrupt and speak'
-                  : (isListening ? 'Stop listening' : 'Speak to Mind Nav'),
+                  : (isListening ? 'Stop listening' : 'Speak to Navigator'),
               color: (isListening || isSpeaking) ? Colors.red : null,
             ),
           ],
@@ -964,7 +967,9 @@ class _ChatFieldPainter extends CustomPainter {
           );
     canvas.drawRect(Offset.zero & size, glow);
     final line = Paint()
-      ..color = MindNavFxPalette.secondary.withValues(alpha: 0.14 * intensity)
+      ..color = MindRecipeFxPalette.secondary.withValues(
+        alpha: 0.14 * intensity,
+      )
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.3;
     for (var i = 0; i < 5; i++) {

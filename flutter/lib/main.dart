@@ -9,42 +9,55 @@ import 'check_in_state.dart';
 import 'cinematic_experience.dart';
 import 'daily_navigation.dart';
 import 'design_tokens.dart';
-import 'mind_nav_chat.dart';
-import 'mind_nav_fx.dart';
+import 'navigator_chat.dart';
+import 'mind_recipe_fx.dart';
 import 'on_device_inference.dart';
 import 'notification_scheduler.dart';
 import 'practitioner_sharing.dart';
-import 'wellness_toolbox.dart';
+import 'recipes_screen.dart';
 
-void main() => runApp(const MindNavApp());
+void main() => runApp(const MindRecipeApp());
 
-class MindNavApp extends StatefulWidget {
-  const MindNavApp({super.key, this.initialAppState, this.initialApi});
+class MindRecipeApp extends StatefulWidget {
+  const MindRecipeApp({super.key, this.initialAppState, this.initialApi});
   final SecureAppState? initialAppState;
-  final MindNavApiClient? initialApi;
+  final MindRecipeApiClient? initialApi;
   @override
-  State<MindNavApp> createState() => _MindNavAppState();
+  State<MindRecipeApp> createState() => _MindRecipeAppState();
 }
 
-class _MindNavAppState extends State<MindNavApp> {
+class _MindRecipeAppState extends State<MindRecipeApp> {
   bool practitionerMode = false;
   bool onboardingComplete = false;
-  ThemeMode _themeMode = ThemeMode.system;
-  late final MindNavApiClient api;
+  bool _initializing = true;
+  late final MindRecipeApiClient api;
   late final SecureAppState appState;
 
   @override
   void initState() {
     super.initState();
-    api = widget.initialApi ?? MindNavApiClient();
+    api = widget.initialApi ?? MindRecipeApiClient();
     appState = widget.initialAppState ?? SecureAppState();
     appState.addListener(_refresh);
     _initialize();
   }
 
   Future<void> _initialize() async {
-    if (!appState.loaded) await appState.load();
-    appState.setManagedAiAvailable(await api.aiAvailable());
+    try {
+      if (!appState.loaded) await appState.load();
+      final restored = appState.session;
+      if (restored != null) {
+        final verified = await api.restoreSession(restored);
+        if (verified == null) {
+          await appState.clearSession();
+        } else {
+          await appState.setSession(verified);
+        }
+      }
+      appState.setManagedAiAvailable(await api.aiAvailable());
+    } finally {
+      if (mounted) setState(() => _initializing = false);
+    }
   }
 
   void _refresh() {
@@ -59,38 +72,65 @@ class _MindNavAppState extends State<MindNavApp> {
 
   @override
   Widget build(BuildContext context) {
-    final scheme =
-        ColorScheme.fromSeed(
-          seedColor: const Color(0xff007d71),
-          brightness: Brightness.light,
-        ).copyWith(
-          primary: const Color(0xff006b60),
-          secondary: MindNavFxPalette.secondary,
-          tertiary: const Color(0xff007a4d),
-        );
+    final themeMode = switch (appState.appearanceMode) {
+      'light' => ThemeMode.light,
+      'dark' => ThemeMode.dark,
+      _ => ThemeMode.system,
+    };
+    final (seed, secondary, tertiary) = switch (appState.chimeraTheme) {
+      'ocean' => (
+        const Color(0xff006d91),
+        const Color(0xff0088a8),
+        const Color(0xff315da8),
+      ),
+      'aurora' => (
+        const Color(0xff6750a4),
+        const Color(0xff008f83),
+        const Color(0xffa13b86),
+      ),
+      'ember' => (
+        const Color(0xffa34213),
+        const Color(0xffc26a00),
+        const Color(0xff8b3a62),
+      ),
+      'twilight' => (
+        const Color(0xff4648a3),
+        const Color(0xff7651a8),
+        const Color(0xff007c91),
+      ),
+      _ => (
+        const Color(0xff007d71),
+        MindRecipeFxPalette.secondary,
+        const Color(0xff007a4d),
+      ),
+    };
+    final scheme = ColorScheme.fromSeed(
+      seedColor: seed,
+      brightness: Brightness.light,
+    ).copyWith(primary: seed, secondary: secondary, tertiary: tertiary);
     return MaterialApp(
-      title: 'Mind Nav',
+      title: 'Mind Recipe',
       theme: ThemeData(
         colorScheme: scheme,
         useMaterial3: true,
-        scaffoldBackgroundColor: MindNavTokens.surfaceWhite,
+        scaffoldBackgroundColor: MindRecipeTokens.surfaceWhite,
       ),
       darkTheme: ThemeData(
         colorScheme:
             ColorScheme.fromSeed(
-              seedColor: MindNavTokens.primary,
+              seedColor: seed,
               brightness: Brightness.dark,
             ).copyWith(
-              primary: MindNavTokens.primary,
-              secondary: MindNavTokens.secondary,
-              tertiary: MindNavTokens.tertiary,
-              surface: MindNavTokens.surfaceBlack,
+              primary: seed,
+              secondary: secondary,
+              tertiary: tertiary,
+              surface: MindRecipeTokens.surfaceBlack,
             ),
         useMaterial3: true,
-        scaffoldBackgroundColor: MindNavTokens.voidBlack,
+        scaffoldBackgroundColor: MindRecipeTokens.voidBlack,
       ),
-      themeMode: _themeMode,
-      home: !appState.loaded
+      themeMode: themeMode,
+      home: !appState.loaded || _initializing
           ? const Scaffold(body: Center(child: CircularProgressIndicator()))
           : appState.session == null
           ? AccountGateway(api: api, appState: appState)
@@ -124,7 +164,7 @@ class MemberHome extends StatefulWidget {
     required this.onSignOut,
   });
   final VoidCallback onPractitioner;
-  final MindNavApiClient api;
+  final MindRecipeApiClient api;
   final SecureAppState appState;
   final VoidCallback onSignOut;
   @override
@@ -139,18 +179,14 @@ class _MemberHomeState extends State<MemberHome> {
   final tools = <String>{};
   final chatMessages = <ChatMessage>[];
   final labels = const [
-    'Mind Nav AI',
-    'Today',
-    'Toolbox',
-    'Mind Recipe',
+    'Navigator',
+    'Recipes',
     'Progress',
     'Booking',
     'Settings',
   ];
   final icons = const [
     Icons.navigation,
-    Icons.today,
-    Icons.handyman,
     Icons.menu_book,
     Icons.insights,
     Icons.calendar_month,
@@ -158,18 +194,35 @@ class _MemberHomeState extends State<MemberHome> {
   ];
   late final PageController pageController;
   late final ScrollController railController;
+  Timer? navigatorReadinessTimer;
 
   @override
   void initState() {
     super.initState();
     pageController = PageController();
     railController = ScrollController();
+    // Readiness belongs to the signed-in app lifecycle, not to whether the
+    // Navigator page happened to be laid out by PageView yet.
+    unawaited(_primeNavigator());
+    navigatorReadinessTimer = Timer.periodic(
+      const Duration(seconds: 8),
+      (_) => unawaited(_primeNavigator()),
+    );
+  }
+
+  Future<void> _primeNavigator() async {
+    await OnDeviceInference().refreshStatus();
+    if (!widget.appState.aiAvailable) {
+      widget.appState.setManagedAiAvailable(await widget.api.aiAvailable());
+    }
+    if (widget.appState.aiAvailable) navigatorReadinessTimer?.cancel();
   }
 
   @override
   void dispose() {
     pageController.dispose();
     railController.dispose();
+    navigatorReadinessTimer?.cancel();
     super.dispose();
   }
 
@@ -222,16 +275,14 @@ class _MemberHomeState extends State<MemberHome> {
                 setState(() {});
               },
             )
-          : MindNavChatExperience(
+          : NavigatorChatExperience(
               state: checkIn,
               onChanged: () => setState(() {}),
               api: widget.api,
               appState: widget.appState,
               messages: chatMessages,
             ),
-      TodayScreen(appState: widget.appState),
-      WellnessToolbox(appState: widget.appState),
-      const MindRecipeScreen(),
+      RecipesScreen(api: widget.api, appState: widget.appState),
       ProgressScreen(checkIn: checkIn, tools: tools),
       const BookingScreen(),
       ProfileScreen(
@@ -248,7 +299,7 @@ class _MemberHomeState extends State<MemberHome> {
             : index.toDouble();
         return Scaffold(
           appBar: AppBar(
-            title: MindNavPageTitle(
+            title: MindRecipePageTitle(
               title: labels[index],
               forward: index >= previousIndex,
             ),
@@ -275,7 +326,11 @@ class _MemberHomeState extends State<MemberHome> {
                       : Icons.dark_mode,
                 ),
                 tooltip: 'Toggle dark mode',
-                onPressed: () => setState(() {}),
+                onPressed: () => widget.appState.setAppearanceMode(
+                  Theme.of(context).brightness == Brightness.dark
+                      ? 'light'
+                      : 'dark',
+                ),
               ),
             ],
           ),
@@ -286,12 +341,20 @@ class _MemberHomeState extends State<MemberHome> {
                 Expanded(
                   child: Stack(
                     children: [
-                      Positioned.fill(
-                        child: MindNavGpuField(progress: progress),
-                      ),
-                      Positioned.fill(
-                        child: MindNavFxBackdrop(progress: progress),
-                      ),
+                      if (widget.appState.chimeraFxEnabled)
+                        Positioned.fill(
+                          child: Opacity(
+                            opacity: widget.appState.chimeraFxIntensity,
+                            child: MindRecipeGpuField(progress: progress),
+                          ),
+                        ),
+                      if (widget.appState.chimeraFxEnabled)
+                        Positioned.fill(
+                          child: Opacity(
+                            opacity: widget.appState.chimeraFxIntensity,
+                            child: MindRecipeFxBackdrop(progress: progress),
+                          ),
+                        ),
                       PageView(
                         controller: pageController,
                         physics: MediaQuery.disableAnimationsOf(context)
@@ -312,7 +375,7 @@ class _MemberHomeState extends State<MemberHome> {
               ],
             ),
           ),
-          bottomNavigationBar: MindNavPageRail(
+          bottomNavigationBar: MindRecipePageRail(
             labels: labels,
             icons: icons,
             selectedIndex: index,
@@ -327,7 +390,7 @@ class _MemberHomeState extends State<MemberHome> {
 }
 
 /// Persistent banner for the selected private model so progress is visible
-/// on every tab (Today, Toolbox, Settings, etc.), not just the Settings tab.
+/// on every tab (Recipes, Progress, Settings, etc.), not just Settings.
 /// Fixes the tab-switch bug where the LinearProgressIndicator disappeared.
 class PrivateModelDownloadBanner extends StatefulWidget {
   const PrivateModelDownloadBanner({super.key});
@@ -490,7 +553,7 @@ class _TodayScreenState extends State<TodayScreen> {
   }
 
   Future<void> _loadData() async {
-    final api = MindNavApiClient();
+    final api = MindRecipeApiClient();
     final memberId = widget.appState.session?.email ?? 'dev-member';
     final trends = await api.getTrends(memberId);
     final patterns = await api.detectPatterns(memberId);
@@ -507,7 +570,7 @@ class _TodayScreenState extends State<TodayScreen> {
     padding: const EdgeInsets.all(20),
     children: [
       const Text(
-        'Your day, shaped by the navigation you have done with Mind Nav AI.',
+        'Your day, shaped by the navigation you have done with Navigator.',
         style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
       ),
       const SizedBox(height: 16),
@@ -559,7 +622,7 @@ class _TodayScreenState extends State<TodayScreen> {
       const SizedBox(height: 16),
       if (_loaded && _patterns.isNotEmpty)
         Card(
-          color: MindNavTokens.primary.withAlpha(15),
+          color: MindRecipeTokens.primary.withAlpha(15),
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -567,7 +630,7 @@ class _TodayScreenState extends State<TodayScreen> {
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.insights, color: MindNavTokens.primary),
+                    const Icon(Icons.insights, color: MindRecipeTokens.primary),
                     const SizedBox(width: 8),
                     const Text(
                       'Patterns detected',
@@ -590,8 +653,8 @@ class _TodayScreenState extends State<TodayScreen> {
                               : Icons.trending_down,
                           size: 18,
                           color: p['type'] == 'activation_improving'
-                              ? MindNavTokens.success
-                              : MindNavTokens.warning,
+                              ? MindRecipeTokens.success
+                              : MindRecipeTokens.warning,
                         ),
                         const SizedBox(width: 8),
                         Expanded(
@@ -654,8 +717,8 @@ class _TodayMetric extends StatelessWidget {
   );
 }
 
-class ToolboxScreen extends StatelessWidget {
-  const ToolboxScreen({
+class RecipePracticeScreen extends StatelessWidget {
+  const RecipePracticeScreen({
     super.key,
     required this.selected,
     required this.onToggle,
@@ -667,7 +730,7 @@ class ToolboxScreen extends StatelessWidget {
     padding: const EdgeInsets.all(20),
     children: [
       const Text(
-        'Build your wellness toolbox',
+        'Build your wellness recipe',
         style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
       ),
       const Text(
@@ -687,58 +750,7 @@ class ToolboxScreen extends StatelessWidget {
             value: selected.contains(tool),
             onChanged: (_) => onToggle(tool),
             title: Text(tool),
-            subtitle: const Text('Mind Recipe wellness tool'),
-          ),
-        ),
-      ),
-    ],
-  );
-}
-
-class MindRecipeScreen extends StatelessWidget {
-  const MindRecipeScreen({super.key});
-  @override
-  Widget build(BuildContext context) => ListView(
-    padding: const EdgeInsets.all(20),
-    children: const [
-      Text(
-        'Mind Recipe',
-        style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
-      ),
-      Text(
-        'A self-development program for brain-body awareness and conscious living.',
-      ),
-      SizedBox(height: 16),
-      Card(
-        child: ListTile(
-          leading: CircleAvatar(child: Text('11')),
-          title: Text('Orientation'),
-          subtitle: Text('11 of 50 lessons complete'),
-          trailing: Icon(Icons.chevron_right),
-        ),
-      ),
-      Card(
-        child: ListTile(
-          leading: Icon(Icons.track_changes),
-          title: Text('Mindful Check-In'),
-          subtitle: Text('Emotion, body sensations, thoughts, surroundings'),
-        ),
-      ),
-      Card(
-        child: ListTile(
-          leading: Icon(Icons.favorite_outline),
-          title: Text('Regulation Tool Used'),
-          subtitle: Text(
-            'Breath, grounding, movement, cold water, music, and more',
-          ),
-        ),
-      ),
-      Card(
-        child: ListTile(
-          leading: Icon(Icons.groups_outlined),
-          title: Text('MindChefs & MindMentor'),
-          subtitle: Text(
-            'Community content will be imported after verified Passion.io inventory.',
+            subtitle: const Text('Mind Recipe practice'),
           ),
         ),
       ),
@@ -768,7 +780,7 @@ class ProgressScreen extends StatelessWidget {
       ),
       Card(
         child: ListTile(
-          title: const Text('Wellness toolbox'),
+          title: const Text('Recipes and saved practices'),
           subtitle: Text(
             '${tools.length} saved practice${tools.length == 1 ? '' : 's'}',
           ),
@@ -852,15 +864,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
     OnDeviceStatus.checking,
   );
   bool _modelActionInProgress = false;
-  OnDeviceModelChoice _selectedPrivateChoice = mindNavPrivateModelChoices.last;
+  bool _privateModelSelectionTouched = false;
+  Set<String> _downloadedPrivateModelIds = const {};
+  OnDeviceModelChoice _selectedPrivateChoice =
+      mindRecipePrivateModelChoices.last;
+  late double _chimeraFxIntensity;
   Timer? _progressTimer;
 
   @override
   void initState() {
     super.initState();
+    _chimeraFxIntensity = widget.appState.chimeraFxIntensity;
     _refreshPrivateModel();
     _progressTimer = Timer.periodic(const Duration(milliseconds: 500), (_) {
       if (!mounted) return;
+      final current = OnDeviceInference().snapshot;
+      if (_modelActionInProgress ||
+          current.status == OnDeviceStatus.downloading ||
+          current.status == OnDeviceStatus.verifying) {
+        setState(() => _privateModel = current);
+        return;
+      }
       // While downloading/verifying, just repaint progress from the
       // singleton — calling refreshStatus would risk resetting `downloading`
       // → `notInstalled` while .partial is still growing (tab-switch bug).
@@ -884,19 +908,88 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _refreshPrivateModel() async {
     final snapshot = await OnDeviceInference().refreshStatus();
+    final downloaded = await OnDeviceInference().downloadedModelIds();
     if (mounted) {
       final active = OnDeviceInference().activeModel.id;
       setState(() {
         _privateModel = snapshot;
-        _selectedPrivateChoice = mindNavPrivateModelChoices.firstWhere(
-          (choice) => choice.manifest.id == active,
-          orElse: () => _selectedPrivateChoice,
-        );
+        _downloadedPrivateModelIds = downloaded;
+        if (!_privateModelSelectionTouched || snapshot.isReady) {
+          _selectedPrivateChoice = mindRecipePrivateModelChoices.firstWhere(
+            (choice) => choice.manifest.id == active,
+            orElse: () => _selectedPrivateChoice,
+          );
+        }
       });
     }
   }
 
+  Future<void> _usePrivateModel(OnDeviceModelChoice choice) async {
+    setState(() => _modelActionInProgress = true);
+    try {
+      await OnDeviceInference().activateModel(choice.manifest);
+      _privateModelSelectionTouched = false;
+      await _refreshPrivateModel();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${choice.name} is now active.')),
+        );
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not activate ${choice.name}: $error')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _modelActionInProgress = false);
+    }
+  }
+
+  Future<void> _removePrivateModel(OnDeviceModelChoice choice) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Remove ${choice.name}?'),
+        content: const Text(
+          'This deletes the downloaded model from this device. You can download it again later.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _modelActionInProgress = true);
+    try {
+      await OnDeviceInference().removeDownloadedModel(choice.manifest);
+      _privateModelSelectionTouched = false;
+      await _refreshPrivateModel();
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('${choice.name} was removed.')));
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not remove ${choice.name}: $error')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _modelActionInProgress = false);
+    }
+  }
+
   Future<void> _installPrivateModel() async {
+    final selectedName = _selectedPrivateChoice.name;
     setState(() => _modelActionInProgress = true);
     var installed = false;
     try {
@@ -904,9 +997,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
         model: _selectedPrivateChoice.manifest,
       );
       installed = true;
+      _privateModelSelectionTouched = false;
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$selectedName is ready for private guidance.'),
+          ),
+        );
+      }
     } catch (_) {
       // Preserve the safe failure detail from OnDeviceInference below.
-      if (mounted) setState(() => _privateModel = OnDeviceInference().snapshot);
+      if (mounted) {
+        setState(() => _privateModel = OnDeviceInference().snapshot);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              _privateModel.detail ?? 'The private model could not be prepared. Try again from Settings.',
+            ),
+          ),
+        );
+      }
     } finally {
       if (installed) await _refreshPrivateModel();
       if (mounted) setState(() => _modelActionInProgress = false);
@@ -920,7 +1030,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final value = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Connect Mind Nav AI'),
+        title: const Text('Connect Navigator'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -969,6 +1079,157 @@ class _ProfileScreenState extends State<ProfileScreen> {
         style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
       ),
       Card(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const ListTile(
+              leading: Icon(Icons.auto_awesome_rounded),
+              title: Text('Chimera FX appearance'),
+              subtitle: Text(
+                'Choose the app theme and control the animated visual atmosphere.',
+              ),
+            ),
+            const Divider(height: 1),
+            RadioListTile<String>(
+              title: const Text('Follow device theme'),
+              value: 'system',
+              groupValue: widget.appState.appearanceMode,
+              onChanged: (value) => widget.appState.setAppearanceMode(value!),
+            ),
+            RadioListTile<String>(
+              title: const Text('Light'),
+              value: 'light',
+              groupValue: widget.appState.appearanceMode,
+              onChanged: (value) => widget.appState.setAppearanceMode(value!),
+            ),
+            RadioListTile<String>(
+              title: const Text('Dark'),
+              value: 'dark',
+              groupValue: widget.appState.appearanceMode,
+              onChanged: (value) => widget.appState.setAppearanceMode(value!),
+            ),
+            const Divider(height: 1),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 14, 16, 6),
+              child: Text(
+                'COLOR THEME',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.1,
+                ),
+              ),
+            ),
+            for (final theme in const [
+              (
+                id: 'verdant',
+                name: 'Verdant Signal',
+                description: 'Signature teal, green, and violet',
+                colors: [Color(0xff007d71), Color(0xff7c3aed)],
+              ),
+              (
+                id: 'ocean',
+                name: 'Deep Ocean',
+                description: 'Cool blue, cyan, and indigo',
+                colors: [Color(0xff006d91), Color(0xff315da8)],
+              ),
+              (
+                id: 'aurora',
+                name: 'Aurora',
+                description: 'Violet, turquoise, and orchid',
+                colors: [Color(0xff6750a4), Color(0xff008f83)],
+              ),
+              (
+                id: 'ember',
+                name: 'Warm Ember',
+                description: 'Grounded copper, amber, and berry',
+                colors: [Color(0xffa34213), Color(0xffc26a00)],
+              ),
+              (
+                id: 'twilight',
+                name: 'Twilight',
+                description: 'Indigo, purple, and dusk blue',
+                colors: [Color(0xff4648a3), Color(0xff7651a8)],
+              ),
+            ])
+              RadioListTile<String>(
+                title: Text(theme.name),
+                subtitle: Text(theme.description),
+                value: theme.id,
+                groupValue: widget.appState.chimeraTheme,
+                onChanged: (value) => widget.appState.setChimeraTheme(value!),
+                secondary: SizedBox(
+                  width: 42,
+                  child: Stack(
+                    children: [
+                      CircleAvatar(
+                        radius: 13,
+                        backgroundColor: theme.colors.first,
+                      ),
+                      Positioned(
+                        left: 16,
+                        top: 8,
+                        child: CircleAvatar(
+                          radius: 13,
+                          backgroundColor: theme.colors.last,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            const Divider(height: 1),
+            SwitchListTile(
+              title: const Text('Chimera FX motion'),
+              subtitle: const Text(
+                'Show animated fields and reactive background effects.',
+              ),
+              value: widget.appState.chimeraFxEnabled,
+              onChanged: widget.appState.setChimeraFxEnabled,
+            ),
+            if (widget.appState.chimeraFxEnabled)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'FX intensity · ${(_chimeraFxIntensity * 100).round()}%',
+                    ),
+                    Slider(
+                      value: _chimeraFxIntensity,
+                      min: 0.2,
+                      max: 1,
+                      divisions: 8,
+                      label: '${(_chimeraFxIntensity * 100).round()}%',
+                      onChanged: (value) =>
+                          setState(() => _chimeraFxIntensity = value),
+                      onChangeEnd: widget.appState.setChimeraFxIntensity,
+                    ),
+                    Wrap(
+                      spacing: 8,
+                      children: [
+                        for (final preset in const [
+                          ('Calm', 0.3),
+                          ('Balanced', 0.7),
+                          ('Vivid', 1.0),
+                        ])
+                          ActionChip(
+                            label: Text(preset.$1),
+                            onPressed: () {
+                              setState(() => _chimeraFxIntensity = preset.$2);
+                              widget.appState.setChimeraFxIntensity(preset.$2);
+                            },
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+      Card(
         child: ListTile(
           leading: Icon(
             widget.appState.aiAvailable
@@ -977,8 +1238,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           title: Text(
             widget.appState.aiAvailable
-                ? 'Mind Nav AI connected'
-                : 'Mind Nav AI not connected',
+                ? 'Navigator connected'
+                : 'Navigator not connected',
           ),
           subtitle: Text(
             widget.appState.managedAiAvailable
@@ -1019,13 +1280,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     style: TextStyle(fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(height: 8),
-                  ...mindNavPrivateModelChoices.map(
+                  ...mindRecipePrivateModelChoices.map(
                     (choice) => InkWell(
                       borderRadius: BorderRadius.circular(12),
                       onTap: _modelActionInProgress
                           ? null
-                          : () =>
-                                setState(() => _selectedPrivateChoice = choice),
+                          : () => setState(() {
+                              _privateModelSelectionTouched = true;
+                              _selectedPrivateChoice = choice;
+                            }),
                       child: Container(
                         width: double.infinity,
                         margin: const EdgeInsets.only(bottom: 8),
@@ -1062,9 +1325,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   groupValue: _selectedPrivateChoice,
                                   onChanged: _modelActionInProgress
                                       ? null
-                                      : (value) => setState(
-                                          () => _selectedPrivateChoice = value!,
-                                        ),
+                                      : (value) => setState(() {
+                                          _privateModelSelectionTouched = true;
+                                          _selectedPrivateChoice = value!;
+                                        }),
                                 ),
                               ],
                             ),
@@ -1074,13 +1338,69 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               '${choice.bestFor}\n${choice.memoryNote}',
                               style: Theme.of(context).textTheme.bodySmall,
                             ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                if (choice.manifest.id ==
+                                        OnDeviceInference().activeModel.id &&
+                                    _privateModel.isReady)
+                                  const Chip(
+                                    avatar: Icon(Icons.check_circle, size: 16),
+                                    label: Text('Active'),
+                                  )
+                                else if (_downloadedPrivateModelIds.contains(
+                                  choice.manifest.id,
+                                ))
+                                  OutlinedButton.icon(
+                                    onPressed: _modelActionInProgress
+                                        ? null
+                                        : () => _usePrivateModel(choice),
+                                    icon: const Icon(
+                                      Icons.swap_horiz_rounded,
+                                      size: 18,
+                                    ),
+                                    label: const Text('Use model'),
+                                  )
+                                else
+                                  FilledButton.tonalIcon(
+                                    onPressed: _modelActionInProgress
+                                        ? null
+                                        : () {
+                                            setState(() {
+                                              _privateModelSelectionTouched =
+                                                  true;
+                                              _selectedPrivateChoice = choice;
+                                            });
+                                            _installPrivateModel();
+                                          },
+                                    icon: const Icon(
+                                      Icons.download_rounded,
+                                      size: 18,
+                                    ),
+                                    label: const Text('Download'),
+                                  ),
+                                const Spacer(),
+                                if (_downloadedPrivateModelIds.contains(
+                                  choice.manifest.id,
+                                ))
+                                  IconButton(
+                                    onPressed: _modelActionInProgress
+                                        ? null
+                                        : () => _removePrivateModel(choice),
+                                    tooltip: 'Remove ${choice.name}',
+                                    icon: const Icon(
+                                      Icons.delete_outline_rounded,
+                                    ),
+                                  ),
+                              ],
+                            ),
                           ],
                         ),
                       ),
                     ),
                   ),
                   Text(
-                    'Every option listed here is downloaded only after you tap Install and is verified before it can run.',
+                    'Download only the models you want. Every download is verified before it can run, and you can switch or remove it here at any time.',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ],
@@ -1112,30 +1432,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
             const Divider(height: 1),
             ButtonBar(
               children: [
-                if (_privateModel.isReady &&
+                if (_downloadedPrivateModelIds.contains(
+                      _selectedPrivateChoice.manifest.id,
+                    ) &&
                     _selectedPrivateChoice.manifest.id !=
                         OnDeviceInference().activeModel.id)
                   FilledButton.icon(
                     onPressed: _modelActionInProgress
                         ? null
-                        : _installPrivateModel,
+                        : () => _usePrivateModel(_selectedPrivateChoice),
                     icon: const Icon(Icons.swap_horiz_rounded),
-                    label: Text('Switch to ${_selectedPrivateChoice.name}'),
+                    label: Text('Use ${_selectedPrivateChoice.name}'),
                   )
-                else if (_privateModel.isReady)
+                else if (_downloadedPrivateModelIds.contains(
+                  _selectedPrivateChoice.manifest.id,
+                ))
                   TextButton.icon(
                     onPressed: _modelActionInProgress
                         ? null
-                        : () async {
-                            setState(() => _modelActionInProgress = true);
-                            await OnDeviceInference().removeModel();
-                            await _refreshPrivateModel();
-                            if (mounted) {
-                              setState(() => _modelActionInProgress = false);
-                            }
-                          },
+                        : () => _removePrivateModel(_selectedPrivateChoice),
                     icon: const Icon(Icons.delete_outline_rounded),
-                    label: const Text('Remove model'),
+                    label: Text('Remove ${_selectedPrivateChoice.name}'),
                   )
                 else
                   FilledButton.icon(
@@ -1187,21 +1504,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ),
       ),
-      Card(
+      const Card(
         child: ListTile(
-          leading: const Icon(Icons.construction),
-          title: const Text('Wellness toolbox'),
-          subtitle: const Text(
-            'Manage your wellness practices, track effectiveness, and discover new tools.',
-          ),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) =>
-                  Scaffold(body: WellnessToolbox(appState: widget.appState)),
-            ),
-          ),
+          leading: Icon(Icons.menu_book_outlined),
+          title: Text('Recipes and saved practices'),
+          subtitle: Text('Manage practices from the Recipes tab.'),
         ),
       ),
       Card(
@@ -1321,7 +1628,7 @@ class _WellnessBoundary extends StatelessWidget {
   const _WellnessBoundary();
   @override
   Widget build(BuildContext context) => const Text(
-    'Mind Nav supports wellness and self-reflection. It is not therapy, medical care, diagnosis, or emergency response.',
+    'Mind Recipe supports wellness and self-reflection. It is not therapy, medical care, diagnosis, or emergency response.',
     style: TextStyle(fontSize: 12, color: Colors.black54),
   );
 }

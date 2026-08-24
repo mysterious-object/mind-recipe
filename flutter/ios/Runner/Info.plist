@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Mind Nav</string>
+	<string>Mind Recipe</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -15,7 +15,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>mind_nav</string>
+	<string>mind_recipe</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -27,9 +27,9 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Mind Nav uses the microphone only when you choose to speak a response.</string>
+	<string>Mind Recipe uses the microphone only when you choose to speak a response.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>Mind Nav converts the response you choose to speak into text for your conversation.</string>
+	<string>Mind Recipe converts the response you choose to speak into text for your conversation.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

@@ -3,7 +3,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-import 'mind_nav_fx.dart';
+import 'mind_recipe_fx.dart';
 
 class CinematicOnboarding extends StatefulWidget {
   const CinematicOnboarding({super.key, required this.onComplete});
@@ -29,7 +29,7 @@ class _CinematicOnboardingState extends State<CinematicOnboarding> {
     _OnboardingScene(
       eyebrow: 'NAVIGATE',
       title: 'Build your route back to steady.',
-      body: 'Your green zone is personal. Together, you build a toolbox from the practices that genuinely help you return.',
+      body: 'Your green zone is personal. Together, you build a recipe from the practices that genuinely help you return.',
       detail: 'No universal score. You define what steady means.',
       icon: Icons.explore_rounded,
     ),
@@ -69,13 +69,13 @@ class _CinematicOnboardingState extends State<CinematicOnboarding> {
       brightness: Brightness.dark,
       colorScheme:
           ColorScheme.fromSeed(
-            seedColor: MindNavFxPalette.primary,
+            seedColor: MindRecipeFxPalette.primary,
             brightness: Brightness.dark,
           ).copyWith(
-            primary: MindNavFxPalette.primary,
-            secondary: MindNavFxPalette.secondary,
-            tertiary: MindNavFxPalette.livingGreen,
-            surface: MindNavFxPalette.surfaceBlack,
+            primary: MindRecipeFxPalette.primary,
+            secondary: MindRecipeFxPalette.secondary,
+            tertiary: MindRecipeFxPalette.livingGreen,
+            surface: MindRecipeFxPalette.surfaceBlack,
           ),
       useMaterial3: true,
     );
@@ -83,7 +83,7 @@ class _CinematicOnboardingState extends State<CinematicOnboarding> {
     return Theme(
       data: darkTheme,
       child: Scaffold(
-        backgroundColor: MindNavFxPalette.voidBlack,
+        backgroundColor: MindRecipeFxPalette.voidBlack,
         body: AnimatedBuilder(
           animation: pageController,
           builder: (context, _) {
@@ -92,8 +92,8 @@ class _CinematicOnboardingState extends State<CinematicOnboarding> {
                 : page.toDouble();
             return Stack(
               children: [
-                Positioned.fill(child: MindNavGpuField(progress: progress)),
-                Positioned.fill(child: MindNavFxBackdrop(progress: progress)),
+                Positioned.fill(child: MindRecipeGpuField(progress: progress)),
+                Positioned.fill(child: MindRecipeFxBackdrop(progress: progress)),
                 SafeArea(
                   child: Column(
                     children: [
@@ -101,7 +101,7 @@ class _CinematicOnboardingState extends State<CinematicOnboarding> {
                         padding: const EdgeInsets.fromLTRB(20, 10, 12, 0),
                         child: Row(
                           children: [
-                            const _MindNavWordmark(),
+                            const _MindRecipeWordmark(),
                             const Spacer(),
                             TextButton(
                               onPressed: widget.onComplete,
@@ -135,8 +135,8 @@ class _CinematicOnboardingState extends State<CinematicOnboarding> {
                                   gradient: index == page
                                       ? const LinearGradient(
                                           colors: [
-                                            MindNavFxPalette.primary,
-                                            MindNavFxPalette.livingGreen,
+                                            MindRecipeFxPalette.primary,
+                                            MindRecipeFxPalette.livingGreen,
                                           ],
                                         )
                                       : null,
@@ -155,7 +155,7 @@ class _CinematicOnboardingState extends State<CinematicOnboarding> {
                               ),
                               label: Text(
                                 page == scenes.length - 1
-                                    ? 'Enter Mind Nav'
+                                    ? 'Enter Mind Recipe'
                                     : 'Continue',
                               ),
                             ),
@@ -203,7 +203,7 @@ class _SceneView extends StatelessWidget {
               Text(
                 scene.eyebrow,
                 style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  color: MindNavFxPalette.primary,
+                  color: MindRecipeFxPalette.primary,
                   letterSpacing: 2.4,
                   fontWeight: FontWeight.w800,
                 ),
@@ -229,7 +229,7 @@ class _SceneView extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.055),
                   border: Border.all(
-                    color: MindNavFxPalette.primary.withValues(alpha: 0.22),
+                    color: MindRecipeFxPalette.primary.withValues(alpha: 0.22),
                   ),
                   borderRadius: BorderRadius.circular(16),
                 ),
@@ -237,7 +237,7 @@ class _SceneView extends StatelessWidget {
                   children: [
                     const Icon(
                       Icons.auto_awesome_rounded,
-                      color: MindNavFxPalette.livingGreen,
+                      color: MindRecipeFxPalette.livingGreen,
                       size: 18,
                     ),
                     const SizedBox(width: 9),
@@ -376,29 +376,29 @@ class _LivingAssistantCardState extends State<LivingAssistantCard> {
     final scheme = Theme.of(context).colorScheme;
     return Semantics(
       liveRegion: true,
-      label: thinking ? 'Mind Nav is preparing a reflection' : widget.message,
+      label: thinking ? 'Mind Recipe is preparing a reflection' : widget.message,
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [
               Color.alphaBlend(
-                MindNavFxPalette.primary.withValues(alpha: 0.11),
+                MindRecipeFxPalette.primary.withValues(alpha: 0.11),
                 scheme.surfaceContainer,
               ),
               Color.alphaBlend(
-                MindNavFxPalette.secondary.withValues(alpha: 0.08),
+                MindRecipeFxPalette.secondary.withValues(alpha: 0.08),
                 scheme.surfaceContainer,
               ),
             ],
           ),
           borderRadius: BorderRadius.circular(24),
           border: Border.all(
-            color: MindNavFxPalette.primary.withValues(alpha: 0.24),
+            color: MindRecipeFxPalette.primary.withValues(alpha: 0.24),
           ),
           boxShadow: [
             BoxShadow(
-              color: MindNavFxPalette.primary.withValues(alpha: 0.09),
+              color: MindRecipeFxPalette.primary.withValues(alpha: 0.09),
               blurRadius: 28,
               offset: const Offset(0, 10),
             ),
@@ -416,7 +416,7 @@ class _LivingAssistantCardState extends State<LivingAssistantCard> {
                   Row(
                     children: [
                       Text(
-                        'MIND NAV',
+                        'NAVIGATOR',
                         style: Theme.of(context).textTheme.labelMedium
                             ?.copyWith(
                               fontWeight: FontWeight.w800,
@@ -428,7 +428,7 @@ class _LivingAssistantCardState extends State<LivingAssistantCard> {
                         width: 6,
                         height: 6,
                         decoration: const BoxDecoration(
-                          color: MindNavFxPalette.livingGreen,
+                          color: MindRecipeFxPalette.livingGreen,
                           shape: BoxShape.circle,
                         ),
                       ),
@@ -486,22 +486,22 @@ class _ThinkingDot extends StatelessWidget {
     width: 7,
     height: 7,
     decoration: BoxDecoration(
-      color: MindNavFxPalette.primary.withValues(alpha: opacity),
+      color: MindRecipeFxPalette.primary.withValues(alpha: opacity),
       shape: BoxShape.circle,
     ),
   );
 }
 
-class _MindNavWordmark extends StatelessWidget {
-  const _MindNavWordmark();
+class _MindRecipeWordmark extends StatelessWidget {
+  const _MindRecipeWordmark();
 
   @override
   Widget build(BuildContext context) => const Row(
     children: [
-      Icon(Icons.navigation_rounded, color: MindNavFxPalette.primary),
+      Icon(Icons.navigation_rounded, color: MindRecipeFxPalette.primary),
       SizedBox(width: 8),
       Text(
-        'MIND NAV',
+        'NAVIGATOR',
         style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.7),
       ),
     ],
@@ -551,9 +551,9 @@ class _PresencePainter extends CustomPainter {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: const [
-            MindNavFxPalette.primary,
-            MindNavFxPalette.livingGreen,
-            MindNavFxPalette.secondary,
+            MindRecipeFxPalette.primary,
+            MindRecipeFxPalette.livingGreen,
+            MindRecipeFxPalette.secondary,
           ],
           transform: GradientRotation(progress * math.pi * 2),
         ).createShader(Rect.fromCircle(center: center, radius: radius)),
@@ -567,9 +567,9 @@ class _PresencePainter extends CustomPainter {
         1.8 + i * 0.6,
         Paint()
           ..color = [
-            MindNavFxPalette.primary,
-            MindNavFxPalette.livingGreen,
-            MindNavFxPalette.secondary,
+            MindRecipeFxPalette.primary,
+            MindRecipeFxPalette.livingGreen,
+            MindRecipeFxPalette.secondary,
           ][i].withValues(alpha: 0.8),
       );
     }

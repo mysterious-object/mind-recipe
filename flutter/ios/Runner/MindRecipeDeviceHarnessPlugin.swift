@@ -1,13 +1,13 @@
 import Flutter
 import UIKit
 
-final class MindNavDeviceHarnessPlugin: NSObject, FlutterPlugin {
+final class MindRecipeDeviceHarnessPlugin: NSObject, FlutterPlugin {
   static func register(with registrar: FlutterPluginRegistrar) {
     let channel = FlutterMethodChannel(
-      name: "mindnav.dev/device_harness",
+      name: "contextfield.mindrecipe/device_harness",
       binaryMessenger: registrar.messenger()
     )
-    registrar.addMethodCallDelegate(MindNavDeviceHarnessPlugin(), channel: channel)
+    registrar.addMethodCallDelegate(MindRecipeDeviceHarnessPlugin(), channel: channel)
   }
 
   func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {

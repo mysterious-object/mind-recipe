@@ -13,7 +13,7 @@ Future<void> _voiceLog(String msg) async {
     final dir =
         await getExternalStorageDirectory() ??
         await getApplicationDocumentsDirectory();
-    final file = File('${dir.path}/mindnav_debug.log');
+    final file = File('${dir.path}/mindrecipe_debug.log');
     final timestamp = DateTime.now().toIso8601String();
     await file.writeAsString(
       '$timestamp [VOICE] $msg\n',
@@ -22,13 +22,13 @@ Future<void> _voiceLog(String msg) async {
   } catch (_) {}
 }
 
-/// Voice interface for Mind Nav — native recognition and interruptible audio.
+/// Voice interface for Mind Recipe — native recognition and interruptible audio.
 class VoiceInterface {
   static final VoiceInterface _instance = VoiceInterface._();
   factory VoiceInterface() => _instance;
   VoiceInterface._();
 
-  static const _channel = MethodChannel('mindnav.dev/voice');
+  static const _channel = MethodChannel('contextfield.mindrecipe/voice');
 
   bool _isListening = false;
   bool _isSpeaking = false;
@@ -80,7 +80,7 @@ class VoiceInterface {
 
   /// Plays a licensed human recording and resolves when playback ends.
   ///
-  /// Dynamic AI text is deliberately not accepted here: Mind Nav must never
+  /// Dynamic AI text is deliberately not accepted here: Mind Recipe must never
   /// substitute synthetic speech when the member selected a human voice.
   Future<bool> playRecordedCueAndWait(String filePath) async {
     if (_isSpeaking) await stopSpeaking();
@@ -99,7 +99,7 @@ class VoiceInterface {
     }
   }
 
-  /// Renders the current Mind Nav companion voice, then plays the completed
+  /// Renders the current Mind Recipe companion voice, then plays the completed
   /// audio through the same interruption-safe recorded-audio path.
   /// If the cloud voice is unavailable (offline, 1.2 GB model verifying, or
   /// API error), falls back to the offline system TTS so read-aloud still
@@ -115,7 +115,7 @@ class VoiceInterface {
         // Read-aloud must feel immediate.  The network voice is a nice-to-have;
         // do not make a member wait through its much longer API timeout before
         // falling back to the operating system voice.
-        final rendered = await MindNavApiClient()
+        final rendered = await MindRecipeApiClient()
             .synthesizeVoice(text, speed: 0.97)
             .timeout(const Duration(seconds: 4));
         if (_speechEpoch != epoch) {
@@ -126,7 +126,7 @@ class VoiceInterface {
         if (audio != null && audio.isNotEmpty) {
           await _voiceLog('audio received base64_len=${audio.length}');
           final folder = await getTemporaryDirectory();
-          final file = File('${folder.path}/mind_nav_companion.mp3');
+          final file = File('${folder.path}/navigator_companion.mp3');
           await file.writeAsBytes(base64Decode(audio), flush: true);
           if (_speechEpoch != epoch) {
             await _voiceLog('epoch mismatch after write');
@@ -162,7 +162,7 @@ class VoiceInterface {
       return ok ?? false;
     } catch (error) {
       await _voiceLog('ERROR: $error');
-      debugPrint('Mind Nav voice rendering error: $error');
+      debugPrint('Navigator voice rendering error: $error');
       return false;
     } finally {
       if (_speechEpoch == epoch) _isSpeaking = false;

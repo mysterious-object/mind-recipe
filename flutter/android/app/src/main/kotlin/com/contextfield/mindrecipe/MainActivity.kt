@@ -1,4 +1,4 @@
-package io.mindnav.mind_nav
+package com.contextfield.mindrecipe
 
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -7,6 +7,6 @@ class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         flutterEngine.plugins.add(VoicePlugin())
-        flutterEngine.plugins.add(MindNavDeviceHarnessPlugin())
+        flutterEngine.plugins.add(MindRecipeDeviceHarnessPlugin())
     }
 }

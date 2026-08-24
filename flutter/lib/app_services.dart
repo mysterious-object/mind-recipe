@@ -4,9 +4,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
-const mindNavApiBase = String.fromEnvironment(
-  'MIND_NAV_API_BASE',
-  defaultValue: 'https://staging-api.mindnav.142.93.201.156.sslip.io',
+const mindRecipeApiBase = String.fromEnvironment(
+  'MIND_RECIPE_API_BASE',
+  defaultValue: 'https://staging-api.mindrecipe.142.93.201.156.sslip.io',
 );
 
 class AccountSession {
@@ -20,8 +20,9 @@ class AccountSession {
   final String email;
 }
 
-class MindNavApiClient {
-  MindNavApiClient({http.Client? client}) : _client = client ?? http.Client();
+class MindRecipeApiClient {
+  MindRecipeApiClient({http.Client? client})
+    : _client = client ?? http.Client();
   final http.Client _client;
 
   Future<AccountSession> register({
@@ -39,13 +40,40 @@ class MindNavApiClient {
     required String password,
   }) => _authenticate('/v1/auth/login', {'email': email, 'password': password});
 
+  /// Confirms that a restored credential still represents a real account.
+  /// Mobile secure storage can survive an app reinstall (iOS Keychain) or be
+  /// restored from backup (Android), so merely finding a token is not enough
+  /// to bypass the account gateway.
+  Future<AccountSession?> restoreSession(AccountSession stored) async {
+    if (stored.token.trim().isEmpty) return null;
+    try {
+      final response = await _client
+          .get(
+            Uri.parse('$mindRecipeApiBase/v1/auth/me'),
+            headers: {'authorization': 'Bearer ${stored.token}'},
+          )
+          .timeout(const Duration(seconds: 8));
+      if (response.statusCode != 200) return null;
+      final user = jsonDecode(response.body) as Map<String, dynamic>;
+      return AccountSession(
+        token: stored.token,
+        displayName: user['display_name']?.toString() ?? stored.displayName,
+        email: user['email']?.toString() ?? stored.email,
+      );
+    } catch (_) {
+      // Fail closed: an unverifiable saved credential must not silently open
+      // the member area. The person can sign in again from the gateway.
+      return null;
+    }
+  }
+
   Future<AccountSession> _authenticate(
     String path,
     Map<String, String> body,
   ) async {
     final response = await _client
         .post(
-          Uri.parse('$mindNavApiBase$path'),
+          Uri.parse('$mindRecipeApiBase$path'),
           headers: const {'content-type': 'application/json'},
           body: jsonEncode(body),
         )
@@ -78,14 +106,14 @@ class MindNavApiClient {
   Map<String, String> _memberHeaders(String token, {bool json = false}) => {
     if (json) 'content-type': 'application/json',
     if (token.isNotEmpty) 'authorization': 'Bearer $token',
-    if (token.isEmpty) 'x-mind-nav-user': 'local-device-member',
-    'x-mind-nav-role': 'member',
+    if (token.isEmpty) 'x-mind-recipe-user': 'local-device-member',
+    'x-mind-recipe-role': 'member',
   };
 
   Future<bool> aiAvailable() async {
     try {
       final response = await _client
-          .get(Uri.parse('$mindNavApiBase/v1/assistant/status'))
+          .get(Uri.parse('$mindRecipeApiBase/v1/assistant/status'))
           .timeout(const Duration(seconds: 4));
       if (response.statusCode != 200) return false;
       return (jsonDecode(response.body) as Map<String, dynamic>)['available'] ==
@@ -104,11 +132,12 @@ class MindNavApiClient {
   }) async {
     final response = await _client
         .post(
-          Uri.parse('$mindNavApiBase/v1/assistant/respond'),
+          Uri.parse('$mindRecipeApiBase/v1/assistant/respond'),
           headers: {
             'content-type': 'application/json',
             if (token.isNotEmpty) 'authorization': 'Bearer $token',
-            if (providerKey.isNotEmpty) 'x-mind-nav-provider-key': providerKey,
+            if (providerKey.isNotEmpty)
+              'x-mind-recipe-provider-key': providerKey,
           },
           body: jsonEncode({
             'text': text,
@@ -121,7 +150,7 @@ class MindNavApiClient {
         )
         .timeout(const Duration(seconds: 30));
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw const ApiException('Mind Nav AI is temporarily unavailable.');
+      throw const ApiException('Navigator is temporarily unavailable.');
     }
     final decoded = jsonDecode(response.body) as Map<String, dynamic>;
     return AiReply(
@@ -134,7 +163,7 @@ class MindNavApiClient {
 
   Future<Map<String, dynamic>> getTrends(String memberId) async {
     final response = await _client
-        .get(Uri.parse('$mindNavApiBase/v1/trends/$memberId'))
+        .get(Uri.parse('$mindRecipeApiBase/v1/trends/$memberId'))
         .timeout(const Duration(seconds: 5));
     if (response.statusCode != 200) return {};
     return jsonDecode(response.body) as Map<String, dynamic>;
@@ -142,7 +171,7 @@ class MindNavApiClient {
 
   Future<List<dynamic>> detectPatterns(String memberId) async {
     final response = await _client
-        .get(Uri.parse('$mindNavApiBase/v1/patterns/$memberId'))
+        .get(Uri.parse('$mindRecipeApiBase/v1/patterns/$memberId'))
         .timeout(const Duration(seconds: 5));
     if (response.statusCode != 200) return [];
     return jsonDecode(response.body) as List<dynamic>;
@@ -150,7 +179,7 @@ class MindNavApiClient {
 
   Future<List<dynamic>> fetchConsents(String id) async {
     final r = await _client
-        .get(Uri.parse('$mindNavApiBase/v1/consents/$id'))
+        .get(Uri.parse('$mindRecipeApiBase/v1/consents/$id'))
         .timeout(const Duration(seconds: 5));
     if (r.statusCode != 200) return [];
     return (jsonDecode(r.body) as List<dynamic>);
@@ -158,7 +187,7 @@ class MindNavApiClient {
 
   Future<List<dynamic>> fetchAudit(String id) async {
     final r = await _client
-        .get(Uri.parse('$mindNavApiBase/v1/audit/$id?limit=20'))
+        .get(Uri.parse('$mindRecipeApiBase/v1/audit/$id?limit=20'))
         .timeout(const Duration(seconds: 5));
     if (r.statusCode != 200) return [];
     return (jsonDecode(r.body) as List<dynamic>);
@@ -175,7 +204,7 @@ class MindNavApiClient {
         .toIso8601String();
     await _client
         .post(
-          Uri.parse('$mindNavApiBase/v1/consents'),
+          Uri.parse('$mindRecipeApiBase/v1/consents'),
           headers: {'content-type': 'application/json'},
           body: jsonEncode({
             'recipient_practitioner_id': practitionerId,
@@ -188,23 +217,23 @@ class MindNavApiClient {
         .timeout(const Duration(seconds: 5));
   }
 
-  Future<List<Map<String, dynamic>>> fetchToolbox({
+  Future<List<Map<String, dynamic>>> fetchRecipePractice({
     required String token,
   }) async {
     final response = await _client
         .get(
-          Uri.parse('$mindNavApiBase/v1/toolbox'),
+          Uri.parse('$mindRecipeApiBase/v1/recipes/practices'),
           headers: _memberHeaders(token),
         )
         .timeout(const Duration(seconds: 8));
     if (response.statusCode != 200) {
-      throw const ApiException('Could not load your toolbox.');
+      throw const ApiException('Could not load your saved practices.');
     }
     return (jsonDecode(response.body) as List<dynamic>)
         .cast<Map<String, dynamic>>();
   }
 
-  Future<Map<String, dynamic>> createToolboxItem({
+  Future<Map<String, dynamic>> createRecipePracticeItem({
     required String token,
     required String name,
     required String description,
@@ -213,7 +242,7 @@ class MindNavApiClient {
   }) async {
     final response = await _client
         .post(
-          Uri.parse('$mindNavApiBase/v1/toolbox'),
+          Uri.parse('$mindRecipeApiBase/v1/recipes/practices'),
           headers: _memberHeaders(token, json: true),
           body: jsonEncode({
             'name': name,
@@ -229,36 +258,37 @@ class MindNavApiClient {
     return jsonDecode(response.body) as Map<String, dynamic>;
   }
 
-  Future<Map<String, dynamic>> createAiToolboxItem({
+  Future<Map<String, dynamic>> createAiRecipePracticeItem({
     required String token,
     required String description,
     required String providerKey,
   }) async {
     final response = await _client
         .post(
-          Uri.parse('$mindNavApiBase/v1/toolbox/ai-create'),
+          Uri.parse('$mindRecipeApiBase/v1/recipes/practices/ai-create'),
           headers: {
             ..._memberHeaders(token, json: true),
-            if (providerKey.isNotEmpty) 'x-mind-nav-provider-key': providerKey,
+            if (providerKey.isNotEmpty)
+              'x-mind-recipe-provider-key': providerKey,
           },
           body: jsonEncode({'description': description}),
         )
         .timeout(const Duration(seconds: 30));
 
     if (response.statusCode != 200) {
-      throw Exception('Failed to create AI toolbox item: ${response.body}');
+      throw Exception('Failed to create AI recipe practice: ${response.body}');
     }
     return jsonDecode(response.body) as Map<String, dynamic>;
   }
 
-  Future<Map<String, dynamic>> setToolboxFavorite({
+  Future<Map<String, dynamic>> setRecipePracticeFavorite({
     required String token,
     required String itemId,
     required bool favorite,
   }) async {
     final response = await _client
         .patch(
-          Uri.parse('$mindNavApiBase/v1/toolbox/$itemId/favorite'),
+          Uri.parse('$mindRecipeApiBase/v1/recipes/practices/$itemId/favorite'),
           headers: _memberHeaders(token, json: true),
           body: jsonEncode({'favorite': favorite}),
         )
@@ -269,7 +299,7 @@ class MindNavApiClient {
     return jsonDecode(response.body) as Map<String, dynamic>;
   }
 
-  Future<Map<String, dynamic>> recordToolboxPractice({
+  Future<Map<String, dynamic>> recordRecipePracticePractice({
     required String token,
     required String itemId,
     required int effectiveness,
@@ -277,7 +307,7 @@ class MindNavApiClient {
   }) async {
     final response = await _client
         .post(
-          Uri.parse('$mindNavApiBase/v1/toolbox/$itemId/practice'),
+          Uri.parse('$mindRecipeApiBase/v1/recipes/practices/$itemId/practice'),
           headers: _memberHeaders(token, json: true),
           body: jsonEncode({
             'tool_id': itemId,
@@ -292,13 +322,13 @@ class MindNavApiClient {
     return jsonDecode(response.body) as Map<String, dynamic>;
   }
 
-  Future<void> deleteToolboxItem({
+  Future<void> deleteRecipePracticeItem({
     required String token,
     required String itemId,
   }) async {
     final response = await _client
         .delete(
-          Uri.parse('$mindNavApiBase/v1/toolbox/$itemId'),
+          Uri.parse('$mindRecipeApiBase/v1/recipes/practices/$itemId'),
           headers: _memberHeaders(token),
         )
         .timeout(const Duration(seconds: 8));
@@ -307,26 +337,56 @@ class MindNavApiClient {
     }
   }
 
+  Future<Map<String, dynamic>> getCurriculumProgress({
+    required String token,
+  }) async {
+    final response = await _client
+        .get(
+          Uri.parse('$mindRecipeApiBase/v1/recipes/progress'),
+          headers: _memberHeaders(token),
+        )
+        .timeout(const Duration(seconds: 8));
+    if (response.statusCode != 200)
+      throw const ApiException('Could not sync recipe progress.');
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> putCurriculumProgress({
+    required String token,
+    required Map<String, dynamic> progress,
+  }) async {
+    final response = await _client
+        .put(
+          Uri.parse('$mindRecipeApiBase/v1/recipes/progress'),
+          headers: _memberHeaders(token, json: true),
+          body: jsonEncode(progress),
+        )
+        .timeout(const Duration(seconds: 8));
+    if (response.statusCode != 200)
+      throw const ApiException('Could not sync recipe progress.');
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
   Future<Map<String, dynamic>> synthesizeVoice(
     String text, {
     double speed = 1.0,
-    String voice = 'mind_nav_companion',
+    String voice = 'navigator_companion',
   }) async {
     final response = await _client
         .post(
-          Uri.parse('$mindNavApiBase/v1/voice/synthesize'),
+          Uri.parse('$mindRecipeApiBase/v1/voice/synthesize'),
           headers: const {'content-type': 'application/json'},
           body: jsonEncode({'text': text, 'speed': speed, 'voice': voice}),
         )
         .timeout(const Duration(seconds: 35));
     if (response.statusCode != 200) {
-      throw const ApiException('Mind Nav voice is temporarily unavailable.');
+      throw const ApiException('Navigator voice is temporarily unavailable.');
     }
     final decoded = jsonDecode(response.body) as Map<String, dynamic>;
     if (decoded['success'] != true) {
       throw ApiException(
         decoded['error']?.toString() ??
-            'Mind Nav voice is temporarily unavailable.',
+            'Navigator voice is temporarily unavailable.',
       );
     }
     return decoded;
@@ -356,13 +416,19 @@ class ApiException implements Exception {
 
 class SecureAppState extends ChangeNotifier {
   static const _storage = FlutterSecureStorage();
-  static const _tokenKey = 'mind_nav_session_token';
-  static const _nameKey = 'mind_nav_display_name';
-  static const _emailKey = 'mind_nav_email';
-  static const _providerKey = 'mind_nav_openrouter_key';
-  static const _assistantActivityKey = 'mind_nav_assistant_activity';
-  static const _cloudAiEnabledKey = 'mind_nav_cloud_ai_enabled';
-  static const _publicResearchEnabledKey = 'mind_nav_public_research_enabled';
+  static const _tokenKey = 'mind_recipe_session_token';
+  static const _nameKey = 'mind_recipe_display_name';
+  static const _emailKey = 'mind_recipe_email';
+  static const _providerKey = 'mind_recipe_openrouter_key';
+  static const _assistantActivityKey = 'mind_recipe_assistant_activity';
+  static const _cloudAiEnabledKey = 'mind_recipe_cloud_ai_enabled';
+  static const _publicResearchEnabledKey =
+      'mind_recipe_public_research_enabled';
+  static const _appearanceModeKey = 'mind_recipe_appearance_mode';
+  static const _chimeraThemeKey = 'mind_recipe_chimera_theme';
+  static const _chimeraFxEnabledKey = 'mind_recipe_chimera_fx_enabled';
+  static const _chimeraFxIntensityKey = 'mind_recipe_chimera_fx_intensity';
+  static const _curriculumProgressKey = 'mind_recipe_curriculum_progress';
 
   AccountSession? session;
   String openRouterKey = '';
@@ -370,6 +436,10 @@ class SecureAppState extends ChangeNotifier {
   bool managedAiAvailable = false;
   bool cloudAiEnabled = true;
   bool publicResearchEnabled = false;
+  String appearanceMode = 'system';
+  String chimeraTheme = 'verdant';
+  bool chimeraFxEnabled = true;
+  double chimeraFxIntensity = 0.7;
   String _activityDate = '';
   int _navigationSessions = 0;
   int _messagesSent = 0;
@@ -402,6 +472,10 @@ class SecureAppState extends ChangeNotifier {
         _storage.read(key: _assistantActivityKey),
         _storage.read(key: _cloudAiEnabledKey),
         _storage.read(key: _publicResearchEnabledKey),
+        _storage.read(key: _appearanceModeKey),
+        _storage.read(key: _chimeraThemeKey),
+        _storage.read(key: _chimeraFxEnabledKey),
+        _storage.read(key: _chimeraFxIntensityKey),
       ]);
       if ((values[0] ?? '').isNotEmpty) {
         session = AccountSession(
@@ -423,6 +497,22 @@ class SecureAppState extends ChangeNotifier {
       }
       cloudAiEnabled = values[5] != 'false';
       publicResearchEnabled = values[6] == 'true';
+      appearanceMode = const {'system', 'light', 'dark'}.contains(values[7])
+          ? values[7]!
+          : 'system';
+      chimeraTheme =
+          const {
+            'verdant',
+            'ocean',
+            'aurora',
+            'ember',
+            'twilight',
+          }.contains(values[8])
+          ? values[8]!
+          : 'verdant';
+      chimeraFxEnabled = values[9] != 'false';
+      chimeraFxIntensity =
+          double.tryParse(values[10] ?? '')?.clamp(0.2, 1.0).toDouble() ?? 0.7;
     } catch (_) {
       // Secure storage can be unavailable in some test harnesses. The app stays fail-closed.
     }
@@ -474,6 +564,30 @@ class SecureAppState extends ChangeNotifier {
     }
   }
 
+  /// Completion is always written locally first so the curriculum remains fully
+  /// usable offline. The Recipes screen sends this compact payload on the next
+  /// authenticated connection; reflections deliberately never leave the device.
+  Future<Map<String, dynamic>?> loadCurriculumProgress() async {
+    try {
+      final raw = await _storage.read(key: _curriculumProgressKey);
+      if (raw == null || raw.isEmpty) return null;
+      return jsonDecode(raw) as Map<String, dynamic>;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> saveCurriculumProgress(Map<String, dynamic> progress) async {
+    try {
+      await _storage.write(
+        key: _curriculumProgressKey,
+        value: jsonEncode(progress),
+      );
+    } catch (_) {
+      // The current session still holds the change when secure storage fails.
+    }
+  }
+
   static String _todayKey() {
     final now = DateTime.now();
     return '${now.year.toString().padLeft(4, '0')}-'
@@ -483,10 +597,15 @@ class SecureAppState extends ChangeNotifier {
 
   Future<void> setSession(AccountSession value) async {
     session = value;
-    await _storage.write(key: _tokenKey, value: value.token);
-    await _storage.write(key: _nameKey, value: value.displayName);
-    await _storage.write(key: _emailKey, value: value.email);
     notifyListeners();
+    try {
+      await _storage.write(key: _tokenKey, value: value.token);
+      await _storage.write(key: _nameKey, value: value.displayName);
+      await _storage.write(key: _emailKey, value: value.email);
+    } catch (_) {
+      // The authenticated in-memory session remains usable if platform secure
+      // storage is temporarily unavailable; the user can sign in next launch.
+    }
   }
 
   void useLocalDemo() {
@@ -520,6 +639,43 @@ class SecureAppState extends ChangeNotifier {
     await _storage.write(key: _publicResearchEnabledKey, value: '$value');
   }
 
+  Future<void> setAppearanceMode(String value) async {
+    if (!const {'system', 'light', 'dark'}.contains(value)) return;
+    appearanceMode = value;
+    notifyListeners();
+    await _storage.write(key: _appearanceModeKey, value: value);
+  }
+
+  Future<void> setChimeraTheme(String value) async {
+    if (!const {
+      'verdant',
+      'ocean',
+      'aurora',
+      'ember',
+      'twilight',
+    }.contains(value)) {
+      return;
+    }
+    chimeraTheme = value;
+    notifyListeners();
+    await _storage.write(key: _chimeraThemeKey, value: value);
+  }
+
+  Future<void> setChimeraFxEnabled(bool value) async {
+    chimeraFxEnabled = value;
+    notifyListeners();
+    await _storage.write(key: _chimeraFxEnabledKey, value: '$value');
+  }
+
+  Future<void> setChimeraFxIntensity(double value) async {
+    chimeraFxIntensity = value.clamp(0.2, 1.0).toDouble();
+    notifyListeners();
+    await _storage.write(
+      key: _chimeraFxIntensityKey,
+      value: chimeraFxIntensity.toString(),
+    );
+  }
+
   Future<void> signOut() async {
     session = null;
     _activityDate = '';
@@ -532,6 +688,16 @@ class SecureAppState extends ChangeNotifier {
       _storage.delete(key: _nameKey),
       _storage.delete(key: _emailKey),
       _storage.delete(key: _assistantActivityKey),
+    ]);
+    notifyListeners();
+  }
+
+  Future<void> clearSession() async {
+    session = null;
+    await Future.wait([
+      _storage.delete(key: _tokenKey),
+      _storage.delete(key: _nameKey),
+      _storage.delete(key: _emailKey),
     ]);
     notifyListeners();
   }

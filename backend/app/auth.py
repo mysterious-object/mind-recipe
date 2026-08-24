@@ -7,7 +7,6 @@ import json
 import os
 import secrets
 import sqlite3
-import tempfile
 import time
 from dataclasses import dataclass
 from typing import Dict, Optional
@@ -26,31 +25,47 @@ class UserAccount:
     password_hash: str
 
 
-class DevelopmentAuthStore:
-    """In-memory account store for local development and emulator testing only."""
+class AccountStore:
+    """Persistent account store for registration and authenticated sessions."""
 
     def __init__(self) -> None:
         self.users_by_email: Dict[str, UserAccount] = {}
         self.users_by_id: Dict[str, UserAccount] = {}
+        self.database_url = settings.database_url
+        self.uses_postgres = self.database_url.startswith("postgresql")
         self.db_path = os.getenv(
-            "MIND_NAV_DEV_AUTH_DB",
-            os.path.join(tempfile.gettempdir(), "mind-nav-development-auth.sqlite3"),
+            "MIND_RECIPE_AUTH_DB",
+            os.getenv("MIND_RECIPE_DB_PATH", os.path.expanduser("~/.mindrecipe/mindrecipe.db")),
         )
+        if not self.uses_postgres:
+            os.makedirs(os.path.dirname(os.path.abspath(self.db_path)), exist_ok=True)
         self._initialize_database()
 
-    def _connect(self) -> sqlite3.Connection:
+    def _sqlite_connect(self) -> sqlite3.Connection:
         return sqlite3.connect(self.db_path)
 
     def _initialize_database(self) -> None:
-        with self._connect() as connection:
-            connection.execute(
-                "CREATE TABLE IF NOT EXISTS accounts ("
-                "id TEXT PRIMARY KEY, email TEXT UNIQUE NOT NULL, "
-                "display_name TEXT NOT NULL, password_hash TEXT NOT NULL)"
-            )
-            rows = connection.execute(
-                "SELECT id, email, display_name, password_hash FROM accounts"
-            ).fetchall()
+        if self.uses_postgres:
+            import psycopg
+            with psycopg.connect(self.database_url) as connection:
+                connection.execute(
+                    "CREATE TABLE IF NOT EXISTS accounts ("
+                    "id TEXT PRIMARY KEY, email TEXT UNIQUE NOT NULL, "
+                    "display_name TEXT NOT NULL, password_hash TEXT NOT NULL)"
+                )
+                rows = connection.execute(
+                    "SELECT id, email, display_name, password_hash FROM accounts"
+                ).fetchall()
+        else:
+            with self._sqlite_connect() as connection:
+                connection.execute(
+                    "CREATE TABLE IF NOT EXISTS accounts ("
+                    "id TEXT PRIMARY KEY, email TEXT UNIQUE NOT NULL, "
+                    "display_name TEXT NOT NULL, password_hash TEXT NOT NULL)"
+                )
+                rows = connection.execute(
+                    "SELECT id, email, display_name, password_hash FROM accounts"
+                ).fetchall()
         for row in rows:
             account = UserAccount(*row)
             self.users_by_email[account.email] = account
@@ -59,8 +74,13 @@ class DevelopmentAuthStore:
     def clear(self) -> None:
         self.users_by_email.clear()
         self.users_by_id.clear()
-        with self._connect() as connection:
-            connection.execute("DELETE FROM accounts")
+        if self.uses_postgres:
+            import psycopg
+            with psycopg.connect(self.database_url) as connection:
+                connection.execute("DELETE FROM accounts")
+        else:
+            with self._sqlite_connect() as connection:
+                connection.execute("DELETE FROM accounts")
 
     def register(self, email: str, display_name: str, password: str) -> UserAccount:
         normalized = email.strip().lower()
@@ -74,11 +94,20 @@ class DevelopmentAuthStore:
         )
         self.users_by_email[normalized] = account
         self.users_by_id[account.id] = account
-        with self._connect() as connection:
-            connection.execute(
-                "INSERT INTO accounts (id, email, display_name, password_hash) VALUES (?, ?, ?, ?)",
-                (account.id, account.email, account.display_name, account.password_hash),
-            )
+        values = (account.id, account.email, account.display_name, account.password_hash)
+        if self.uses_postgres:
+            import psycopg
+            with psycopg.connect(self.database_url) as connection:
+                connection.execute(
+                    "INSERT INTO accounts (id, email, display_name, password_hash) VALUES (%s, %s, %s, %s)",
+                    values,
+                )
+        else:
+            with self._sqlite_connect() as connection:
+                connection.execute(
+                    "INSERT INTO accounts (id, email, display_name, password_hash) VALUES (?, ?, ?, ?)",
+                    values,
+                )
         return account
 
     def authenticate(self, email: str, password: str) -> UserAccount:
@@ -114,13 +143,13 @@ def _decode(raw: str) -> bytes:
 
 
 def _secret() -> bytes:
-    configured = os.getenv("MIND_NAV_AUTH_SECRET", "")
+    configured = os.getenv("MIND_RECIPE_AUTH_SECRET", "")
     if configured:
         if len(configured) < 32:
-            raise RuntimeError("MIND_NAV_AUTH_SECRET must be at least 32 characters")
+            raise RuntimeError("MIND_RECIPE_AUTH_SECRET must be at least 32 characters")
         return configured.encode()
     if not settings.development:
-        raise RuntimeError("production requires MIND_NAV_AUTH_SECRET")
+        raise RuntimeError("production requires MIND_RECIPE_AUTH_SECRET")
     return _development_secret
 
 
@@ -151,4 +180,4 @@ def verify_token(token: str) -> str:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid or expired session")
 
 
-auth_store = DevelopmentAuthStore()
+auth_store = AccountStore()

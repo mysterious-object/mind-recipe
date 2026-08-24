@@ -1,12 +1,12 @@
-/// Design tokens for Mind Nav wellness platform.
+/// Design tokens for Mind Recipe wellness platform.
 /// 
 /// These replace hardcoded colors, sizes, and typography throughout the app.
 /// All components should reference these tokens rather than using Material defaults.
 
 import 'package:flutter/material.dart';
 
-class MindNavTokens {
-  MindNavTokens._();
+class MindRecipeTokens {
+  MindRecipeTokens._();
 
   // ── Color Palette ────────────────────────────────────────────────
 

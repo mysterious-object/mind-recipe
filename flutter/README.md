@@ -1,4 +1,4 @@
-# Mind Nav Flutter app
+# Mind Recipe Flutter app
 
 Run with a verified booking URL only:
 

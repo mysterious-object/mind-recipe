@@ -16,9 +16,20 @@ from .config import settings
 from .models import AiRequest, AiResponse
 from .safety import evaluate
 from .sqlite_store import store
-from .mind_nav_agent import agent
+from .navigator_agent import agent
 
-ALLOWED_CONTEXT = {"emotions", "activation", "body_areas", "context_tags", "zone_label", "toolbox", "conversation"}
+ALLOWED_CONTEXT = {"emotions", "activation", "body_areas", "context_tags", "zone_label", "recipe_practice", "conversation", "curriculum_progress"}
+
+CURRICULUM_LESSONS = {
+    "lesson-1": (1, "Mindfulness"), "lesson-2": (1, "Emotional Data"),
+    "lesson-3": (1, "Safety & Perception"), "lesson-4": (1, "Baselines"),
+    "lesson-5": (1, "Your Zone"), "lesson-6": (2, "Grounding"),
+    "lesson-7": (2, "Current Conditions"), "lesson-8": (2, "Background"),
+    "lesson-9": (2, "Triggers"), "lesson-10": (2, "Survival Strategies"),
+    "lesson-11": (3, "Vision & Values"), "lesson-12": (3, "Self-Talk & Beliefs"),
+    "lesson-13": (3, "Attachment & Communication"),
+    "lesson-14": (3, "Relationships & Boundaries"), "lesson-15": (3, "SMART Goals"),
+}
 
 _conversation_memory: dict[str, list[dict]] = {}
 
@@ -34,7 +45,7 @@ CREATE TABLE IF NOT EXISTS conversation_memory (
 CREATE INDEX IF NOT EXISTS idx_conv_member ON conversation_memory(member_id, created_at);
 """
 
-SYSTEM_PROMPT = """You are Mind Nav, a bounded wellness companion. You are attentive, warm, and genuinely conversational, never a scripted test or therapy replacement.
+SYSTEM_PROMPT = """You are Navigator, the nav-compass AI system in Mind Recipe. You are a bounded wellness companion: attentive, warm, and genuinely conversational, never a scripted test or therapy replacement.
 
 CORE PRINCIPLES:
 - Infer the intended meaning of short or ambiguous replies from the immediately preceding dialogue. Resolve words such as "that", "it", "yes", and "no" before answering.
@@ -143,7 +154,7 @@ def save_to_memory(member_id: str, role: str, content: str):
         pass
 
 
-DAILY_NAVIGATION_PROMPT = """You are Mind Nav, a bounded wellness reflection guide conducting a daily navigation.
+DAILY_NAVIGATION_PROMPT = """You are Navigator, the bounded wellness reflection guide in Mind Recipe, conducting a daily navigation.
 
 Follow this sequence naturally, one step at a time:
 1. Greeting and consent/context reminder
@@ -327,9 +338,9 @@ def _get_api_key(provider: str, provided_key: Optional[str] = None) -> Optional[
     if provided_key:
         return provided_key
     env_keys = {
-        "openrouter": "MIND_NAV_OPENROUTER_KEY",
-        "anthropic": "MIND_NAV_ANTHROPIC_KEY",
-        "google": "MIND_NAV_GOOGLE_KEY",
+        "openrouter": "MIND_RECIPE_OPENROUTER_KEY",
+        "anthropic": "MIND_RECIPE_ANTHROPIC_KEY",
+        "google": "MIND_RECIPE_GOOGLE_KEY",
     }
     env_key = env_keys.get(provider, "")
     return os.getenv(env_key, "").strip() or None
@@ -410,6 +421,24 @@ async def respond(request: AiRequest, provider_key: Optional[str]) -> AiResponse
         for key in used
         if key != "conversation"
     }
+    curriculum = minimized.get("curriculum_progress")
+    curriculum_context = ""
+    if isinstance(curriculum, dict):
+        completed = set(curriculum.get("completed_lesson_ids", []))
+        current_id = curriculum.get("current_lesson_id") or next(
+            (lesson_id for lesson_id in CURRICULUM_LESSONS if lesson_id not in completed),
+            "lesson-15",
+        )
+        module, title = CURRICULUM_LESSONS.get(current_id, (1, "Mindfulness"))
+        curriculum_context = (
+            "\nRecipes journey context (durable account progress): "
+            f"{len(completed)} of 15 lessons complete; current recommendation is "
+            f"{current_id}, {title}, in module {module}. "
+            "Use this when the member asks what to work on or asks you to assign a module. "
+            "Present it as a gentle recommendation, never a lock or requirement. Never claim a "
+            "lesson is complete unless its ID appears in completed_lesson_ids, and never mark "
+            "completion yourself. The member controls completion in Recipes."
+        )
     model = _get_model_for_provider(request.provider, request.model)
 
     is_navigation = not request.context.get("conversation") or len(request.context.get("conversation", [])) <= 1
@@ -448,7 +477,7 @@ async def respond(request: AiRequest, provider_key: Optional[str]) -> AiResponse
         {"role": "user", "content": (
             f"{request.text}\n\n"
             f"Private session context (use only if relevant): {json.dumps(minimized)}\n"
-            f"{tool_context}{research_context}\n"
+            f"{tool_context}{research_context}{curriculum_context}\n"
             "Respond to what this message means in the dialogue. Do not describe your analysis or repeat these instructions."
         )},
     ]
@@ -458,7 +487,7 @@ async def respond(request: AiRequest, provider_key: Optional[str]) -> AiResponse
     except Exception:
         return AiResponse(
             mode="provider_error",
-            message="Mind Nav could not reach the selected AI provider.",
+            message="Mind Recipe could not reach the selected AI provider.",
             safety_interrupted=False,
             policy_version=safety.policy_version,
             context_fields_used=used,

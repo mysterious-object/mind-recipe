@@ -1,4 +1,4 @@
-package io.mindnav.mind_nav
+package com.contextfield.mindrecipe
 
 import android.Manifest
 import android.app.Activity
@@ -35,7 +35,7 @@ class VoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamHandler
     ActivityAware, PluginRegistry.RequestPermissionsResultListener {
     companion object {
         private const val RECORD_AUDIO_REQUEST = 4407
-        private const val LOG_TAG = "MindNavVoice"
+        private const val LOG_TAG = "MindRecipeVoice"
     }
 
     private lateinit var methodChannel: MethodChannel
@@ -71,8 +71,8 @@ class VoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamHandler
 
     override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         context = binding.applicationContext
-        methodChannel = MethodChannel(binding.binaryMessenger, "mindnav.dev/voice")
-        eventChannel = EventChannel(binding.binaryMessenger, "mindnav.dev/voice_stream")
+        methodChannel = MethodChannel(binding.binaryMessenger, "contextfield.mindrecipe/voice")
+        eventChannel = EventChannel(binding.binaryMessenger, "contextfield.mindrecipe/voice_stream")
         methodChannel.setMethodCallHandler(this)
         eventChannel.setStreamHandler(this)
         textToSpeech = TextToSpeech(binding.applicationContext) { status ->
@@ -94,7 +94,7 @@ class VoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamHandler
             )
             "startListening" -> {
                 if (listeningResult != null) {
-                    result.error("ALREADY_LISTENING", "Mind Nav is already listening.", null)
+                    result.error("ALREADY_LISTENING", "Mind Recipe is already listening.", null)
                     return
                 }
                 listeningResult = result

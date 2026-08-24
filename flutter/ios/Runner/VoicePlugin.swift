@@ -16,10 +16,12 @@ class VoicePlugin: NSObject, FlutterPlugin, FlutterStreamHandler, SFSpeechRecogn
     private var ttsResult: FlutterResult?
     private var audioResult: FlutterResult?
     private var latestTranscript: String?
+    private var listeningTimer: Timer?
+    private var hasInputTap = false
 
     public static func register(with registrar: FlutterPluginRegistrar) {
-        let methodChannel = FlutterMethodChannel(name: "mindnav.dev/voice", binaryMessenger: registrar.messenger())
-        let eventChannel = FlutterEventChannel(name: "mindnav.dev/voice_stream", binaryMessenger: registrar.messenger())
+        let methodChannel = FlutterMethodChannel(name: "contextfield.mindrecipe/voice", binaryMessenger: registrar.messenger())
+        let eventChannel = FlutterEventChannel(name: "contextfield.mindrecipe/voice_stream", binaryMessenger: registrar.messenger())
         let instance = VoicePlugin()
         instance.tts.delegate = instance
         registrar.addMethodCallDelegate(instance, channel: methodChannel)
@@ -54,7 +56,7 @@ class VoicePlugin: NSObject, FlutterPlugin, FlutterStreamHandler, SFSpeechRecogn
     }
 
     private func startListening(language: String, result: @escaping FlutterResult) {
-        guard listeningResult == nil else { result(FlutterError(code: "ALREADY_LISTENING", message: "Mind Nav is already listening.", details: nil)); return }
+        guard listeningResult == nil else { result(FlutterError(code: "ALREADY_LISTENING", message: "Mind Recipe is already listening.", details: nil)); return }
         let requestMicrophone: () -> Void = { [weak self] in
             AVAudioSession.sharedInstance().requestRecordPermission { granted in
                 DispatchQueue.main.async {
@@ -98,12 +100,17 @@ class VoicePlugin: NSObject, FlutterPlugin, FlutterStreamHandler, SFSpeechRecogn
         }
         let format = inputNode.outputFormat(forBus: 0)
         inputNode.installTap(onBus: 0, bufferSize: 1024, format: format) { [weak self] buffer, _ in self?.recognitionRequest?.append(buffer) }
+        hasInputTap = true
         do {
             try AVAudioSession.sharedInstance().setCategory(.record, mode: .measurement, options: .duckOthers)
             try AVAudioSession.sharedInstance().setActive(true, options: .notifyOthersOnDeactivation)
             audioEngine.prepare()
             try audioEngine.start()
             eventSink?(["state": "ready"])
+            listeningTimer?.invalidate()
+            listeningTimer = Timer.scheduledTimer(withTimeInterval: 15, repeats: false) { [weak self] _ in
+                self?.completeListening(self?.latestTranscript)
+            }
         } catch { completeListening(nil) }
     }
 
@@ -115,9 +122,14 @@ class VoicePlugin: NSObject, FlutterPlugin, FlutterStreamHandler, SFSpeechRecogn
     }
 
     private func stopRecognitionEngine() {
+        listeningTimer?.invalidate()
+        listeningTimer = nil
         recognitionRequest?.endAudio()
         audioEngine.stop()
-        audioEngine.inputNode.removeTap(onBus: 0)
+        if hasInputTap {
+            audioEngine.inputNode.removeTap(onBus: 0)
+            hasInputTap = false
+        }
         recognitionTask?.cancel()
         recognitionTask = nil
         recognitionRequest = nil
@@ -127,6 +139,7 @@ class VoicePlugin: NSObject, FlutterPlugin, FlutterStreamHandler, SFSpeechRecogn
         guard FileManager.default.fileExists(atPath: path) else { result(FlutterError(code: "FILE_NOT_FOUND", message: "Audio file not found", details: nil)); return }
         stopAudioPlayback()
         do {
+            try preparePlaybackSession()
             let player = try AVAudioPlayer(contentsOf: URL(fileURLWithPath: path))
             audioPlayer = player
             player.delegate = self
@@ -152,11 +165,26 @@ class VoicePlugin: NSObject, FlutterPlugin, FlutterStreamHandler, SFSpeechRecogn
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { result(FlutterError(code: "EMPTY_TEXT", message: "No text to speak", details: nil)); return }
         tts.stopSpeaking(at: .immediate)
         if let callback = ttsResult { ttsResult = nil; callback(false) }
+        do {
+            try preparePlaybackSession()
+        } catch {
+            result(FlutterError(code: "AUDIO_SESSION", message: error.localizedDescription, details: nil))
+            return
+        }
         let utterance = AVSpeechUtterance(string: text)
         utterance.voice = AVSpeechSynthesisVoice(language: language) ?? AVSpeechSynthesisVoice(language: "en-GB")
-        utterance.rate = min(max(rate, AVSpeechUtteranceMinimumSpeechRate), AVSpeechUtteranceMaximumSpeechRate)
+        // Flutter uses a cross-platform multiplier around 1.0. AVFoundation's
+        // useful spoken-word range is much lower and otherwise sounds rushed.
+        utterance.rate = min(max(rate * AVSpeechUtteranceDefaultSpeechRate, 0.35), 0.58)
         ttsResult = result
         tts.speak(utterance)
+    }
+
+    private func preparePlaybackSession() throws {
+        stopRecognitionEngine()
+        let session = AVAudioSession.sharedInstance()
+        try session.setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
+        try session.setActive(true, options: .notifyOthersOnDeactivation)
     }
 
     func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) { if let callback = ttsResult { ttsResult = nil; callback(true) } }

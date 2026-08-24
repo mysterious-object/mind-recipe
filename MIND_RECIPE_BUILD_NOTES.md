@@ -1,4 +1,4 @@
-# Mind Nav Android build notes
+# Mind Recipe Android build notes
 
 Build: `1.0.0+1` Android ARM64 profile APK, emulator-tested on August 20, 2026.
 
@@ -6,15 +6,15 @@ Build: `1.0.0+1` Android ARM64 profile APK, emulator-tested on August 20, 2026.
 
 - Working sign-in, account registration, signed sessions, and local demo entry.
 - Cinematic onboarding headed “The weather of your mind.”
-- Mind Nav AI as the first and default tab, with the Today dashboard second.
+- Navigator as the first and default tab.
 - Live OpenRouter orchestration pinned to `qwen/qwen3.6-flash`.
-- Interactive Mind Nav AI conversation with explicit cloud privacy control and AI-generated-content labeling.
-- Original Mind Nav companion voice plus grounded, bright, and saved-earlier voice presets; no character or performer cloning.
+- Interactive Navigator conversation with explicit cloud privacy control and AI-generated-content labeling.
+- Original Navigator voice plus grounded, bright, and saved-earlier voice presets; no character or performer cloning.
 - Repaired native Android listening: runtime microphone permission, active listening state, stop control, silence handling, and text fallback.
 - Server voice mastering pipeline with fades, loudness normalization, and peak limiting when deployed with ffmpeg.
 - Today metrics derived from assistant activity: daily navigations, member messages, AI reflections, and the last activity time. These counters are stored locally and cleared at sign-out.
 - Mind Recipe, Toolbox, Progress, Booking, and Profile foundations.
-- Mind Nav-only product branding; no ChimeraFX or BGS branding is shown.
+- Mind Recipe by Context Field branding throughout the product.
 
 ## Verification completed
 

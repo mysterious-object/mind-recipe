@@ -1,4 +1,4 @@
-"""Mind Nav speech rendering with bounded, non-identifying voice presets.
+"""Mind Recipe speech rendering with bounded, non-identifying voice presets.
 
 The service never clones a performer or character voice. A source recording may
 only be added after its owner and license have been verified; until then the
@@ -27,9 +27,9 @@ class VoicePreset:
 # `saved_british` preserves the prior app voice without attaching it to a
 # copyrighted character or performer. It is intentionally not the default.
 VOICE_PRESETS: dict[str, VoicePreset] = {
-    "mind_nav_companion": VoicePreset(
+    "navigator_companion": VoicePreset(
         "en-GB-SoniaNeural",
-        "Warm, present British female voice — the original Mind Nav default.",
+        "Warm, present British female voice — the original Mind Recipe default.",
         rate_offset=1,
         pitch="-1Hz",
     ),
@@ -55,7 +55,7 @@ VOICE_PRESETS: dict[str, VoicePreset] = {
 def _master_mp3(source: bytes) -> tuple[bytes, bool]:
     """Master encoded speech with fades, loudness control, and a peak ceiling."""
     try:
-        with tempfile.TemporaryDirectory(prefix="mind-nav-voice-") as folder:
+        with tempfile.TemporaryDirectory(prefix="mind-recipe-voice-") as folder:
             input_path = os.path.join(folder, "raw.mp3")
             output_path = os.path.join(folder, "mastered.mp3")
             with open(input_path, "wb") as output:
@@ -138,13 +138,13 @@ def _delivery_tone(text: str) -> tuple[int, int, str]:
 def synthesize(
     text: str,
     speed: float = 0.94,
-    voice: str = "mind_nav_companion",
+    voice: str = "navigator_companion",
 ) -> dict[str, object]:
     """Render a short response and return mastered MP3 bytes in base64."""
     cleaned, clamped_speed, guided_pacing = prepare_delivery(text, speed)
     if not cleaned:
         return {"error": "No speech text supplied"}
-    preset = VOICE_PRESETS.get(voice, VOICE_PRESETS["mind_nav_companion"])
+    preset = VOICE_PRESETS.get(voice, VOICE_PRESETS["navigator_companion"])
     tone_rate, tone_pitch, delivery_tone = _delivery_tone(cleaned)
     rate = int((clamped_speed - 1.0) * 100) + preset.rate_offset + tone_rate
     rate_str = f"{rate:+d}%"
@@ -193,7 +193,7 @@ def synthesize(
             "success": True,
             "audio_base64": base64.b64encode(mastered).decode("utf-8"),
             "audio_format": "mp3",
-            "voice": voice if voice in VOICE_PRESETS else "mind_nav_companion",
+            "voice": voice if voice in VOICE_PRESETS else "navigator_companion",
             "mastered": was_mastered,
             "guided_pacing": guided_pacing,
             "delivery_tone": delivery_tone,

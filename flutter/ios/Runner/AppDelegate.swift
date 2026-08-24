@@ -13,6 +13,6 @@ import UIKit
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
     VoicePlugin.register(with: engineBridge.pluginRegistry.registrar(forPlugin: "VoicePlugin")!)
-    MindNavDeviceHarnessPlugin.register(with: engineBridge.pluginRegistry.registrar(forPlugin: "MindNavDeviceHarnessPlugin")!)
+    MindRecipeDeviceHarnessPlugin.register(with: engineBridge.pluginRegistry.registrar(forPlugin: "MindRecipeDeviceHarnessPlugin")!)
   }
 }
