@@ -274,6 +274,23 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
           history: priorConversation,
         );
       }
+      // Fallback ladder: a null reply usually means the full prompt
+      // (system + routing + history) overflowed the engine context or the
+      // model buried the answer in a cut-off think block. Retry with less
+      // context before giving up so chat never dead-ends.
+      if (reply == null || reply.trim().isEmpty) {
+        await _log('FALLBACK: retrying with short history');
+        reply = await _localInference.infer(
+          text,
+          history: priorConversation.length > 2
+              ? priorConversation.sublist(priorConversation.length - 2)
+              : priorConversation,
+        );
+      }
+      if (reply == null || reply.trim().isEmpty) {
+        await _log('FALLBACK: retrying with bare prompt');
+        reply = await _localInference.infer(text);
+      }
       final replyToUse = reply;
       await _log(
         'REPLY null=${replyToUse == null} len=${replyToUse?.length ?? 0} preview="${replyToUse?.substring(0, replyToUse != null && replyToUse.length > 100 ? 100 : replyToUse?.length ?? 0)}"',

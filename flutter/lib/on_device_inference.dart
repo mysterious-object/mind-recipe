@@ -676,12 +676,12 @@ class OnDeviceInference implements LocalInference {
       ..nGpuLayers = 0
       ..mainGpu = -1;
     final context = ContextParams()
-      ..nCtx = 2048
+      ..nCtx = 4096
       ..nBatch = 512
       ..nUbatch = 512
       ..nThreads = 6
       ..nThreadsBatch = 6
-      ..nPredict = 220
+      ..nPredict = 512
       ..typeK = LlamaKvCacheType.f16
       ..typeV = LlamaKvCacheType.f16;
     final sampler = SamplerParams()
@@ -761,12 +761,16 @@ Anti-repetition rules (highest priority):
 
 Example: If the member says their manager dismissed their work in front of the team and they froze, stay with the dismissal and the unfinished moment. A useful question might ask what they wish they had been able to say. Do not reduce it to a generic emotion check.<|im_end|>
 ''');
-    final recent = history.length > 8
-        ? history.sublist(history.length - 8)
+    // Keep context well under nCtx: 6 recent turns, each capped, so the
+    // grown system prompt + history never overflow the window (an overflow
+    // makes the engine emit nothing and every reply would fail).
+    final recent = history.length > 6
+        ? history.sublist(history.length - 6)
         : history;
     for (final turn in recent) {
       final role = turn.role == 'assistant' ? 'assistant' : 'user';
-      final clean = _cleanPromptText(turn.text);
+      var clean = _cleanPromptText(turn.text);
+      if (clean.length > 400) clean = '${clean.substring(0, 400)}…';
       if (clean.isEmpty) continue;
       prompt
         ..writeln('<|im_start|>$role')
