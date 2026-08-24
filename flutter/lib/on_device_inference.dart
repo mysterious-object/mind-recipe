@@ -363,103 +363,164 @@ class OnDeviceInference implements LocalInference {
     _downloadedBytes = resumeOffset;
     _downloadBytesPerSecond = 0;
     // If we are resuming, keep the file; otherwise start fresh
-    var isResume = resumeOffset > 0 && resumeOffset < _activeManifest.sizeBytes;
+    // `received` lives across attempts so a background interruption (Android
+    // suspends sockets when the app loses focus) auto-resumes from the exact
+    // byte instead of surfacing an error and forcing the member to Retry.
+    var received = resumeOffset;
+    const maxDownloadAttempts = 8;
+    var attempt = 0;
     try {
-      final client = HttpClient()..autoUncompress = false;
-      client.connectionTimeout = const Duration(seconds: 30);
-      client.idleTimeout = const Duration(seconds: 60);
-      final request = await client.getUrl(_activeManifest.downloadUri);
-      request.followRedirects = true;
-      request.maxRedirects = 8;
-      request.headers.set(
-        'User-Agent',
-        'MindRecipe/1.0 (Flutter; +https://mindrecipe.app)',
-      );
-      request.headers.set('Accept', '*/*');
-      // Hugging Face / CloudFront returns 304/206 only when Range is valid;
-      // keep the partial if the server later stalls – do not delete on retry.
-      if (isResume) {
-        request.headers.set('Range', 'bytes=$resumeOffset-');
-      }
-      final response = await request.close().timeout(
-        const Duration(minutes: 2),
-      );
-      // 206 = Partial Content (resume), 200 = OK (fresh), 416 = already complete
-      if (response.statusCode == HttpStatus.requestedRangeNotSatisfiable) {
-        client.close(force: true);
-        await _inferLog(
-          'range not satisfiable resumeOffset=$resumeOffset size=${_activeManifest.sizeBytes} – treating as complete',
-        );
-      } else if (response.statusCode != HttpStatus.ok &&
-          response.statusCode != HttpStatus.partialContent) {
-        client.close(force: true);
-        throw HttpException('Model download returned ${response.statusCode}.');
-      }
-      // If server ignored Range and returned 200, restart from 0
-      if (isResume && response.statusCode == HttpStatus.ok) {
-        await _inferLog('server ignored Range – restarting from 0');
-        if (await temporary.exists()) await temporary.delete();
-        resumeOffset = 0;
-        _downloadProgress = 0;
-        _downloadedBytes = 0;
-        isResume = false;
-      }
-      final contentLen = response.contentLength;
-      final expected = contentLen > 0
-          ? (isResume ? resumeOffset + contentLen : contentLen)
-          : _activeManifest.sizeBytes;
-      // Guard against truncated manifest (e.g. x-linked-size mismatch).
-      if (expected > _activeManifest.sizeBytes + 1024) {
-        await _inferLog(
-          'warn: server expected $expected > manifest ${_activeManifest.sizeBytes} – clamping',
-        );
-      }
-      var received = resumeOffset;
-      var lastSampleBytes = received;
-      var lastSampleAt = DateTime.now();
-      final sink = temporary.openWrite(
-        mode: isResume ? FileMode.append : FileMode.write,
-      );
-      try {
-        await for (final bytes in response.timeout(
-          const Duration(minutes: 2),
-          onTimeout: (sink) => sink.close(),
-        )) {
-          received += bytes.length;
-          sink.add(bytes);
-          _downloadProgress = (received / expected).clamp(0.0, 1.0);
-          _downloadedBytes = received;
-          final now = DateTime.now();
-          final elapsedMs = now.difference(lastSampleAt).inMilliseconds;
-          if (elapsedMs >= 750) {
-            _downloadBytesPerSecond =
-                ((received - lastSampleBytes) * 1000 / elapsedMs).round();
-            lastSampleBytes = received;
-            lastSampleAt = now;
+      while (true) {
+        attempt++;
+        HttpClient? client;
+        IOSink? sink;
+        var transient = false;
+        var transientNote = '';
+        try {
+          client = HttpClient()..autoUncompress = false;
+          client.connectionTimeout = const Duration(seconds: 30);
+          client.idleTimeout = const Duration(seconds: 60);
+          final request = await client.getUrl(_activeManifest.downloadUri);
+          request.followRedirects = true;
+          request.maxRedirects = 8;
+          request.headers.set(
+            'User-Agent',
+            'MindRecipe/1.0 (Flutter; +https://mindrecipe.app)',
+          );
+          request.headers.set('Accept', '*/*');
+          final resuming = received > 0 && received < _activeManifest.sizeBytes;
+          if (resuming) {
+            request.headers.set('Range', 'bytes=$received-');
           }
+          final response = await request.close().timeout(
+            const Duration(minutes: 2),
+          );
+          if (response.statusCode == HttpStatus.requestedRangeNotSatisfiable) {
+            final onDisk = await temporary.exists()
+                ? await temporary.length()
+                : 0;
+            if (onDisk >= _activeManifest.sizeBytes) {
+              await _inferLog(
+                'range not satisfiable at $received but file complete ($onDisk) – verifying',
+              );
+              break;
+            }
+            // Server disagrees with our partial – start clean.
+            await _inferLog('range not satisfiable with short file – restarting');
+            if (await temporary.exists()) await temporary.delete();
+            received = 0;
+            _downloadProgress = 0;
+            _downloadedBytes = 0;
+            transient = true;
+            transientNote = 'range reset';
+          } else if (response.statusCode != HttpStatus.ok &&
+              response.statusCode != HttpStatus.partialContent) {
+            throw HttpException(
+              'Model download returned ${response.statusCode}.',
+            );
+          } else {
+            if (resuming && response.statusCode == HttpStatus.ok) {
+              await _inferLog('server ignored Range – restarting from 0');
+              if (await temporary.exists()) await temporary.delete();
+              received = 0;
+              _downloadProgress = 0;
+              _downloadedBytes = 0;
+            }
+            final contentLen = response.contentLength;
+            final expected = contentLen > 0
+                ? (received > 0 ? received + contentLen : contentLen)
+                : _activeManifest.sizeBytes;
+            if (expected > _activeManifest.sizeBytes + 1024) {
+              await _inferLog(
+                'warn: server expected $expected > manifest ${_activeManifest.sizeBytes} – clamping',
+              );
+            }
+            var lastSampleBytes = received;
+            var lastSampleAt = DateTime.now();
+            sink = temporary.openWrite(
+              mode: received > 0 ? FileMode.append : FileMode.write,
+            );
+            try {
+              await for (final bytes in response.timeout(
+                const Duration(minutes: 2),
+                onTimeout: (s) => s.close(),
+              )) {
+                received += bytes.length;
+                sink.add(bytes);
+                _downloadProgress = (received / expected).clamp(0.0, 1.0);
+                _downloadedBytes = received;
+                final now = DateTime.now();
+                final elapsedMs = now.difference(lastSampleAt).inMilliseconds;
+                if (elapsedMs >= 750) {
+                  _downloadBytesPerSecond =
+                      ((received - lastSampleBytes) * 1000 / elapsedMs)
+                          .round();
+                  lastSampleBytes = received;
+                  lastSampleAt = now;
+                }
+              }
+            } on TimeoutException {
+              throw TimeoutException('stream stalled 2 min at $received bytes');
+            }
+            await sink.flush();
+            await sink.close();
+            sink = null;
+            final downloadedLen = await temporary.length();
+            await _inferLog(
+              'attempt $attempt finished $downloadedLen bytes (received $received, expect ${_activeManifest.sizeBytes})',
+            );
+            // Truncated body – socket closed early, classic backgrounding
+            // interruption. Route through the transient handler to resume.
+            if (received < _activeManifest.sizeBytes ||
+                downloadedLen < _activeManifest.sizeBytes) {
+              throw SocketException(
+                'connection closed early at $received/$downloadedLen',
+              );
+            }
+          }
+          client.close(force: true);
+          client = null;
+          break; // full download on disk – proceed to verification
+        } on TimeoutException catch (error) {
+          transient = true;
+          transientNote = '$error';
+        } on SocketException catch (error) {
+          transient = true;
+          transientNote = '${error.message ?? error}';
+        } on HttpException catch (error) {
+          // Permanent status-code failures surface immediately; mid-stream
+          // connection resets are transient.
+          if (error.message.startsWith('Model download returned')) rethrow;
+          transient = true;
+          transientNote = error.message;
+        } finally {
+          if (sink != null) {
+            try {
+              await sink.flush();
+            } catch (_) {}
+            try {
+              await sink.close();
+            } catch (_) {}
+          }
+          try {
+            client?.close(force: true);
+          } catch (_) {}
         }
-      } on TimeoutException {
+        if (!transient) break;
+        if (attempt >= maxDownloadAttempts) {
+          throw TimeoutException(
+            'Download lost connection $attempt times (last: $transientNote). '
+            'Progress is kept at ${_downloadedBytes ~/ (1024 * 1024)} MB – press Retry to resume.',
+          );
+        }
+        final delayMs = (1200 * attempt).clamp(1200, 6000);
         await _inferLog(
-          'download stall timeout after 2 min – received $received/$expected',
+          'download interrupted ($transientNote) – auto-resume from $received in ${delayMs}ms (attempt $attempt/$maxDownloadAttempts)',
         );
-        throw TimeoutException(
-          'Download stalled for 2 minutes at $received/$expected bytes – check Wi-Fi and try again. Partial kept for resume.',
-        );
-      }
-      await sink.flush();
-      await sink.close();
-      client.close(force: true);
-      final downloadedLen = await temporary.length();
-      await _inferLog(
-        'download finished $downloadedLen bytes (expected ${_activeManifest.sizeBytes}) – entering verify',
-      );
-      // If we still have a short file, keep it for resume instead of deleting.
-      if (downloadedLen < _activeManifest.sizeBytes) {
-        throw HttpException(
-          'Download incomplete $downloadedLen/${_activeManifest.sizeBytes} bytes – will resume next time. Keep Wi-Fi on.',
-        );
+        await Future.delayed(Duration(milliseconds: delayMs));
       }
       _set(const LocalInferenceSnapshot(OnDeviceStatus.verifying));
+      final downloadedLen = await temporary.length();
       await _inferLog(
         'verifying download ${temporary.path} ($downloadedLen bytes, expect ${_activeManifest.sizeBytes})',
       );
