@@ -351,24 +351,33 @@ class _MemberHomeState extends State<MemberHome> {
             : index.toDouble();
         return Scaffold(
           appBar: AppBar(
-            title: MindRecipePageTitle(
-              title: labels[index],
-              forward: index >= previousIndex,
-            ),
-            actions: [
-              Tooltip(
-                message: useStructuredNav ? 'Navigator: structured steps' : 'Navigator: free chat',
-                child: SegmentedButton<bool>(
-                  segments: const [
-                    ButtonSegment(value: false, label: Text('Chat'), icon: Icon(Icons.chat_bubble_rounded, size: 18)),
-                    ButtonSegment(value: true, label: Text('Steps'), icon: Icon(Icons.view_list_rounded, size: 18)),
-                  ],
-                  selected: {useStructuredNav},
-                  onSelectionChanged: (v) => setState(() => useStructuredNav = v.first),
-                  style: ButtonStyle(visualDensity: VisualDensity.compact),
-                  showSelectedIcon: false,
+            title: Flexible(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: MindRecipePageTitle(
+                  title: labels[index],
+                  forward: index >= previousIndex,
                 ),
               ),
+            ),
+            actions: [
+              // The Chat/Steps switch only exists on the Navigator tab, so the
+              // title keeps full width on every other screen (fixes cramming).
+              if (index == 0)
+                Tooltip(
+                  message: useStructuredNav ? 'Navigator: structured steps' : 'Navigator: free chat',
+                  child: SegmentedButton<bool>(
+                    segments: const [
+                      ButtonSegment(value: false, label: Text('Chat'), icon: Icon(Icons.chat_bubble_rounded, size: 18)),
+                      ButtonSegment(value: true, label: Text('Steps'), icon: Icon(Icons.view_list_rounded, size: 18)),
+                    ],
+                    selected: {useStructuredNav},
+                    onSelectionChanged: (v) => setState(() => useStructuredNav = v.first),
+                    style: ButtonStyle(visualDensity: VisualDensity.compact),
+                    showSelectedIcon: false,
+                  ),
+                ),
               IconButton(
                 icon: Icon(
                   Theme.of(context).brightness == Brightness.dark

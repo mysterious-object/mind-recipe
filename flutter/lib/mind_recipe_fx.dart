@@ -3,6 +3,8 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
+import 'motion_field.dart';
+
 /// Mind Recipe visual tokens adapted from an internal effects system.
 
 abstract final class MindRecipeFxPalette {
@@ -40,6 +42,8 @@ class _MindRecipeGpuFieldState extends State<MindRecipeGpuField>
       vsync: this,
       duration: const Duration(seconds: 18),
     );
+    MotionField.instance.ensureStarted();
+    MotionField.instance.addListener(_onMotion);
     ui.FragmentProgram.fromAsset('shaders/mind_recipe_field.frag')
         .then((loaded) {
           if (mounted) setState(() => program = loaded);
@@ -47,6 +51,10 @@ class _MindRecipeGpuFieldState extends State<MindRecipeGpuField>
         .catchError((Object _) {
           // The CustomPainter fallback remains visible on unsupported targets.
         });
+  }
+
+  void _onMotion() {
+    if (mounted) setState(() {});
   }
 
   @override
@@ -62,6 +70,7 @@ class _MindRecipeGpuFieldState extends State<MindRecipeGpuField>
 
   @override
   void dispose() {
+    MotionField.instance.removeListener(_onMotion);
     controller.dispose();
     super.dispose();
   }
@@ -72,6 +81,7 @@ class _MindRecipeGpuFieldState extends State<MindRecipeGpuField>
     if (loaded == null) return const SizedBox.expand();
     final dark = Theme.of(context).brightness == Brightness.dark;
     final wash = _washForVariant(widget.variant, dark);
+    final tilt = MotionField.instance.tilt;
     // Variant-specific progress offset makes the shader animate differently per variant
     final variantProgress = widget.progress + _variantProgressOffset(widget.variant);
     return IgnorePointer(
@@ -87,6 +97,8 @@ class _MindRecipeGpuFieldState extends State<MindRecipeGpuField>
                   progress: variantProgress,
                   dark: dark,
                   variantIndex: _variantIndex(widget.variant),
+                  tiltX: tilt.dx,
+                  tiltY: tilt.dy,
                 ),
                 size: Size.infinite,
               ),
@@ -163,6 +175,8 @@ class _MindRecipeGpuPainter extends CustomPainter {
     required this.progress,
     required this.dark,
     this.variantIndex = 0,
+    this.tiltX = 0,
+    this.tiltY = 0,
   });
 
   final ui.FragmentProgram program;
@@ -170,6 +184,8 @@ class _MindRecipeGpuPainter extends CustomPainter {
   final double progress;
   final bool dark;
   final double variantIndex;
+  final double tiltX;
+  final double tiltY;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -180,7 +196,9 @@ class _MindRecipeGpuPainter extends CustomPainter {
       ..setFloat(2, time)
       ..setFloat(3, progress)
       ..setFloat(4, dark ? 1 : 0)
-      ..setFloat(5, variantIndex);
+      ..setFloat(5, variantIndex)
+      ..setFloat(6, tiltX)
+      ..setFloat(7, tiltY);
     canvas.drawRect(Offset.zero & size, Paint()..shader = shader);
     shader.dispose();
   }
@@ -190,6 +208,8 @@ class _MindRecipeGpuPainter extends CustomPainter {
       oldDelegate.time != time ||
       oldDelegate.progress != progress ||
       oldDelegate.dark != dark ||
+      oldDelegate.tiltX != tiltX ||
+      oldDelegate.tiltY != tiltY ||
       oldDelegate.program != program;
 }
 
@@ -198,25 +218,69 @@ class _MindRecipeGpuPainter extends CustomPainter {
 /// Mind Recipe FX intentionally has no continuous ticker. It morphs while the user
 /// swipes or changes pages, which keeps idle battery use at zero and makes the
 /// experience compatible with reduced-motion preferences.
-class MindRecipeFxBackdrop extends StatelessWidget {
+class MindRecipeFxBackdrop extends StatefulWidget {
   const MindRecipeFxBackdrop({super.key, required this.progress, this.variant = 'field'});
 
   final double progress;
   final String variant;
 
   @override
+  State<MindRecipeFxBackdrop> createState() => _MindRecipeFxBackdropState();
+}
+
+class _MindRecipeFxBackdropState extends State<MindRecipeFxBackdrop>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController ticker;
+
+  @override
+  void initState() {
+    super.initState();
+    ticker = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 16),
+    );
+    MotionField.instance.ensureStarted();
+    MotionField.instance.addListener(_onMotion);
+  }
+
+  void _onMotion() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.disableAnimationsOf(context)) {
+      ticker.stop();
+      ticker.value = 0.4;
+    } else if (!ticker.isAnimating) {
+      ticker.repeat();
+    }
+  }
+
+  @override
+  void dispose() {
+    MotionField.instance.removeListener(_onMotion);
+    ticker.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final dark = Theme.of(context).brightness == Brightness.dark;
+    final tilt = MotionField.instance.tilt;
     return IgnorePointer(
       child: RepaintBoundary(
         child: CustomPaint(
           painter: _MindRecipeFxPainter(
-            progress: progress,
+            progress: widget.progress,
+            time: ticker.value * 16,
+            tilt: tilt,
             primary: scheme.primary,
             secondary: scheme.secondary,
             dark: dark,
-            variant: variant,
+            variant: widget.variant,
           ),
           size: Size.infinite,
         ),
@@ -416,6 +480,8 @@ class _MindRecipeFxPainter extends CustomPainter {
     required this.secondary,
     required this.dark,
     this.variant = 'field',
+    this.time = 0,
+    this.tilt = Offset.zero,
   });
 
   final double progress;
@@ -423,11 +489,15 @@ class _MindRecipeFxPainter extends CustomPainter {
   final Color secondary;
   final bool dark;
   final String variant;
+  final double time;
+  final Offset tilt;
 
   @override
   void paint(Canvas canvas, Size size) {
     if (size.isEmpty) return;
-    final phase = progress * 0.72 + _variantPhaseOffset(variant);
+    // Continuous drift (ticker) + page-reactive phase + per-variant offset.
+    final phase = time * 0.45 + progress * 0.72 + _variantPhaseOffset(variant);
+    final tiltEnergy = (tilt.dx.abs() + tilt.dy.abs()).clamp(0.0, 1.0);
     final palette = _paletteForVariant(variant, primary, secondary);
     final wash = _washForVariant(variant, dark);
     // Whole moving background – 12 washes at 0.52/0.36 fill entire screen, not just tint
@@ -435,7 +505,10 @@ class _MindRecipeFxPainter extends CustomPainter {
     // Add a second wash layer for depth – makes each variant's *motion* distinct
     canvas.drawRect(Offset.zero & size, Paint()..color = palette[0].withValues(alpha: dark ? 0.07 : 0.04));
 
-    // Distinct graphics per variant – not just color, but *shape* (like hummingbot chimera)
+    // Distinct graphics per variant – not just color, but *shape* (like hummingbot chimera).
+    // Shapes parallax against device tilt; motion energy lifts their presence.
+    canvas.save();
+    canvas.translate(tilt.dx * size.width * 0.045, tilt.dy * size.height * 0.045);
     switch (variant) {
       case 'field':
         _paintField(canvas, size, phase, palette, dark);
@@ -475,6 +548,20 @@ class _MindRecipeFxPainter extends CustomPainter {
         break;
       default:
         _paintField(canvas, size, phase, palette, dark);
+    }
+    canvas.restore();
+    // Moving the phone lifts the whole field — it answers your hand.
+    if (tiltEnergy > 0.02) {
+      canvas.drawRect(
+        Offset.zero & size,
+        Paint()
+          ..shader = RadialGradient(
+            colors: [
+              palette[0].withValues(alpha: 0.10 * tiltEnergy),
+              palette[1].withValues(alpha: 0),
+            ],
+          ).createShader(Rect.fromCircle(center: size.center(Offset.zero), radius: size.shortestSide)),
+      );
     }
   }
 
@@ -762,6 +849,8 @@ class _MindRecipeFxPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _MindRecipeFxPainter oldDelegate) =>
       oldDelegate.progress != progress ||
+      oldDelegate.time != time ||
+      oldDelegate.tilt != tilt ||
       oldDelegate.primary != primary ||
       oldDelegate.secondary != secondary ||
       oldDelegate.dark != dark ||

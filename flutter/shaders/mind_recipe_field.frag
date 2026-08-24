@@ -5,6 +5,8 @@ uniform float uTime;
 uniform float uProgress;
 uniform float uDark;
 uniform float uVariant; // 0 field · 1 nebula · 2 rivers · 3 tendrils · 4 orbs · 5 lattice · 6 void · 7 prism · 8 aurora · 9 ember · 10 ocean · 11 twilight
+uniform float uTiltX; // smoothed device roll  -1..1
+uniform float uTiltY; // smoothed device pitch -1..1
 
 out vec4 fragColor;
 
@@ -26,11 +28,15 @@ float noise(vec2 p) {
 }
 
 void main() {
-  vec2 uv = FlutterFragCoord().xy / uSize;
+  // Device-tilt parallax: the whole field slides against the motion.
+  vec2 tilt = vec2(uTiltX, -uTiltY);
+  vec2 uv = FlutterFragCoord().xy / uSize + tilt * 0.055;
   vec2 centered = uv - 0.5;
   centered.x *= uSize.x / uSize.y;
 
-  float t = uTime * 0.16 + uProgress * 0.7;
+  // Tilting the phone adds energy — the field brightens and speeds up.
+  float tiltEnergy = min(1.0, abs(uTiltX) + abs(uTiltY));
+  float t = uTime * (0.16 + tiltEnergy * 0.10) + uProgress * 0.7;
   int variant = int(uVariant + 0.5);
 
   float organic = noise(uv * 4.0 + vec2(t, -t * 0.7));
@@ -169,6 +175,12 @@ void main() {
     strength = stars * 0.30 + organic * 0.008;
   }
 
+  // Fine sparkle so the field always shimmers, boosted by device motion.
+  float shimmer = pow(noise(uv * 22.0 + vec2(t * 2.1, -t * 1.3)), 6.0);
+  strength += shimmer * (0.05 + tiltEnergy * 0.10);
+
+  // Tilting the phone makes the whole field glow brighter and feel alive.
+  strength *= 1.0 + tiltEnergy * 0.55;
   strength *= mix(0.48, 1.0, uDark);
   fragColor = vec4(color * strength, strength);
 }
