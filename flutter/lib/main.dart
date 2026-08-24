@@ -14,6 +14,7 @@ import 'mind_recipe_fx.dart';
 import 'on_device_inference.dart';
 import 'notification_scheduler.dart';
 import 'practitioner_sharing.dart';
+import 'pulse_screen.dart';
 import 'recipes_screen.dart';
 import 'voice_interface.dart';
 
@@ -182,14 +183,14 @@ class _MemberHomeState extends State<MemberHome> {
   final labels = const [
     'Navigator',
     'Recipes',
-    'Progress',
+    'Pulse',
     'Booking',
     'Settings',
   ];
   final icons = const [
     Icons.navigation,
     Icons.menu_book,
-    Icons.insights,
+    Icons.monitor_heart,
     Icons.calendar_month,
     Icons.settings,
   ];
@@ -321,7 +322,18 @@ class _MemberHomeState extends State<MemberHome> {
               ),
       ),
       _KeepAlivePage(child: RecipesScreen(api: widget.api, appState: widget.appState, onAskNavigator: _onRecipeAskNavigator)),
-      _KeepAlivePage(child: ProgressScreen(checkIn: checkIn, tools: tools, appState: widget.appState)),
+      _KeepAlivePage(
+        child: PulseScreen(
+          checkIn: checkIn,
+          appState: widget.appState,
+          onAskNavigator: (message) {
+            setState(() {
+              chatMessages.add(ChatMessage(role: ChatRole.member, text: message));
+            });
+            goToPage(0);
+          },
+        ),
+      ),
       const _KeepAlivePage(child: BookingScreen()),
       _KeepAlivePage(
         child: ProfileScreen(

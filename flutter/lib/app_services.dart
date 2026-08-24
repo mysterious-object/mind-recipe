@@ -660,6 +660,41 @@ class SecureAppState extends ChangeNotifier {
 
   static const _savedThreadsKey = 'mind_recipe_saved_threads';
 
+  static const _moodPulsesKey = 'mind_recipe_mood_pulses';
+
+  /// Real-time mood ring history: [{v: -1..1 valence, a: 0..1 activation,
+  /// t: ISO time, src: origin}] — kept to the most recent 300 points.
+  Future<List<Map<String, dynamic>>> loadMoodPulses() async {
+    try {
+      final raw = await _storage.read(key: _moodPulsesKey);
+      if (raw == null || raw.isEmpty) return [];
+      final decoded = jsonDecode(raw) as List<dynamic>;
+      return decoded.map((e) => e as Map<String, dynamic>).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<void> recordMoodPulse({
+    required double valence,
+    required double activation,
+    String? source,
+  }) async {
+    try {
+      final all = await loadMoodPulses();
+      all.add({
+        'v': valence.clamp(-1.0, 1.0),
+        'a': activation.clamp(0.0, 1.0),
+        't': DateTime.now().toIso8601String(),
+        if (source != null) 'src': source,
+      });
+      while (all.length > 300) {
+        all.removeAt(0);
+      }
+      await _storage.write(key: _moodPulsesKey, value: jsonEncode(all));
+    } catch (_) {}
+  }
+
   Future<List<Map<String, dynamic>>> loadSavedThreads() async {
     try {
       final raw = await _storage.read(key: _savedThreadsKey);
