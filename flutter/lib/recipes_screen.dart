@@ -166,9 +166,10 @@ const recipeLessons = <RecipeLesson>[
 ];
 
 class RecipesScreen extends StatefulWidget {
-  const RecipesScreen({super.key, required this.api, required this.appState});
+  const RecipesScreen({super.key, required this.api, required this.appState, this.onAskNavigator});
   final MindRecipeApiClient api;
   final SecureAppState appState;
+  final void Function(String prompt, String response)? onAskNavigator;
   @override
   State<RecipesScreen> createState() => _RecipesScreenState();
 }
@@ -335,6 +336,24 @@ class _RecipesScreenState extends State<RecipesScreen> {
           onContinue: () => _open(next),
         ),
         const SizedBox(height: 12),
+        Card(
+          color: Theme.of(context).colorScheme.secondaryContainer.withValues(alpha: 0.5),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Icon(Icons.calendar_today_rounded, size: 18, color: Theme.of(context).colorScheme.primary),
+                const SizedBox(width: 8),
+                const Text('Why daily?', style: TextStyle(fontWeight: FontWeight.w800)),
+                const Spacer(),
+                Text('${_completed.length}/15', style: Theme.of(context).textTheme.labelLarge),
+              ]),
+              const SizedBox(height: 6),
+              const Text('One lesson a day builds the “workable zone” — small, steady practice is more effective than bingeing. Your Progress tab shows the streak and which practices you actually return to. Nothing is locked; daily is a gentle rhythm, not a rule.'),
+            ]),
+          ),
+        ),
+        const SizedBox(height: 12),
         OutlinedButton.icon(
           onPressed: () => setState(() => _savedPractices = true),
           icon: const Icon(Icons.bookmark_outline_rounded),
@@ -387,6 +406,8 @@ class _RecipesScreenState extends State<RecipesScreen> {
           lesson: lesson,
           completed: _completed.contains(lesson.id),
           onComplete: () => _complete(lesson),
+          appState: widget.appState,
+          onAskNavigator: widget.onAskNavigator,
         ),
       ),
     );
@@ -626,10 +647,14 @@ class _LessonDetail extends StatefulWidget {
     required this.lesson,
     required this.completed,
     required this.onComplete,
+    required this.appState,
+    this.onAskNavigator,
   });
   final RecipeLesson lesson;
   final bool completed;
   final Future<void> Function() onComplete;
+  final SecureAppState appState;
+  final void Function(String prompt, String response)? onAskNavigator;
   @override
   State<_LessonDetail> createState() => _LessonDetailState();
 }
@@ -645,10 +670,19 @@ class _LessonDetailState extends State<_LessonDetail> {
   void initState() {
     super.initState();
     completed = widget.completed;
+    // Load persisted reflection for this lesson (stays on device)
+    widget.appState.loadLessonReflections().then((all) {
+      final saved = all[widget.lesson.id];
+      if (saved != null && saved.isNotEmpty && mounted) {
+        setState(() => _practiceController.text = saved);
+      }
+    });
   }
 
   @override
   void dispose() {
+    // Persist reflection on dispose
+    unawaited(widget.appState.saveLessonReflection(widget.lesson.id, _practiceController.text));
     _practiceController.dispose();
     super.dispose();
   }
@@ -657,17 +691,22 @@ class _LessonDetailState extends State<_LessonDetail> {
     final prompt = _practiceController.text.trim().isEmpty
         ? 'How can I work with "${widget.lesson.title}" – ${widget.lesson.practice}'
         : 'For lesson "${widget.lesson.title}": ${widget.lesson.summary}. My reflection: ${_practiceController.text.trim()}. What is one gentle next step?';
+    // Persist the reflection immediately (daily persistence)
+    unawaited(widget.appState.saveLessonReflection(widget.lesson.id, _practiceController.text));
     setState(() {
       _aiLoading = true;
       _aiResponse = null;
     });
     try {
       final local = await OnDeviceInference().infer(prompt);
+      final response = local ??
+          'Navigator is not ready yet. Try the private model in Settings or connect cloud AI – your reflection was saved privately on device.';
       if (mounted) {
-        setState(() {
-          _aiResponse = local ??
-              'Navigator is not ready yet. Try the private model in Settings or connect cloud AI – your reflection was saved privately on device.';
-        });
+        setState(() => _aiResponse = response);
+      }
+      // Connect to main Navigator chat (persisted across tabs)
+      if (widget.onAskNavigator != null) {
+        widget.onAskNavigator!(prompt, response);
       }
     } catch (_) {
       if (mounted) {
@@ -734,6 +773,7 @@ class _LessonDetailState extends State<_LessonDetail> {
                       controller: _practiceController,
                       minLines: 2,
                       maxLines: 4,
+                      onChanged: (v) => unawaited(widget.appState.saveLessonReflection(widget.lesson.id, v)),
                       decoration: const InputDecoration(
                         labelText: 'Your reflection (optional, stays on device)',
                         hintText: 'What came up as you tried this?',

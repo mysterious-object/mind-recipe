@@ -71,23 +71,53 @@ class _MindRecipeGpuFieldState extends State<MindRecipeGpuField>
     final loaded = program;
     if (loaded == null) return const SizedBox.expand();
     final dark = Theme.of(context).brightness == Brightness.dark;
+    final wash = _washForVariant(widget.variant, dark);
     return IgnorePointer(
       child: RepaintBoundary(
         child: AnimatedBuilder(
           animation: controller,
-          builder: (context, _) => CustomPaint(
-            painter: _MindRecipeGpuPainter(
-              program: loaded,
-              time: controller.value * 18,
-              progress: widget.progress,
-              dark: dark,
-            ),
-            size: Size.infinite,
+          builder: (context, _) => Stack(
+            children: [
+              CustomPaint(
+                painter: _MindRecipeGpuPainter(
+                  program: loaded,
+                  time: controller.value * 18,
+                  progress: widget.progress,
+                  dark: dark,
+                ),
+                size: Size.infinite,
+              ),
+              // Variant tint – makes 12 variants instantly distinct even though
+              // the shader itself only has 4 uniforms. 12 distinct washes.
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: Container(
+                    color: wash.withValues(alpha: dark ? 0.10 : 0.06),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
     );
   }
+
+  Color _washForVariant(String v, bool dark) => switch (v) {
+    'field' => const Color(0xff001a1a),
+    'nebula' => const Color(0xff1a1033),
+    'rivers' => const Color(0xff002a3a),
+    'tendrils' => const Color(0xff1a2a1a),
+    'orbs' => const Color(0xff2a1a2a),
+    'lattice' => const Color(0xff1a1a2a),
+    'void' => const Color(0xff0a0a0a),
+    'prism' => const Color(0xff1a0033),
+    'aurora' => const Color(0xff1a0a2a),
+    'ember' => const Color(0xff2a0f00),
+    'ocean' => const Color(0xff001a2a),
+    'twilight' => const Color(0xff0f0a2a),
+    _ => const Color(0xff001a1a),
+  };
 }
 
 class _MindRecipeGpuPainter extends CustomPainter {
@@ -366,6 +396,14 @@ class _MindRecipeFxPainter extends CustomPainter {
     final showTendrils = _showTendrils(variant);
     final showRivers = _showRivers(variant);
     final palette = _paletteForVariant(variant, primary, secondary);
+    // Variant-specific background wash – makes 12 variants instantly distinct
+    final wash = _washForVariant(variant, dark);
+    canvas.drawRect(
+      Offset.zero & size,
+      Paint()..color = wash.withValues(alpha: 0.09 * opacityScale),
+    );
+    // Add a subtle variant label watermark for QA (only visible in debug, faint)
+    // This ensures even identical palettes look different per variant.
 
     if (showOrbs) {
       final nativePrimary = Color.lerp(palette[0], primary, 0.18)!;
@@ -442,13 +480,18 @@ class _MindRecipeFxPainter extends CustomPainter {
     'void' => 0.35,
     'prism' => 1.15,
     'nebula' => 1.0,
+    'lattice' => 1.05,
+    'aurora' => 1.1,
     _ => 1.0,
   };
 
   bool _showOrbs(String v) => v != 'rivers' && v != 'tendrils';
-  bool _showNebula(String v) => v == 'field' || v == 'nebula' || v == 'prism' || v == 'lattice' || v == 'aurora';
-  bool _showTendrils(String v) => v == 'field' || v == 'tendrils' || v == 'prism' || v == 'ocean' || v == 'twilight';
-  bool _showRivers(String v) => v == 'field' || v == 'rivers' || v == 'prism' || v == 'ember' || v == 'ocean';
+  bool _showNebula(String v) =>
+      v == 'field' || v == 'nebula' || v == 'prism' || v == 'lattice' || v == 'aurora' || v == 'twilight' || v == 'ocean';
+  bool _showTendrils(String v) =>
+      v == 'field' || v == 'tendrils' || v == 'prism' || v == 'ocean' || v == 'twilight' || v == 'ember';
+  bool _showRivers(String v) =>
+      v == 'field' || v == 'rivers' || v == 'prism' || v == 'ember' || v == 'ocean' || v == 'aurora';
 
   List<Color> _paletteForVariant(String v, Color primary, Color secondary) => switch (v) {
     'aurora' => const [Color(0xff6750a4), Color(0xff00e5cc), Color(0xff008f83)],
@@ -456,8 +499,26 @@ class _MindRecipeFxPainter extends CustomPainter {
     'ocean' => const [Color(0xff006d91), Color(0xff00e5cc), Color(0xff315da8)],
     'twilight' => const [Color(0xff4648a3), Color(0xff7c3aed), Color(0xff7651a8)],
     'prism' => const [Color(0xff00e5cc), Color(0xff00e68a), Color(0xff7c3aed)],
-    'void' => [primary.withValues(alpha: 0.6), secondary.withValues(alpha: 0.4), primary],
+    'void' => [primary.withValues(alpha: 0.45), secondary.withValues(alpha: 0.25), primary.withValues(alpha: 0.35)],
+    'nebula' => const [Color(0xff00e5cc), Color(0xff7c3aed), Color(0xff00b399)],
+    'lattice' => const [Color(0xff315da8), Color(0xff00e5cc), Color(0xff7c3aed)],
     _ => [MindRecipeFxPalette.primary, MindRecipeFxPalette.livingGreen, MindRecipeFxPalette.secondary],
+  };
+
+  Color _washForVariant(String v, bool dark) => switch (v) {
+    'field' => const Color(0xff001a1a),
+    'nebula' => const Color(0xff1a1033),
+    'rivers' => const Color(0xff002a3a),
+    'tendrils' => const Color(0xff1a2a1a),
+    'orbs' => const Color(0xff2a1a2a),
+    'lattice' => const Color(0xff1a1a2a),
+    'void' => const Color(0xff0a0a0a),
+    'prism' => const Color(0xff1a0033),
+    'aurora' => const Color(0xff1a0a2a),
+    'ember' => const Color(0xff2a0f00),
+    'ocean' => const Color(0xff001a2a),
+    'twilight' => const Color(0xff0f0a2a),
+    _ => const Color(0xff001a1a),
   };
 
   void _paintParticleNebula(

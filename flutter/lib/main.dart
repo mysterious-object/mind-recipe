@@ -15,6 +15,7 @@ import 'on_device_inference.dart';
 import 'notification_scheduler.dart';
 import 'practitioner_sharing.dart';
 import 'recipes_screen.dart';
+import 'voice_interface.dart';
 
 void main() => runApp(const MindRecipeApp());
 
@@ -195,6 +196,9 @@ class _MemberHomeState extends State<MemberHome> {
   late final PageController pageController;
   late final ScrollController railController;
   Timer? navigatorReadinessTimer;
+  Timer? _voiceBubbleTimer;
+  bool _voiceIsSpeaking = false;
+  bool _voiceIsListening = false;
 
   @override
   void initState() {
@@ -208,6 +212,16 @@ class _MemberHomeState extends State<MemberHome> {
       const Duration(seconds: 8),
       (_) => unawaited(_primeNavigator()),
     );
+    _voiceBubbleTimer = Timer.periodic(const Duration(milliseconds: 350), (_) {
+      final speaking = VoiceInterface().isSpeaking;
+      final listening = VoiceInterface().isListening;
+      if (speaking != _voiceIsSpeaking || listening != _voiceIsListening) {
+        if (mounted) setState(() {
+          _voiceIsSpeaking = speaking;
+          _voiceIsListening = listening;
+        });
+      }
+    });
   }
 
   Future<void> _primeNavigator() async {
@@ -223,6 +237,7 @@ class _MemberHomeState extends State<MemberHome> {
     pageController.dispose();
     railController.dispose();
     navigatorReadinessTimer?.cancel();
+    _voiceBubbleTimer?.cancel();
     super.dispose();
   }
 
@@ -264,31 +279,46 @@ class _MemberHomeState extends State<MemberHome> {
     }
   }
 
+  void _onRecipeAskNavigator(String prompt, String response) {
+    setState(() {
+      chatMessages.add(ChatMessage(role: ChatRole.member, text: prompt));
+      chatMessages.add(ChatMessage(role: ChatRole.assistant, text: response, localGenerated: true));
+    });
+    goToPage(0);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Added to Navigator — continue the conversation there')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final screens = [
-      useStructuredNav
-          ? DailyNavigation(
-              onComplete: () {
-                widget.appState.recordAssistantMessage(startsSession: true);
-                widget.appState.recordAiReflection();
-                setState(() {});
-              },
-            )
-          : NavigatorChatExperience(
-              state: checkIn,
-              onChanged: () => setState(() {}),
-              api: widget.api,
-              appState: widget.appState,
-              messages: chatMessages,
-            ),
-      RecipesScreen(api: widget.api, appState: widget.appState),
-      ProgressScreen(checkIn: checkIn, tools: tools),
-      const BookingScreen(),
-      ProfileScreen(
-        onPractitioner: widget.onPractitioner,
-        appState: widget.appState,
-        onSignOut: widget.onSignOut,
+      _KeepAlivePage(
+        child: useStructuredNav
+            ? DailyNavigation(
+                onComplete: () {
+                  widget.appState.recordAssistantMessage(startsSession: true);
+                  widget.appState.recordAiReflection();
+                  setState(() {});
+                },
+              )
+            : NavigatorChatExperience(
+                state: checkIn,
+                onChanged: () => setState(() {}),
+                api: widget.api,
+                appState: widget.appState,
+                messages: chatMessages,
+              ),
+      ),
+      _KeepAlivePage(child: RecipesScreen(api: widget.api, appState: widget.appState, onAskNavigator: _onRecipeAskNavigator)),
+      _KeepAlivePage(child: ProgressScreen(checkIn: checkIn, tools: tools, appState: widget.appState)),
+      const _KeepAlivePage(child: BookingScreen()),
+      _KeepAlivePage(
+        child: ProfileScreen(
+          onPractitioner: widget.onPractitioner,
+          appState: widget.appState,
+          onSignOut: widget.onSignOut,
+        ),
       ),
     ];
     return AnimatedBuilder(
@@ -304,19 +334,17 @@ class _MemberHomeState extends State<MemberHome> {
               forward: index >= previousIndex,
             ),
             actions: [
-              Semantics(
-                label: useStructuredNav
-                    ? 'Switch to free-form chat'
-                    : 'Switch to structured navigation',
-                child: IconButton(
-                  icon: Icon(
-                    useStructuredNav ? Icons.format_list_numbered : Icons.chat,
-                  ),
-                  tooltip: useStructuredNav
-                      ? 'Switch to chat'
-                      : 'Structured navigation',
-                  onPressed: () =>
-                      setState(() => useStructuredNav = !useStructuredNav),
+              Tooltip(
+                message: useStructuredNav ? 'Navigator: structured steps' : 'Navigator: free chat',
+                child: SegmentedButton<bool>(
+                  segments: const [
+                    ButtonSegment(value: false, label: Text('Chat'), icon: Icon(Icons.chat_bubble_rounded, size: 18)),
+                    ButtonSegment(value: true, label: Text('Steps'), icon: Icon(Icons.view_list_rounded, size: 18)),
+                  ],
+                  selected: {useStructuredNav},
+                  onSelectionChanged: (v) => setState(() => useStructuredNav = v.first),
+                  style: ButtonStyle(visualDensity: VisualDensity.compact),
+                  showSelectedIcon: false,
                 ),
               ),
               IconButton(
@@ -375,6 +403,61 @@ class _MemberHomeState extends State<MemberHome> {
                         },
                         children: screens,
                       ),
+                      if ((_voiceIsSpeaking || _voiceIsListening) && index != 0)
+                        Positioned(
+                          left: 12,
+                          right: 12,
+                          bottom: 12,
+                          child: Material(
+                            elevation: 8,
+                            borderRadius: BorderRadius.circular(18),
+                            color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.96),
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(18),
+                              onTap: () => goToPage(0),
+                              child: Padding(
+                                padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
+                                child: Row(
+                                  children: [
+                                    SizedBox(
+                                      width: 22,
+                                      height: 22,
+                                      child: _voiceIsSpeaking
+                                          ? const CircularProgressIndicator(strokeWidth: 2)
+                                          : const Icon(Icons.mic_rounded, size: 18),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            _voiceIsSpeaking ? 'Navigator is speaking…' : 'Navigator is listening…',
+                                            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+                                          ),
+                                          const Text(
+                                            'Tap to return to chat — audio continues in background',
+                                            style: TextStyle(fontSize: 11),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.close_rounded, size: 18),
+                                      tooltip: 'Stop',
+                                      onPressed: () async {
+                                        await VoiceInterface().stopSpeaking();
+                                        await VoiceInterface().stopListening();
+                                      },
+                                    ),
+                                    const Icon(Icons.chevron_right_rounded, size: 18),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -392,6 +475,23 @@ class _MemberHomeState extends State<MemberHome> {
         );
       },
     );
+  }
+}
+
+class _KeepAlivePage extends StatefulWidget {
+  const _KeepAlivePage({required this.child});
+  final Widget child;
+  @override
+  State<_KeepAlivePage> createState() => _KeepAlivePageState();
+}
+
+class _KeepAlivePageState extends State<_KeepAlivePage> with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return widget.child;
   }
 }
 
@@ -798,44 +898,131 @@ class RecipePracticeScreen extends StatelessWidget {
   );
 }
 
-class ProgressScreen extends StatelessWidget {
-  const ProgressScreen({super.key, required this.checkIn, required this.tools});
+class ProgressScreen extends StatefulWidget {
+  const ProgressScreen({super.key, required this.checkIn, required this.tools, required this.appState});
   final CheckInState checkIn;
   final Set<String> tools;
+  final SecureAppState appState;
   @override
-  Widget build(BuildContext context) => ListView(
-    padding: const EdgeInsets.all(20),
-    children: [
-      const Text(
-        'Your progress',
-        style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
-      ),
-      Card(
-        child: ListTile(
-          title: const Text('Today’s user-reported facts'),
-          subtitle: Text(
-            '${checkIn.emotions.isEmpty ? 'No emotions selected' : checkIn.emotions.join(', ')} · Activation ${checkIn.activation}',
+  State<ProgressScreen> createState() => _ProgressScreenState();
+}
+
+class _ProgressScreenState extends State<ProgressScreen> {
+  Map<String, dynamic>? _curriculum;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final c = await widget.appState.loadCurriculumProgress();
+    if (mounted) setState(() { _curriculum = c; _loading = false; });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final completed = (_curriculum?['completed_lesson_ids'] as List?)?.length ?? 0;
+    const total = 15;
+    final pct = total == 0 ? 0.0 : completed / total;
+    final streak = _streakDays();
+    final insight = _insight(completed);
+    return ListView(
+      padding: const EdgeInsets.all(20),
+      children: [
+        const Text('Your progress', style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 4),
+        Text('Recipes, practices, and daily navigation — woven together', style: Theme.of(context).textTheme.bodyMedium),
+        const SizedBox(height: 16),
+        Card(
+          color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.5),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                SizedBox(width: 56, height: 56, child: Stack(alignment: Alignment.center, children: [
+                  CircularProgressIndicator(value: pct, strokeWidth: 6),
+                  Text('$completed', style: const TextStyle(fontWeight: FontWeight.w800)),
+                ])),
+                const SizedBox(width: 12),
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('$completed of $total recipes complete', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+                  Text(streak == 0 ? 'Start a streak — one lesson a day keeps the path warm' : '$streak-day streak · keep it gentle', style: Theme.of(context).textTheme.bodySmall),
+                ])),
+              ]),
+              const SizedBox(height: 12),
+              LinearProgressIndicator(value: pct, minHeight: 6, borderRadius: BorderRadius.circular(99)),
+              const SizedBox(height: 8),
+              Text(insight, style: Theme.of(context).textTheme.bodySmall),
+            ]),
           ),
         ),
-      ),
-      Card(
-        child: ListTile(
-          title: const Text('Recipes and saved practices'),
-          subtitle: Text(
-            '${tools.length} saved practice${tools.length == 1 ? '' : 's'}',
+        Card(
+          child: ListTile(
+            leading: const Icon(Icons.insights_rounded),
+            title: const Text('Today’s check-in meets your recipes'),
+            subtitle: Text(
+              widget.checkIn.emotions.isEmpty
+                  ? 'No emotions selected yet — your next recipe will adapt once you check in.'
+                  : '${widget.checkIn.emotions.join(', ')} · Activation ${widget.checkIn.activation}/10 · ${widget.checkIn.activation >= 7 ? 'Try Grounding (Module 2) today' : widget.checkIn.activation <= 3 ? 'Try Vision & Values (Module 3) today' : 'Try Mindfulness (Module 1) today'}',
+            ),
           ),
         ),
-      ),
-      const Card(
-        child: ListTile(
-          title: Text('AI reflections'),
-          subtitle: Text(
-            'AI-generated suggestions are shown separately from your responses and are not diagnoses.',
+        Card(
+          child: ListTile(
+            leading: const Icon(Icons.menu_book_rounded),
+            title: Text('Recipes · $completed/$total'),
+            subtitle: Text(_moduleBreakdown()),
           ),
         ),
-      ),
-    ],
-  );
+        Card(
+          child: ListTile(
+            leading: const Icon(Icons.spa_rounded),
+            title: Text('${widget.tools.length} saved practices'),
+            subtitle: Text(widget.tools.isEmpty ? 'Save a practice from Recipes or Navigator — then we’ll surface what helps most' : 'We track which practices you rate most effective and surface them here'),
+          ),
+        ),
+        const Card(
+          child: ListTile(
+            leading: Icon(Icons.auto_awesome_rounded),
+            title: Text('How this fits together'),
+            subtitle: Text('Daily navigation → Recipes teach the skill → you practice → Progress shows what steadies you. Small steps, noticed over days, build your recipe.'),
+          ),
+        ),
+        if (_loading) const Padding(padding: EdgeInsets.all(12), child: LinearProgressIndicator()),
+      ],
+    );
+  }
+
+  String _moduleBreakdown() {
+    final ids = (_curriculum?['completed_lesson_ids'] as List?)?.map((e) => e.toString()).toSet() ?? {};
+    int m1 = [1,2,3,4,5].where((n) => ids.contains('lesson-$n')).length;
+    int m2 = [6,7,8,9,10].where((n) => ids.contains('lesson-$n')).length;
+    int m3 = [11,12,13,14,15].where((n) => ids.contains('lesson-$n')).length;
+    return 'Foundations $m1/5 · Patterns $m2/5 · Direction $m3/5';
+  }
+
+  int _streakDays() {
+    // Simple: if updated_at is today and at least one lesson, streak 1; otherwise 0.
+    // Real streak would need history, but this gives a gentle nudge.
+    final raw = _curriculum?['updated_at']?.toString();
+    if (raw == null) return 0;
+    final d = DateTime.tryParse(raw);
+    if (d == null) return 0;
+    final now = DateTime.now().toUtc();
+    final diff = now.difference(d).inHours;
+    return diff < 36 ? 1 : 0;
+  }
+
+  String _insight(int completed) {
+    if (completed == 0) return 'Start with Foundations — Notice What Is Present. One lesson a day is enough; consistency matters more than speed.';
+    if (completed < 5) return 'Nice start in Foundations. Daily practice helps your nervous system learn what “steady” feels like.';
+    if (completed < 10) return 'You’re building Patterns. Progress shows which practices you return to — that’s your personal recipe emerging.';
+    if (completed < 15) return 'Direction ahead. Your Progress insights will suggest the next small, values-aligned step.';
+    return 'All 15 complete — revisit any lesson. Progress now highlights your most effective practices.';
+  }
 }
 
 class BookingScreen extends StatelessWidget {

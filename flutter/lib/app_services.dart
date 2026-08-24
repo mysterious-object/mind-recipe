@@ -607,6 +607,31 @@ class SecureAppState extends ChangeNotifier {
     }
   }
 
+  static const _lessonReflectionsKey = 'mind_recipe_lesson_reflections';
+
+  Future<Map<String, String>> loadLessonReflections() async {
+    try {
+      final raw = await _storage.read(key: _lessonReflectionsKey);
+      if (raw == null || raw.isEmpty) return {};
+      final decoded = jsonDecode(raw) as Map<String, dynamic>;
+      return decoded.map((k, v) => MapEntry(k, v.toString()));
+    } catch (_) {
+      return {};
+    }
+  }
+
+  Future<void> saveLessonReflection(String lessonId, String text) async {
+    try {
+      final all = await loadLessonReflections();
+      if (text.trim().isEmpty) {
+        all.remove(lessonId);
+      } else {
+        all[lessonId] = text.trim();
+      }
+      await _storage.write(key: _lessonReflectionsKey, value: jsonEncode(all));
+    } catch (_) {}
+  }
+
   static String _todayKey() {
     final now = DateTime.now();
     return '${now.year.toString().padLeft(4, '0')}-'
