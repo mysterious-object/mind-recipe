@@ -7,6 +7,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'app_services.dart';
+import 'chat_actions.dart';
 import 'check_in_state.dart';
 import 'mind_recipe_fx.dart';
 import 'mind_recipe_device_harness.dart';
@@ -59,6 +60,9 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
     OnDeviceStatus.checking,
   );
   List<Map<String, dynamic>> _savedThreads = [];
+  PhoneAction? _pendingPhoneAction;
+  bool _executingPhoneAction = false;
+  final PhoneActionParser _phoneActionParser = const PhoneActionParser();
 
   Future<void> _log(String msg) async {
     try {
@@ -93,6 +97,32 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
   void _onSnapshotChanged() {
     if (!mounted) return;
     setState(() => _localSnapshot = OnDeviceInference.snapshotNotifier.value);
+  }
+
+  /// Executes a consented phone action through the on-device harness
+  /// (Calendar / Reminders / AlarmClock) and reports the result in chat.
+  Future<void> _executePhoneAction(PhoneAction action) async {
+    setState(() => _executingPhoneAction = true);
+    try {
+      final result = await executePhoneAction(action);
+      if (!mounted) return;
+      setState(() {
+        widget.messages.add(
+          ChatMessage(
+            role: ChatRole.status,
+            text: result.success
+                ? '${action.summaryLabel} created on this device — "${action.title}"${action.when != null ? ' for ${formatActionTime(action.when!)}' : ''}. You can change it in your Calendar or Clock app anytime.'
+                : 'I could not create that automatically (${result.message}). Nothing was changed on your device.',
+            systemGenerated: true,
+          ),
+        );
+        _pendingPhoneAction = null;
+      });
+      widget.onChanged();
+      _scrollToEnd();
+    } finally {
+      if (mounted) setState(() => _executingPhoneAction = false);
+    }
   }
 
   Future<void> _loadVoiceConversationPreference() async {
@@ -297,6 +327,9 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
       );
       final localReplyUseful = _isUsefulLocalReply(replyToUse, text);
       await _log('USEFUL=$localReplyUseful');
+      // Phone-harness intent detection — offer a consent-gated action card
+      // whenever the member's message maps to a reminder/appointment/alarm.
+      final phoneAction = _phoneActionParser.parse(text);
       if (replyToUse != null && mounted && localReplyUseful) {
         setState(() {
           widget.messages.add(
@@ -308,6 +341,7 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
           );
           _lastMessageSide = 1.0;
           sending = false;
+          _pendingPhoneAction = phoneAction;
         });
         unawaited(widget.appState.recordAiReflection());
         widget.onChanged();
@@ -707,6 +741,13 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
                 },
               ),
             ),
+            if (_pendingPhoneAction != null)
+              _PhoneActionCard(
+                action: _pendingPhoneAction!,
+                busy: _executingPhoneAction,
+                onAllow: () => _executePhoneAction(_pendingPhoneAction!),
+                onDismiss: () => setState(() => _pendingPhoneAction = null),
+              ),
             _Composer(
               controller: composer,
               canSend: canSend,
@@ -727,6 +768,92 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
 }
 
 enum ChatRole { assistant, member, status }
+
+/// Consent-gated phone action card — Mind Recipe's on-device phone-harness
+/// surface inside free chat. Nothing executes until the member taps Allow.
+class _PhoneActionCard extends StatelessWidget {
+  const _PhoneActionCard({
+    required this.action,
+    required this.busy,
+    required this.onAllow,
+    required this.onDismiss,
+  });
+
+  final PhoneAction action;
+  final bool busy;
+  final VoidCallback onAllow;
+  final VoidCallback onDismiss;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Card(
+      margin: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+      color: scheme.secondaryContainer.withValues(alpha: 0.55),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  switch (action.type) {
+                    PhoneActionType.reminder => Icons.notifications_active_outlined,
+                    PhoneActionType.appointment => Icons.event_outlined,
+                    PhoneActionType.alarm => Icons.alarm_outlined,
+                  },
+                  size: 18,
+                  color: scheme.primary,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    action.summary,
+                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5),
+                  ),
+                ),
+                IconButton(
+                  visualDensity: VisualDensity.compact,
+                  onPressed: busy ? null : onDismiss,
+                  icon: const Icon(Icons.close_rounded, size: 18),
+                  tooltip: 'Not now',
+                ),
+              ],
+            ),
+            const SizedBox(height: 2),
+            Text(
+              'Mind Recipe can add this on your phone — it stays in your own Calendar, Reminders, or Clock app.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: busy ? null : onDismiss,
+                  child: const Text('Not now'),
+                ),
+                const SizedBox(width: 4),
+                FilledButton.icon(
+                  onPressed: busy ? null : onAllow,
+                  icon: busy
+                      ? const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.bolt_rounded, size: 16),
+                  label: Text(busy ? 'Adding…' : 'Allow'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 class ChatMessage {
   const ChatMessage({
