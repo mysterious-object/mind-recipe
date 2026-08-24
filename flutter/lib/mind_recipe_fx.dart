@@ -389,91 +389,196 @@ class _MindRecipeFxPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     if (size.isEmpty) return;
     final phase = progress * 0.72;
-    final variantOpacity = _variantOpacityScale(variant);
-    final opacityScale = (dark ? 1.0 : 0.62) * variantOpacity;
-    final showOrbs = _showOrbs(variant);
-    final showNebula = _showNebula(variant);
-    final showTendrils = _showTendrils(variant);
-    final showRivers = _showRivers(variant);
     final palette = _paletteForVariant(variant, primary, secondary);
-    // Variant-specific background wash – makes 12 variants instantly distinct
     final wash = _washForVariant(variant, dark);
-    canvas.drawRect(
-      Offset.zero & size,
-      Paint()..color = wash.withValues(alpha: 0.09 * opacityScale),
-    );
-    // Add a subtle variant label watermark for QA (only visible in debug, faint)
-    // This ensures even identical palettes look different per variant.
+    // Strong wash per variant – 12 distinct backgrounds (fixes 'color only' report)
+    canvas.drawRect(Offset.zero & size, Paint()..color = wash.withValues(alpha: dark ? 0.18 : 0.11));
 
-    if (showOrbs) {
-      final nativePrimary = Color.lerp(palette[0], primary, 0.18)!;
-      final firstCenter = Offset(
-        size.width * (0.82 + math.sin(phase) * 0.12),
-        size.height * (0.12 + math.cos(phase * 1.3) * 0.05),
-      );
-      final secondCenter = Offset(
-        size.width * (0.08 + math.cos(phase * 0.8) * 0.09),
-        size.height * (0.68 + math.sin(phase * 1.1) * 0.08),
-      );
-
-      canvas.drawCircle(
-        firstCenter,
-        size.shortestSide * 0.42,
-        Paint()
-          ..shader =
-              RadialGradient(
-                colors: [
-                  nativePrimary.withValues(alpha: 0.12 * opacityScale),
-                  nativePrimary.withValues(alpha: 0),
-                ],
-              ).createShader(
-                Rect.fromCircle(
-                  center: firstCenter,
-                  radius: size.shortestSide * 0.42,
-                ),
-              ),
-      );
-      canvas.drawCircle(
-        secondCenter,
-        size.shortestSide * 0.34,
-        Paint()
-          ..shader =
-              RadialGradient(
-                colors: [
-                  palette[1].withValues(alpha: 0.10 * opacityScale),
-                  palette[1].withValues(alpha: 0),
-                ],
-              ).createShader(
-                Rect.fromCircle(
-                  center: secondCenter,
-                  radius: size.shortestSide * 0.34,
-                ),
-              ),
-      );
+    // Distinct graphics per variant – not just color, but *shape* (like hummingbot chimera)
+    switch (variant) {
+      case 'field':
+        _paintField(canvas, size, phase, palette, dark);
+        break;
+      case 'nebula':
+        _paintNebulaVariant(canvas, size, phase, palette, dark);
+        break;
+      case 'rivers':
+        _paintRiversVariant(canvas, size, phase, palette, dark);
+        break;
+      case 'tendrils':
+        _paintTendrilsVariant(canvas, size, phase, palette, dark);
+        break;
+      case 'orbs':
+        _paintOrbsVariant(canvas, size, phase, palette, dark);
+        break;
+      case 'lattice':
+        _paintLatticeVariant(canvas, size, phase, palette, dark);
+        break;
+      case 'void':
+        _paintVoidVariant(canvas, size, phase, palette, dark);
+        break;
+      case 'prism':
+        _paintPrismVariant(canvas, size, phase, palette, dark);
+        break;
+      case 'aurora':
+        _paintAuroraVariant(canvas, size, phase, palette, dark);
+        break;
+      case 'ember':
+        _paintEmberVariant(canvas, size, phase, palette, dark);
+        break;
+      case 'ocean':
+        _paintOceanVariant(canvas, size, phase, palette, dark);
+        break;
+      case 'twilight':
+        _paintTwilightVariant(canvas, size, phase, palette, dark);
+        break;
+      default:
+        _paintField(canvas, size, phase, palette, dark);
     }
+  }
 
-    if (showNebula) _paintParticleNebula(canvas, size, phase, opacityScale, palette);
-    if (showTendrils) _paintEnergyTendrils(canvas, size, phase, opacityScale, palette);
+  void _paintField(Canvas canvas, Size size, double phase, List<Color> palette, bool dark) {
+    final opacity = dark ? 1.0 : 0.62;
+    // Orbs
+    final firstCenter = Offset(size.width * (0.82 + math.sin(phase) * 0.12), size.height * (0.12 + math.cos(phase * 1.3) * 0.05));
+    final secondCenter = Offset(size.width * (0.08 + math.cos(phase * 0.8) * 0.09), size.height * (0.68 + math.sin(phase * 1.1) * 0.08));
+    canvas.drawCircle(firstCenter, size.shortestSide * 0.42, Paint()..shader = RadialGradient(colors: [palette[0].withValues(alpha: 0.12 * opacity), palette[0].withValues(alpha: 0)]).createShader(Rect.fromCircle(center: firstCenter, radius: size.shortestSide * 0.42)));
+    canvas.drawCircle(secondCenter, size.shortestSide * 0.34, Paint()..shader = RadialGradient(colors: [palette[1].withValues(alpha: 0.10 * opacity), palette[1].withValues(alpha: 0)]).createShader(Rect.fromCircle(center: secondCenter, radius: size.shortestSide * 0.34)));
+    _paintParticleNebula(canvas, size, phase, opacity, palette);
+    _paintEnergyTendrils(canvas, size, phase, opacity, palette);
+    final path = Path();
+    for (var i = 0; i <= 32; i++) {
+      final x = size.width * i / 32;
+      final y = size.height * 0.26 + math.sin((i / 32 * math.pi * 2.2) + phase) * 16;
+      i == 0 ? path.moveTo(x, y) : path.lineTo(x, y);
+    }
+    canvas.drawPath(path, Paint()..shader = LinearGradient(colors: palette).createShader(Rect.fromLTWH(0, 0, size.width, 1))..style = PaintingStyle.stroke..strokeWidth = 1.1 * opacity);
+  }
 
-    if (showRivers) {
-      // Data Rivers: a page-reactive flow line adapted from DataRivers.js.
+  void _paintNebulaVariant(Canvas canvas, Size size, double phase, List<Color> palette, bool dark) {
+    final opacity = dark ? 1.0 : 0.7;
+    // Dense nebula: 60 particles, larger, slower drift
+    for (var i = 0; i < 60; i++) {
+      final seed = i * 1.7;
+      final x = size.width * (0.5 + math.cos(seed + phase * 0.12) * (0.42 + math.sin(seed) * 0.1));
+      final y = size.height * (0.5 + math.sin(seed * 1.3 + phase * 0.08) * 0.38);
+      final r = 1.2 + (i % 5) * 0.9;
+      canvas.drawCircle(Offset(x, y), r, Paint()..color = palette[i % palette.length].withValues(alpha: (0.07 + (i % 4) * 0.03) * opacity));
+    }
+  }
+
+  void _paintRiversVariant(Canvas canvas, Size size, double phase, List<Color> palette, bool dark) {
+    final opacity = dark ? 1.0 : 0.65;
+    for (var r = 0; r < 4; r++) {
       final path = Path();
-      for (var i = 0; i <= 32; i++) {
-        final x = size.width * i / 32;
-        final y =
-            size.height * 0.26 + math.sin((i / 32 * math.pi * 2.2) + phase) * 16;
+      final yBase = 0.18 + r * 0.17;
+      for (var i = 0; i <= 40; i++) {
+        final x = size.width * i / 40;
+        final y = size.height * yBase + math.sin((i / 40 * math.pi * 3.0) + phase + r) * (14 + r * 4);
         i == 0 ? path.moveTo(x, y) : path.lineTo(x, y);
       }
-      canvas.drawPath(
-        path,
-        Paint()
-          ..shader = LinearGradient(
-            colors: palette,
-          ).createShader(Rect.fromLTWH(0, 0, size.width, 1))
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.1 * opacityScale,
-      );
+      canvas.drawPath(path, Paint()..color = palette[r % palette.length].withValues(alpha: 0.22 * opacity)..style = PaintingStyle.stroke..strokeWidth = 1.4 + r * 0.3);
     }
+  }
+
+  void _paintTendrilsVariant(Canvas canvas, Size size, double phase, List<Color> palette, bool dark) {
+    final opacity = dark ? 1.0 : 0.65;
+    for (var i = 0; i < 5; i++) {
+      final path = Path()..moveTo(-20, size.height * (0.12 + i * 0.15) + math.sin(phase + i) * 20);
+      path.cubicTo(size.width * 0.3, size.height * (0.08 + i * 0.14), size.width * 0.7, size.height * (0.32 + i * 0.09), size.width + 20, size.height * (0.15 + i * 0.13) - math.sin(phase + i) * 20);
+      canvas.drawPath(path, Paint()..color = palette[i % palette.length].withValues(alpha: 0.14 * opacity)..style = PaintingStyle.stroke..strokeWidth = 1.6);
+    }
+  }
+
+  void _paintOrbsVariant(Canvas canvas, Size size, double phase, List<Color> palette, bool dark) {
+    final opacity = dark ? 1.0 : 0.7;
+    for (var i = 0; i < 3; i++) {
+      final center = Offset(size.width * (0.5 + math.cos(phase + i * 2.1) * 0.22), size.height * (0.5 + math.sin(phase * 0.9 + i) * 0.18));
+      final radius = size.shortestSide * (0.22 + i * 0.09);
+      canvas.drawCircle(center, radius, Paint()..shader = RadialGradient(colors: [palette[i % palette.length].withValues(alpha: 0.16 * opacity), palette[i % palette.length].withValues(alpha: 0)]).createShader(Rect.fromCircle(center: center, radius: radius)));
+    }
+  }
+
+  void _paintLatticeVariant(Canvas canvas, Size size, double phase, List<Color> palette, bool dark) {
+    final opacity = dark ? 1.0 : 0.6;
+    final paint = Paint()..color = palette[0].withValues(alpha: 0.09 * opacity)..style = PaintingStyle.stroke..strokeWidth = 0.9;
+    const step = 42.0;
+    for (double x = 0; x < size.width; x += step) {
+      canvas.drawLine(Offset(x, 0), Offset(x + math.sin(phase + x * 0.01) * 18, size.height), paint);
+    }
+    for (double y = 0; y < size.height; y += step) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y + math.cos(phase + y * 0.01) * 18), paint);
+    }
+  }
+
+  void _paintVoidVariant(Canvas canvas, Size size, double phase, List<Color> palette, bool dark) {
+    // Almost empty – faint vignette only, like hummingbot void
+    final center = size.center(Offset.zero);
+    canvas.drawCircle(center, size.shortestSide * 0.55, Paint()..shader = RadialGradient(colors: [palette[0].withValues(alpha: 0.04), Colors.transparent]).createShader(Rect.fromCircle(center: center, radius: size.shortestSide * 0.55)));
+  }
+
+  void _paintPrismVariant(Canvas canvas, Size size, double phase, List<Color> palette, bool dark) {
+    final opacity = dark ? 1.0 : 0.75;
+    // Prism: all layers bright + central prism triangle
+    _paintParticleNebula(canvas, size, phase, opacity, palette);
+    _paintEnergyTendrils(canvas, size, phase, opacity, palette);
+    final path = Path()..moveTo(size.width * 0.5, size.height * 0.22)..lineTo(size.width * 0.32, size.height * 0.68)..lineTo(size.width * 0.68, size.height * 0.68)..close();
+    canvas.drawPath(path, Paint()..shader = LinearGradient(colors: palette).createShader(path.getBounds())..style = PaintingStyle.stroke..strokeWidth = 2.2 * opacity);
+  }
+
+  void _paintAuroraVariant(Canvas canvas, Size size, double phase, List<Color> palette, bool dark) {
+    final opacity = dark ? 1.0 : 0.68;
+    // Vertical aurora curtains
+    for (var i = 0; i < 3; i++) {
+      final path = Path();
+      final xBase = size.width * (0.28 + i * 0.22);
+      for (var y = 0; y <= size.height; y += 8) {
+        final x = xBase + math.sin((y / size.height * math.pi * 2) + phase + i) * 36;
+        y == 0 ? path.moveTo(x, y.toDouble()) : path.lineTo(x, y.toDouble());
+      }
+      canvas.drawPath(path, Paint()..shader = LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [palette[i % palette.length].withValues(alpha: 0.22 * opacity), palette[i % palette.length].withValues(alpha: 0)]).createShader(Rect.fromLTWH(xBase - 40, 0, 80, size.height))..style = PaintingStyle.stroke..strokeWidth = 42 * opacity);
+    }
+  }
+
+  void _paintEmberVariant(Canvas canvas, Size size, double phase, List<Color> palette, bool dark) {
+    final opacity = dark ? 1.0 : 0.68;
+    // Ember: small warm particles rising
+    for (var i = 0; i < 40; i++) {
+      final seed = i * 2.1;
+      final x = size.width * (0.2 + (i % 7) * 0.11 + math.sin(phase + seed) * 0.04);
+      final y = size.height * (0.85 - ((phase * 0.12 + seed * 0.13) % 0.75));
+      final r = 1.0 + (i % 3) * 0.8;
+      canvas.drawCircle(Offset(x, y), r, Paint()..color = palette[i % palette.length].withValues(alpha: (0.09 + (i % 3) * 0.04) * opacity));
+    }
+  }
+
+  void _paintOceanVariant(Canvas canvas, Size size, double phase, List<Color> palette, bool dark) {
+    final opacity = dark ? 1.0 : 0.68;
+    // Ocean: horizontal sine waves
+    for (var i = 0; i < 5; i++) {
+      final path = Path();
+      final yBase = 0.22 + i * 0.13;
+      for (var x = 0; x <= size.width; x += 6) {
+        final y = size.height * yBase + math.sin((x / size.width * math.pi * 4) + phase + i * 0.9) * 10;
+        x == 0 ? path.moveTo(x.toDouble(), y) : path.lineTo(x.toDouble(), y);
+      }
+      canvas.drawPath(path, Paint()..color = palette[i % palette.length].withValues(alpha: 0.18 * opacity)..style = PaintingStyle.stroke..strokeWidth = 1.3);
+    }
+  }
+
+  void _paintTwilightVariant(Canvas canvas, Size size, double phase, List<Color> palette, bool dark) {
+    final opacity = dark ? 1.0 : 0.68;
+    // Twilight: stars + faint orbs
+    for (var i = 0; i < 50; i++) {
+      final seed = i * 3.7;
+      final x = (seed * 91.3) % size.width;
+      final y = (seed * 47.1) % (size.height * 0.55);
+      final r = (i % 3 == 0) ? 1.4 : 0.7;
+      final twinkle = 0.4 + math.sin(phase * 2 + seed) * 0.3;
+      canvas.drawCircle(Offset(x, y), r, Paint()..color = Colors.white.withValues(alpha: twinkle * 0.12 * opacity));
+    }
+    final center = Offset(size.width * 0.5, size.height * 0.35);
+    canvas.drawCircle(center, size.shortestSide * 0.18, Paint()..shader = RadialGradient(colors: [palette[1].withValues(alpha: 0.14 * opacity), Colors.transparent]).createShader(Rect.fromCircle(center: center, radius: size.shortestSide * 0.18)));
   }
 
   double _variantOpacityScale(String v) => switch (v) {

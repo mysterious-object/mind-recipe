@@ -632,6 +632,34 @@ class SecureAppState extends ChangeNotifier {
     } catch (_) {}
   }
 
+  static const _savedThreadsKey = 'mind_recipe_saved_threads';
+
+  Future<List<Map<String, dynamic>>> loadSavedThreads() async {
+    try {
+      final raw = await _storage.read(key: _savedThreadsKey);
+      if (raw == null || raw.isEmpty) return [];
+      final decoded = jsonDecode(raw) as List<dynamic>;
+      return decoded.map((e) => e as Map<String, dynamic>).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<void> saveThread(String title, List<Map<String, String>> messages) async {
+    try {
+      final all = await loadSavedThreads();
+      all.insert(0, {
+        'id': DateTime.now().millisecondsSinceEpoch.toString(),
+        'title': title,
+        'messages': messages,
+        'saved_at': DateTime.now().toIso8601String(),
+      });
+      // Keep only last 20 threads
+      if (all.length > 20) all.removeRange(20, all.length);
+      await _storage.write(key: _savedThreadsKey, value: jsonEncode(all));
+    } catch (_) {}
+  }
+
   static String _todayKey() {
     final now = DateTime.now();
     return '${now.year.toString().padLeft(4, '0')}-'

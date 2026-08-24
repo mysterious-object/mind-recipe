@@ -199,6 +199,7 @@ class _MemberHomeState extends State<MemberHome> {
   Timer? _voiceBubbleTimer;
   bool _voiceIsSpeaking = false;
   bool _voiceIsListening = false;
+  String? _lastAssistantSnippet;
 
   @override
   void initState() {
@@ -1551,131 +1552,74 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'Available private models',
+                    'Private on-device AI',
                     style: TextStyle(fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(height: 8),
-                  ...mindRecipePrivateModelChoices.map(
-                    (choice) => InkWell(
-                      borderRadius: BorderRadius.circular(12),
-                      onTap: _modelActionInProgress
-                          ? null
-                          : () => setState(() {
-                              _privateModelSelectionTouched = true;
-                              _selectedPrivateChoice = choice;
-                            }),
-                      child: Container(
-                        width: double.infinity,
-                        margin: const EdgeInsets.only(bottom: 8),
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          border: Border.all(
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
-                          borderRadius: BorderRadius.circular(12),
-                          color:
-                              choice.manifest.id ==
-                                  _selectedPrivateChoice.manifest.id
-                              ? Theme.of(context).colorScheme.primaryContainer
-                                    .withOpacity(0.34)
-                              : null,
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    choice.name,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ),
-                                if (choice.recommended)
-                                  const Chip(label: Text('Recommended')),
-                                Radio<OnDeviceModelChoice>(
-                                  value: choice,
-                                  groupValue: _selectedPrivateChoice,
-                                  onChanged: _modelActionInProgress
-                                      ? null
-                                      : (value) => setState(() {
-                                          _privateModelSelectionTouched = true;
-                                          _selectedPrivateChoice = value!;
-                                        }),
-                                ),
-                              ],
-                            ),
-                            Text(choice.quality),
-                            const SizedBox(height: 3),
-                            Text(
-                              '${choice.bestFor}\n${choice.memoryNote}',
-                              style: Theme.of(context).textTheme.bodySmall,
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                if (choice.manifest.id ==
-                                        OnDeviceInference().activeModel.id &&
-                                    _privateModel.isReady)
-                                  const Chip(
-                                    avatar: Icon(Icons.check_circle, size: 16),
-                                    label: Text('Active'),
-                                  )
-                                else if (_downloadedPrivateModelIds.contains(
-                                  choice.manifest.id,
-                                ))
-                                  OutlinedButton.icon(
-                                    onPressed: _modelActionInProgress
-                                        ? null
-                                        : () => _usePrivateModel(choice),
-                                    icon: const Icon(
-                                      Icons.swap_horiz_rounded,
-                                      size: 18,
-                                    ),
-                                    label: const Text('Use model'),
-                                  )
-                                else
-                                  FilledButton.tonalIcon(
-                                    onPressed: _modelActionInProgress
-                                        ? null
-                                        : () {
-                                            setState(() {
-                                              _privateModelSelectionTouched =
-                                                  true;
-                                              _selectedPrivateChoice = choice;
-                                            });
-                                            _installPrivateModel();
-                                          },
-                                    icon: const Icon(
-                                      Icons.download_rounded,
-                                      size: 18,
-                                    ),
-                                    label: const Text('Download'),
-                                  ),
-                                const Spacer(),
-                                if (_downloadedPrivateModelIds.contains(
-                                  choice.manifest.id,
-                                ))
-                                  IconButton(
-                                    onPressed: _modelActionInProgress
-                                        ? null
-                                        : () => _removePrivateModel(choice),
-                                    tooltip: 'Remove ${choice.name}',
-                                    icon: const Icon(
-                                      Icons.delete_outline_rounded,
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ],
-                        ),
+                  Builder(builder: (context) {
+                    final choice = mindRecipePrivateModelChoices.first;
+                    final isActive = choice.manifest.id == OnDeviceInference().activeModel.id && _privateModel.isReady;
+                    final isDownloaded = _downloadedPrivateModelIds.contains(choice.manifest.id);
+                    return Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Theme.of(context).colorScheme.primary, width: 1.2),
+                        borderRadius: BorderRadius.circular(14),
+                        color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.18),
                       ),
-                    ),
-                  ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(children: [
+                            const Icon(Icons.shield_rounded, size: 20),
+                            const SizedBox(width: 8),
+                            Expanded(child: Text(choice.name, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16))),
+                            if (isActive) const Chip(avatar: Icon(Icons.check_circle, size: 16), label: Text('Active')),
+                            if (isActive) const SizedBox(width: 8),
+                            const Chip(label: Text('On-device')),
+                          ]),
+                          const SizedBox(height: 6),
+                          Text(choice.quality, style: Theme.of(context).textTheme.bodyMedium),
+                          const SizedBox(height: 4),
+                          Text('${choice.bestFor}\n${choice.memoryNote}', style: Theme.of(context).textTheme.bodySmall),
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            width: double.infinity,
+                            child: isActive
+                                ? OutlinedButton.icon(
+                                    onPressed: _modelActionInProgress ? null : () => _removePrivateModel(choice),
+                                    icon: const Icon(Icons.delete_outline_rounded, size: 18),
+                                    label: const Text('Remove Private model'),
+                                  )
+                                : isDownloaded
+                                    ? FilledButton.icon(
+                                        onPressed: _modelActionInProgress ? null : () => _usePrivateModel(choice),
+                                        icon: const Icon(Icons.check_rounded, size: 18),
+                                        label: const Text('Use Private model'),
+                                      )
+                                    : FilledButton.icon(
+                                        onPressed: _modelActionInProgress ? null : _installPrivateModel,
+                                        icon: const Icon(Icons.download_rounded, size: 18),
+                                        label: const Text('Download Private model'),
+                                      ),
+                          ),
+                          if (isDownloaded && !isActive)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: TextButton.icon(
+                                onPressed: _modelActionInProgress ? null : () => _removePrivateModel(choice),
+                                icon: const Icon(Icons.delete_outline_rounded, size: 16),
+                                label: const Text('Remove download'),
+                              ),
+                            ),
+                        ],
+                      ),
+                    );
+                  }),
+                  const SizedBox(height: 8),
                   Text(
-                    'Download only the models you want. Every download is verified before it can run, and you can switch or remove it here at any time.',
+                    'One private model — 1.2 GB, stays on this device, verified before it can run. Download once, use everywhere.',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ],
@@ -1705,41 +1649,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
             const Divider(height: 1),
-            ButtonBar(
-              children: [
-                if (_downloadedPrivateModelIds.contains(
-                      _selectedPrivateChoice.manifest.id,
-                    ) &&
-                    _selectedPrivateChoice.manifest.id !=
-                        OnDeviceInference().activeModel.id)
-                  FilledButton.icon(
-                    onPressed: _modelActionInProgress
-                        ? null
-                        : () => _usePrivateModel(_selectedPrivateChoice),
-                    icon: const Icon(Icons.swap_horiz_rounded),
-                    label: Text('Use ${_selectedPrivateChoice.name}'),
-                  )
-                else if (_downloadedPrivateModelIds.contains(
-                  _selectedPrivateChoice.manifest.id,
-                ))
-                  TextButton.icon(
-                    onPressed: _modelActionInProgress
-                        ? null
-                        : () => _removePrivateModel(_selectedPrivateChoice),
-                    icon: const Icon(Icons.delete_outline_rounded),
-                    label: Text('Remove ${_selectedPrivateChoice.name}'),
-                  )
-                else
-                  FilledButton.icon(
-                    onPressed:
-                        _modelActionInProgress ||
-                            _privateModel.status == OnDeviceStatus.downloading
-                        ? null
-                        : _installPrivateModel,
-                    icon: const Icon(Icons.download_rounded),
-                    label: Text('Install ${_selectedPrivateChoice.name}'),
-                  ),
-              ],
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+              child: Text(
+                _privateModel.isReady
+                    ? 'Private model ready — stays on this device.'
+                    : _privateModel.status == OnDeviceStatus.downloading || _privateModel.status == OnDeviceStatus.verifying
+                        ? 'Preparing private model — you can keep using the app.'
+                        : 'Tap Download Private model above to enable on-device guidance.',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
             ),
           ],
         ),

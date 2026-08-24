@@ -120,50 +120,15 @@ final mindRecipePrivateModel = OnDeviceModelManifest(
   license: 'Apache-2.0',
 );
 
-final mindRecipePrivateFastModel = OnDeviceModelManifest(
-  id: 'mind-recipe-private-fast-qwen3-0.6b-q4-0',
-  version: '2026.08.22-qwen3-0.6b-q4-0',
-  downloadUri: Uri.parse(
-    'https://huggingface.co/ggml-org/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q4_0.gguf',
-  ),
-  sha256: 'da2572f16c06133561ce56accaa822216f2391ef4d37fba427801cd6736417d4',
-  sizeBytes: 428970080,
-  license: 'Apache-2.0',
-);
-
-final mindRecipePrivateCompactModel = OnDeviceModelManifest(
-  id: 'mind-recipe-private-compact-qwen3-0.6b-q8-0',
-  version: '2026.08.22-qwen3-0.6b-q8-0',
-  downloadUri: Uri.parse(
-    'https://huggingface.co/ggml-org/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q8_0.gguf',
-  ),
-  sha256: '361cc68159042c36ebff7715dc5a2e4612153e88f3e9c9c234820849d6dc9e1d',
-  sizeBytes: 804753632,
-  license: 'Apache-2.0',
-);
-
 /// Every choice is an explicitly pinned, checksum-verified download.
+/// Single private model – renamed from Balanced per feedback (compact/fast removed).
 final mindRecipePrivateModelChoices = <OnDeviceModelChoice>[
   OnDeviceModelChoice(
-    manifest: mindRecipePrivateFastModel,
-    name: 'Private Fast',
-    quality: 'Quick, lighter-weight guidance',
-    bestFor: 'Short check-ins and quick resets on phones with less storage.',
-    memoryNote: '409 MB download · needs 4 GB device memory',
-  ),
-  OnDeviceModelChoice(
-    manifest: mindRecipePrivateCompactModel,
-    name: 'Private Compact',
-    quality: 'Better detail in a smaller download',
-    bestFor: 'Everyday reflection with more nuance without the largest model.',
-    memoryNote: '768 MB download · needs 6 GB device memory',
-  ),
-  OnDeviceModelChoice(
     manifest: mindRecipePrivateModel,
-    name: 'Private Balanced',
-    quality: 'Strong everyday reflection',
-    bestFor: 'Most conversations; a good balance of nuance and speed.',
-    memoryNote: '1.2 GB download · needs 8 GB device memory',
+    name: 'Private',
+    quality: 'Private on-device guidance',
+    bestFor: 'All conversations; stays on this device.',
+    memoryNote: '1.2 GB download · needs 8 GB device memory · keep 2.5 GB free',
     recommended: true,
   ),
 ];
@@ -244,11 +209,7 @@ class OnDeviceInference implements LocalInference {
                       _downloadBytesPerSecond)
                   .ceil(),
         );
-  int get _minimumMemoryMiB {
-    if (_activeManifest.id == mindRecipePrivateFastModel.id) return 4096;
-    if (_activeManifest.id == mindRecipePrivateCompactModel.id) return 6144;
-    return 8192;
-  }
+  int get _minimumMemoryMiB => 8192;
 
   Future<File> _modelFile([OnDeviceModelManifest? manifest]) async {
     final target = manifest ?? _activeManifest;

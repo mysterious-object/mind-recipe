@@ -1,0 +1,33 @@
+<!--
+  Merge into flutter/ios/Runner/Info.plist (inside <dict>)
+
+  These keys allow the Mind Recipe Mobile Automation plugin to:
+    - Insert calendar events / reminders via EventKit (requires member permission prompt)
+    - Query shortcuts:// / calshow: / x-apple-* URL schemes
+-->
+
+<!-- Calendars — shown when the member approves the first appointment/reminder -->
+<key>NSCalendarsUsageDescription</key>
+<string>Mind Recipe can add wellness appointments to your calendar when you approve.</string>
+
+<!-- iOS 17+ full access string (shown for requestFullAccessToEvents) -->
+<key>NSCalendarsFullAccessUsageDescription</key>
+<string>Mind Recipe adds calendar events only after your confirmation.</string>
+
+<key>NSCalendarsWriteOnlyAccessUsageDescription</key>
+<string>Mind Recipe can add wellness appointments to your calendar when you approve.</string>
+
+<key>NSRemindersUsageDescription</key>
+<string>Mind Recipe can add gentle reminders when you approve.</string>
+
+<!-- Allow canOpenURL for these schemes (iOS 9+ requires allowlist) -->
+<key>LSApplicationQueriesSchemes</key>
+<array>
+  <string>shortcuts</string>
+  <string>x-apple-calevent</string>
+  <string>calshow</string>
+  <string>x-apple-reminderkit</string>
+  <string>clock-alarm</string>
+  <!-- Google Calendar fallback -->
+  <string>https</string>
+</array>
