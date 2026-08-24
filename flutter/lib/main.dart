@@ -448,7 +448,41 @@ class _PrivateModelDownloadBannerState
   Widget build(BuildContext context) {
     final isDownloading = _snap.status == OnDeviceStatus.downloading;
     final isVerifying = _snap.status == OnDeviceStatus.verifying;
-    if (!isDownloading && !isVerifying) return const SizedBox.shrink();
+    final isError = _snap.status == OnDeviceStatus.error;
+    if (!isDownloading && !isVerifying && !isError) return const SizedBox.shrink();
+    if (isError) {
+      return Material(
+        elevation: 6,
+        color: Theme.of(context).colorScheme.errorContainer.withOpacity(0.98),
+        child: SafeArea(
+          bottom: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 8, 14, 10),
+            child: Row(
+              children: [
+                const Icon(Icons.error_outline, size: 18),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    _snap.detail ?? 'Private model setup failed.',
+                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () async {
+                    // Retry helper – re-trigger from banner without leaving tab
+                    try {
+                      await OnDeviceInference().installModel();
+                    } catch (_) {}
+                  },
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
     final progress = OnDeviceInference().downloadProgress;
     final percent = isDownloading
         ? (progress * 100).clamp(0, 100).toStringAsFixed(0)
@@ -511,8 +545,8 @@ class _PrivateModelDownloadBannerState
               const SizedBox(height: 4),
               Text(
                 isDownloading
-                    ? '$transferDetail. Keep the app open on Wi-Fi; you can use any tab while it downloads.'
-                    : 'Verification has a four-minute safety limit. If it cannot finish, you can retry from Settings.',
+                    ? '$transferDetail. Keep the app open on Wi-Fi; you can use any tab while it downloads. Partial is kept for resume.'
+                    : 'Verifying 10-min limit · hashing and starting engine (~30 s after download). If this fails, banner shows Retry – try the smaller Fast model on low-storage devices.',
                 style: TextStyle(
                   fontSize: 11.5,
                   color: Theme.of(context).textTheme.bodySmall?.color

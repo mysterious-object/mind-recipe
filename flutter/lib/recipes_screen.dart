@@ -702,21 +702,6 @@ class _LessonDetailState extends State<_LessonDetail> {
                   ),
                 ),
               ),
-              Card(
-                child: ExpansionTile(
-                  leading: const Icon(Icons.article_outlined),
-                  title: const Text('Full transcript'),
-                  subtitle: Text('Source: ${widget.lesson.source}'),
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
-                      child: Text(
-                        'This lesson is grounded in the bundled ${widget.lesson.source}. Move at your own pace; grounding and support come before deeper reflection.',
-                      ),
-                    ),
-                  ],
-                ),
-              ),
               const SizedBox(height: 16),
               SizedBox(
                 width: double.infinity,

@@ -396,8 +396,9 @@ class OnDeviceInference implements LocalInference {
     // If we are resuming, keep the file; otherwise start fresh
     var isResume = resumeOffset > 0 && resumeOffset < _activeManifest.sizeBytes;
     try {
-      final client = HttpClient()..autoUncompress = true;
+      final client = HttpClient()..autoUncompress = false;
       client.connectionTimeout = const Duration(seconds: 30);
+      client.idleTimeout = const Duration(seconds: 60);
       final request = await client.getUrl(_activeManifest.downloadUri);
       request.followRedirects = true;
       request.maxRedirects = 8;
@@ -406,59 +407,99 @@ class OnDeviceInference implements LocalInference {
         'MindRecipe/1.0 (Flutter; +https://mindrecipe.app)',
       );
       request.headers.set('Accept', '*/*');
+      // Hugging Face / CloudFront returns 304/206 only when Range is valid;
+      // keep the partial if the server later stalls – do not delete on retry.
       if (isResume) {
         request.headers.set('Range', 'bytes=$resumeOffset-');
       }
       final response = await request.close().timeout(
-        const Duration(minutes: 30),
+        const Duration(minutes: 2),
       );
-      // 206 = Partial Content (resume), 200 = OK (fresh)
-      if (response.statusCode != HttpStatus.ok &&
+      // 206 = Partial Content (resume), 200 = OK (fresh), 416 = already complete
+      if (response.statusCode == HttpStatus.requestedRangeNotSatisfiable) {
+        client.close(force: true);
+        await _inferLog(
+          'range not satisfiable resumeOffset=$resumeOffset size=${_activeManifest.sizeBytes} – treating as complete',
+        );
+      } else if (response.statusCode != HttpStatus.ok &&
           response.statusCode != HttpStatus.partialContent) {
         client.close(force: true);
         throw HttpException('Model download returned ${response.statusCode}.');
       }
       // If server ignored Range and returned 200, restart from 0
       if (isResume && response.statusCode == HttpStatus.ok) {
-        await temporary.delete();
+        await _inferLog('server ignored Range – restarting from 0');
+        if (await temporary.exists()) await temporary.delete();
         resumeOffset = 0;
         _downloadProgress = 0;
+        _downloadedBytes = 0;
         isResume = false;
       }
       final contentLen = response.contentLength;
       final expected = contentLen > 0
           ? (isResume ? resumeOffset + contentLen : contentLen)
           : _activeManifest.sizeBytes;
+      // Guard against truncated manifest (e.g. x-linked-size mismatch).
+      if (expected > _activeManifest.sizeBytes + 1024) {
+        await _inferLog(
+          'warn: server expected $expected > manifest ${_activeManifest.sizeBytes} – clamping',
+        );
+      }
       var received = resumeOffset;
       var lastSampleBytes = received;
       var lastSampleAt = DateTime.now();
       final sink = temporary.openWrite(
         mode: isResume ? FileMode.append : FileMode.write,
       );
-      await for (final bytes in response) {
-        received += bytes.length;
-        sink.add(bytes);
-        _downloadProgress = received / expected;
-        _downloadedBytes = received;
-        final now = DateTime.now();
-        final elapsedMs = now.difference(lastSampleAt).inMilliseconds;
-        if (elapsedMs >= 750) {
-          _downloadBytesPerSecond =
-              ((received - lastSampleBytes) * 1000 / elapsedMs).round();
-          lastSampleBytes = received;
-          lastSampleAt = now;
+      try {
+        await for (final bytes in response.timeout(
+          const Duration(minutes: 2),
+          onTimeout: (sink) => sink.close(),
+        )) {
+          received += bytes.length;
+          sink.add(bytes);
+          _downloadProgress = (received / expected).clamp(0.0, 1.0);
+          _downloadedBytes = received;
+          final now = DateTime.now();
+          final elapsedMs = now.difference(lastSampleAt).inMilliseconds;
+          if (elapsedMs >= 750) {
+            _downloadBytesPerSecond =
+                ((received - lastSampleBytes) * 1000 / elapsedMs).round();
+            lastSampleBytes = received;
+            lastSampleAt = now;
+          }
         }
+      } on TimeoutException {
+        await _inferLog(
+          'download stall timeout after 2 min – received $received/$expected',
+        );
+        throw TimeoutException(
+          'Download stalled for 2 minutes at $received/$expected bytes – check Wi-Fi and try again. Partial kept for resume.',
+        );
       }
+      await sink.flush();
       await sink.close();
       client.close(force: true);
+      final downloadedLen = await temporary.length();
+      await _inferLog(
+        'download finished $downloadedLen bytes (expected ${_activeManifest.sizeBytes}) – entering verify',
+      );
+      // If we still have a short file, keep it for resume instead of deleting.
+      if (downloadedLen < _activeManifest.sizeBytes) {
+        throw HttpException(
+          'Download incomplete $downloadedLen/${_activeManifest.sizeBytes} bytes – will resume next time. Keep Wi-Fi on.',
+        );
+      }
       _set(const LocalInferenceSnapshot(OnDeviceStatus.verifying));
       await _inferLog(
-        'verifying download ${temporary.path} (${await temporary.length()} bytes, expect ${_activeManifest.sizeBytes})',
+        'verifying download ${temporary.path} ($downloadedLen bytes, expect ${_activeManifest.sizeBytes})',
       );
+      // SHA-256 of 1.2 GB on mid-range Android can take 3-6 min with pure Dart crypto.
+      // Give 10 min to avoid deleting a good download on slow devices.
       if (!await _matchesManifest(
         temporary,
         _activeManifest,
-      ).timeout(const Duration(minutes: 4))) {
+      ).timeout(const Duration(minutes: 10))) {
         throw const FileSystemException(
           'Downloaded model did not match the signed manifest.',
         );
@@ -478,7 +519,19 @@ class OnDeviceInference implements LocalInference {
         );
       }
     } catch (error) {
-      if (await temporary.exists()) await temporary.delete();
+      final isIntegrityError =
+          error is FileSystemException &&
+          error.message.contains('signed manifest');
+      if (isIntegrityError && await temporary.exists()) {
+        await _inferLog('integrity failure – deleting corrupted $temporary: $error');
+        try {
+          await temporary.delete();
+        } catch (_) {}
+      } else if (await temporary.exists()) {
+        final len = await temporary.length();
+        await _inferLog('install failed kept partial $len bytes for resume: $error');
+        // Keep partial so tab switch / retry can resume via Range.
+      }
       _set(LocalInferenceSnapshot(OnDeviceStatus.error, detail: '$error'));
       rethrow;
     }
