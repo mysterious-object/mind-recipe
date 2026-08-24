@@ -345,14 +345,20 @@ class _MemberHomeState extends State<MemberHome> {
                         Positioned.fill(
                           child: Opacity(
                             opacity: widget.appState.chimeraFxIntensity,
-                            child: MindRecipeGpuField(progress: progress),
+                            child: MindRecipeGpuField(
+                              progress: progress,
+                              variant: widget.appState.chimeraFxVariant,
+                            ),
                           ),
                         ),
                       if (widget.appState.chimeraFxEnabled)
                         Positioned.fill(
                           child: Opacity(
                             opacity: widget.appState.chimeraFxIntensity,
-                            child: MindRecipeFxBackdrop(progress: progress),
+                            child: MindRecipeFxBackdrop(
+                              progress: progress,
+                              variant: widget.appState.chimeraFxVariant,
+                            ),
                           ),
                         ),
                       PageView(
@@ -1254,6 +1260,54 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               setState(() => _chimeraFxIntensity = preset.$2);
                               widget.appState.setChimeraFxIntensity(preset.$2);
                             },
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            if (widget.appState.chimeraFxEnabled) const Divider(height: 1),
+            if (widget.appState.chimeraFxEnabled)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'BACKGROUND VFX',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, letterSpacing: 1.1),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Choose from 12 chimera-fx backgrounds. They stay subtle and react to swipes.',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final v in const [
+                          ('field', 'Field Flux', Icons.gradient_rounded),
+                          ('nebula', 'Nebula Drift', Icons.blur_on_rounded),
+                          ('rivers', 'Data Rivers', Icons.water_rounded),
+                          ('tendrils', 'Energy Tendrils', Icons.bolt_rounded),
+                          ('orbs', 'Orb Glow', Icons.circle_outlined),
+                          ('lattice', 'Lattice Mesh', Icons.grid_on_rounded),
+                          ('void', 'Void Minimal', Icons.nights_stay_rounded),
+                          ('prism', 'Prism Burst', Icons.auto_awesome_rounded),
+                          ('aurora', 'Aurora Bloom', Icons.wb_twilight_rounded),
+                          ('ember', 'Ember Warm', Icons.local_fire_department_rounded),
+                          ('ocean', 'Ocean Depth', Icons.waves_rounded),
+                          ('twilight', 'Twilight Veil', Icons.nightlight_rounded),
+                        ])
+                          ChoiceChip(
+                            label: Text(v.$2),
+                            avatar: Icon(v.$3, size: 18),
+                            selected: widget.appState.chimeraFxVariant == v.$1,
+                            onSelected: (_) => setState(() {
+                              widget.appState.setChimeraFxVariant(v.$1);
+                            }),
                           ),
                       ],
                     ),

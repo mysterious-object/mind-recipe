@@ -428,6 +428,7 @@ class SecureAppState extends ChangeNotifier {
   static const _chimeraThemeKey = 'mind_recipe_chimera_theme';
   static const _chimeraFxEnabledKey = 'mind_recipe_chimera_fx_enabled';
   static const _chimeraFxIntensityKey = 'mind_recipe_chimera_fx_intensity';
+  static const _chimeraFxVariantKey = 'mind_recipe_chimera_fx_variant';
   static const _curriculumProgressKey = 'mind_recipe_curriculum_progress';
 
   AccountSession? session;
@@ -440,6 +441,7 @@ class SecureAppState extends ChangeNotifier {
   String chimeraTheme = 'verdant';
   bool chimeraFxEnabled = true;
   double chimeraFxIntensity = 0.7;
+  String chimeraFxVariant = 'field'; // 12 variants: field, nebula, rivers, tendrils, orbs, lattice, void, prism, aurora, ember, ocean, twilight
   String _activityDate = '';
   int _navigationSessions = 0;
   int _messagesSent = 0;
@@ -476,6 +478,7 @@ class SecureAppState extends ChangeNotifier {
         _storage.read(key: _chimeraThemeKey),
         _storage.read(key: _chimeraFxEnabledKey),
         _storage.read(key: _chimeraFxIntensityKey),
+        _storage.read(key: _chimeraFxVariantKey),
       ]);
       if ((values[0] ?? '').isNotEmpty) {
         session = AccountSession(
@@ -513,6 +516,22 @@ class SecureAppState extends ChangeNotifier {
       chimeraFxEnabled = values[9] != 'false';
       chimeraFxIntensity =
           double.tryParse(values[10] ?? '')?.clamp(0.2, 1.0).toDouble() ?? 0.7;
+      chimeraFxVariant = const {
+        'field',
+        'nebula',
+        'rivers',
+        'tendrils',
+        'orbs',
+        'lattice',
+        'void',
+        'prism',
+        'aurora',
+        'ember',
+        'ocean',
+        'twilight',
+      }.contains(values[11])
+          ? values[11]!
+          : 'field';
     } catch (_) {
       // Secure storage can be unavailable in some test harnesses. The app stays fail-closed.
     }
@@ -674,6 +693,28 @@ class SecureAppState extends ChangeNotifier {
       key: _chimeraFxIntensityKey,
       value: chimeraFxIntensity.toString(),
     );
+  }
+
+  Future<void> setChimeraFxVariant(String value) async {
+    if (!const {
+      'field',
+      'nebula',
+      'rivers',
+      'tendrils',
+      'orbs',
+      'lattice',
+      'void',
+      'prism',
+      'aurora',
+      'ember',
+      'ocean',
+      'twilight',
+    }.contains(value)) {
+      return;
+    }
+    chimeraFxVariant = value;
+    notifyListeners();
+    await _storage.write(key: _chimeraFxVariantKey, value: value);
   }
 
   Future<void> signOut() async {

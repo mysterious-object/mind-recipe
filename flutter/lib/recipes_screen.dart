@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'app_services.dart';
+import 'on_device_inference.dart';
 import 'recipe_practices.dart';
 
 const _curriculumVersion = '2026.08.24';
@@ -636,10 +637,47 @@ class _LessonDetail extends StatefulWidget {
 class _LessonDetailState extends State<_LessonDetail> {
   bool reflection = false;
   late bool completed;
+  bool _useAi = false;
+  bool _aiLoading = false;
+  String? _aiResponse;
+  final _practiceController = TextEditingController();
   @override
   void initState() {
     super.initState();
     completed = widget.completed;
+  }
+
+  @override
+  void dispose() {
+    _practiceController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _askNavigator() async {
+    final prompt = _practiceController.text.trim().isEmpty
+        ? 'How can I work with "${widget.lesson.title}" – ${widget.lesson.practice}'
+        : 'For lesson "${widget.lesson.title}": ${widget.lesson.summary}. My reflection: ${_practiceController.text.trim()}. What is one gentle next step?';
+    setState(() {
+      _aiLoading = true;
+      _aiResponse = null;
+    });
+    try {
+      final local = await OnDeviceInference().infer(prompt);
+      if (mounted) {
+        setState(() {
+          _aiResponse = local ??
+              'Navigator is not ready yet. Try the private model in Settings or connect cloud AI – your reflection was saved privately on device.';
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _aiResponse = 'Could not reach Navigator right now. Your reflection stays on this device; try again later.';
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _aiLoading = false);
+    }
   }
 
   @override
@@ -687,7 +725,23 @@ class _LessonDetailState extends State<_LessonDetail> {
               _LessonSection(
                 icon: Icons.spa_outlined,
                 title: 'Practice',
-                child: Text(widget.lesson.practice),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(widget.lesson.practice),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _practiceController,
+                      minLines: 2,
+                      maxLines: 4,
+                      decoration: const InputDecoration(
+                        labelText: 'Your reflection (optional, stays on device)',
+                        hintText: 'What came up as you tried this?',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  ],
+                ),
               ),
               const SizedBox(height: 12),
               Card(
@@ -699,6 +753,60 @@ class _LessonDetailState extends State<_LessonDetail> {
                   title: const Text('Reflection pause'),
                   subtitle: const Text(
                     'Check this when you have taken a moment to notice what came up.',
+                  ),
+                ),
+              ),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('AI assistance (optional)'),
+                        subtitle: const Text(
+                          'Ask Navigator for a brief, private reflection on this lesson. On-device if installed, otherwise cloud if enabled.',
+                        ),
+                        secondary: const Icon(Icons.auto_awesome_outlined),
+                        value: _useAi,
+                        onChanged: (v) => setState(() => _useAi = v),
+                      ),
+                      if (_useAi) ...[
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          width: double.infinity,
+                          child: FilledButton.tonalIcon(
+                            onPressed: _aiLoading ? null : _askNavigator,
+                            icon: _aiLoading
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  )
+                                : const Icon(Icons.chat_bubble_outline_rounded),
+                            label: Text(_aiLoading ? 'Thinking…' : 'Ask Navigator'),
+                          ),
+                        ),
+                        if (_aiResponse != null) ...[
+                          const SizedBox(height: 12),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(_aiResponse!),
+                          ),
+                        ],
+                        const SizedBox(height: 4),
+                        Text(
+                          'AI is optional and stays on this device when the private model is ready. No journal is sent.',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ],
+                    ],
                   ),
                 ),
               ),

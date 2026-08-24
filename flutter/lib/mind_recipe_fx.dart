@@ -19,9 +19,10 @@ abstract final class MindRecipeFxPalette {
 /// It preserves the fluid shader language while staying inside Flutter's
 /// renderer and gracefully disappears if shader compilation is unavailable.
 class MindRecipeGpuField extends StatefulWidget {
-  const MindRecipeGpuField({super.key, required this.progress});
+  const MindRecipeGpuField({super.key, required this.progress, this.variant = 'field'});
 
   final double progress;
+  final String variant;
 
   @override
   State<MindRecipeGpuField> createState() => _MindRecipeGpuFieldState();
@@ -129,9 +130,10 @@ class _MindRecipeGpuPainter extends CustomPainter {
 /// swipes or changes pages, which keeps idle battery use at zero and makes the
 /// experience compatible with reduced-motion preferences.
 class MindRecipeFxBackdrop extends StatelessWidget {
-  const MindRecipeFxBackdrop({super.key, required this.progress});
+  const MindRecipeFxBackdrop({super.key, required this.progress, this.variant = 'field'});
 
   final double progress;
+  final String variant;
 
   @override
   Widget build(BuildContext context) {
@@ -145,6 +147,7 @@ class MindRecipeFxBackdrop extends StatelessWidget {
             primary: scheme.primary,
             secondary: scheme.secondary,
             dark: dark,
+            variant: variant,
           ),
           size: Size.infinite,
         ),
@@ -343,103 +346,137 @@ class _MindRecipeFxPainter extends CustomPainter {
     required this.primary,
     required this.secondary,
     required this.dark,
+    this.variant = 'field',
   });
 
   final double progress;
   final Color primary;
   final Color secondary;
   final bool dark;
+  final String variant;
 
   @override
   void paint(Canvas canvas, Size size) {
     if (size.isEmpty) return;
     final phase = progress * 0.72;
-    final nativePrimary = Color.lerp(MindRecipeFxPalette.primary, primary, 0.18)!;
-    final opacityScale = dark ? 1.0 : 0.62;
-    final firstCenter = Offset(
-      size.width * (0.82 + math.sin(phase) * 0.12),
-      size.height * (0.12 + math.cos(phase * 1.3) * 0.05),
-    );
-    final secondCenter = Offset(
-      size.width * (0.08 + math.cos(phase * 0.8) * 0.09),
-      size.height * (0.68 + math.sin(phase * 1.1) * 0.08),
-    );
+    final variantOpacity = _variantOpacityScale(variant);
+    final opacityScale = (dark ? 1.0 : 0.62) * variantOpacity;
+    final showOrbs = _showOrbs(variant);
+    final showNebula = _showNebula(variant);
+    final showTendrils = _showTendrils(variant);
+    final showRivers = _showRivers(variant);
+    final palette = _paletteForVariant(variant, primary, secondary);
 
-    canvas.drawCircle(
-      firstCenter,
-      size.shortestSide * 0.42,
-      Paint()
-        ..shader =
-            RadialGradient(
-              colors: [
-                nativePrimary.withValues(alpha: 0.12 * opacityScale),
-                nativePrimary.withValues(alpha: 0),
-              ],
-            ).createShader(
-              Rect.fromCircle(
-                center: firstCenter,
-                radius: size.shortestSide * 0.42,
+    if (showOrbs) {
+      final nativePrimary = Color.lerp(palette[0], primary, 0.18)!;
+      final firstCenter = Offset(
+        size.width * (0.82 + math.sin(phase) * 0.12),
+        size.height * (0.12 + math.cos(phase * 1.3) * 0.05),
+      );
+      final secondCenter = Offset(
+        size.width * (0.08 + math.cos(phase * 0.8) * 0.09),
+        size.height * (0.68 + math.sin(phase * 1.1) * 0.08),
+      );
+
+      canvas.drawCircle(
+        firstCenter,
+        size.shortestSide * 0.42,
+        Paint()
+          ..shader =
+              RadialGradient(
+                colors: [
+                  nativePrimary.withValues(alpha: 0.12 * opacityScale),
+                  nativePrimary.withValues(alpha: 0),
+                ],
+              ).createShader(
+                Rect.fromCircle(
+                  center: firstCenter,
+                  radius: size.shortestSide * 0.42,
+                ),
               ),
-            ),
-    );
-    canvas.drawCircle(
-      secondCenter,
-      size.shortestSide * 0.34,
-      Paint()
-        ..shader =
-            RadialGradient(
-              colors: [
-                secondary.withValues(alpha: 0.10 * opacityScale),
-                secondary.withValues(alpha: 0),
-              ],
-            ).createShader(
-              Rect.fromCircle(
-                center: secondCenter,
-                radius: size.shortestSide * 0.34,
+      );
+      canvas.drawCircle(
+        secondCenter,
+        size.shortestSide * 0.34,
+        Paint()
+          ..shader =
+              RadialGradient(
+                colors: [
+                  palette[1].withValues(alpha: 0.10 * opacityScale),
+                  palette[1].withValues(alpha: 0),
+                ],
+              ).createShader(
+                Rect.fromCircle(
+                  center: secondCenter,
+                  radius: size.shortestSide * 0.34,
+                ),
               ),
-            ),
-    );
-
-    _paintParticleNebula(canvas, size, phase, opacityScale);
-    _paintEnergyTendrils(canvas, size, phase, opacityScale);
-
-    // Data Rivers: a page-reactive flow line adapted from DataRivers.js.
-    final path = Path();
-    for (var i = 0; i <= 32; i++) {
-      final x = size.width * i / 32;
-      final y =
-          size.height * 0.26 + math.sin((i / 32 * math.pi * 2.2) + phase) * 16;
-      i == 0 ? path.moveTo(x, y) : path.lineTo(x, y);
+      );
     }
-    canvas.drawPath(
-      path,
-      Paint()
-        ..shader = const LinearGradient(
-          colors: [
-            MindRecipeFxPalette.primary,
-            MindRecipeFxPalette.livingGreen,
-            MindRecipeFxPalette.secondary,
-          ],
-        ).createShader(Rect.fromLTWH(0, 0, size.width, 1))
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.1 * opacityScale,
-    );
+
+    if (showNebula) _paintParticleNebula(canvas, size, phase, opacityScale, palette);
+    if (showTendrils) _paintEnergyTendrils(canvas, size, phase, opacityScale, palette);
+
+    if (showRivers) {
+      // Data Rivers: a page-reactive flow line adapted from DataRivers.js.
+      final path = Path();
+      for (var i = 0; i <= 32; i++) {
+        final x = size.width * i / 32;
+        final y =
+            size.height * 0.26 + math.sin((i / 32 * math.pi * 2.2) + phase) * 16;
+        i == 0 ? path.moveTo(x, y) : path.lineTo(x, y);
+      }
+      canvas.drawPath(
+        path,
+        Paint()
+          ..shader = LinearGradient(
+            colors: palette,
+          ).createShader(Rect.fromLTWH(0, 0, size.width, 1))
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.1 * opacityScale,
+      );
+    }
   }
+
+  double _variantOpacityScale(String v) => switch (v) {
+    'void' => 0.35,
+    'prism' => 1.15,
+    'nebula' => 1.0,
+    _ => 1.0,
+  };
+
+  bool _showOrbs(String v) => v != 'rivers' && v != 'tendrils';
+  bool _showNebula(String v) => v == 'field' || v == 'nebula' || v == 'prism' || v == 'lattice' || v == 'aurora';
+  bool _showTendrils(String v) => v == 'field' || v == 'tendrils' || v == 'prism' || v == 'ocean' || v == 'twilight';
+  bool _showRivers(String v) => v == 'field' || v == 'rivers' || v == 'prism' || v == 'ember' || v == 'ocean';
+
+  List<Color> _paletteForVariant(String v, Color primary, Color secondary) => switch (v) {
+    'aurora' => const [Color(0xff6750a4), Color(0xff00e5cc), Color(0xff008f83)],
+    'ember' => const [Color(0xffa34213), Color(0xfff5a623), Color(0xffc26a00)],
+    'ocean' => const [Color(0xff006d91), Color(0xff00e5cc), Color(0xff315da8)],
+    'twilight' => const [Color(0xff4648a3), Color(0xff7c3aed), Color(0xff7651a8)],
+    'prism' => const [Color(0xff00e5cc), Color(0xff00e68a), Color(0xff7c3aed)],
+    'void' => [primary.withValues(alpha: 0.6), secondary.withValues(alpha: 0.4), primary],
+    _ => [MindRecipeFxPalette.primary, MindRecipeFxPalette.livingGreen, MindRecipeFxPalette.secondary],
+  };
 
   void _paintParticleNebula(
     Canvas canvas,
     Size size,
     double phase,
     double opacityScale,
+    List<Color> overridePalette,
   ) {
     // A deterministic, low-count mobile interpretation of ShapableMatter's
     // nebula mode. Position changes only during pagination—no idle ticker.
-    const palette = [
-      MindRecipeFxPalette.primary,
-      MindRecipeFxPalette.livingGreen,
-      MindRecipeFxPalette.secondary,
-      Color(0xff00b399),
-    ];
+    final palette = overridePalette.length >= 4
+        ? overridePalette
+        : const [
+            MindRecipeFxPalette.primary,
+            MindRecipeFxPalette.livingGreen,
+            MindRecipeFxPalette.secondary,
+            Color(0xff00b399),
+          ];
     for (var i = 0; i < 28; i++) {
       final seed = i * 2.399963229728653;
       final orbit = 0.15 + (i % 7) * 0.017;
@@ -468,12 +505,15 @@ class _MindRecipeFxPainter extends CustomPainter {
     Size size,
     double phase,
     double opacityScale,
+    List<Color> overridePalette,
   ) {
-    const colors = [
-      MindRecipeFxPalette.primary,
-      MindRecipeFxPalette.livingGreen,
-      MindRecipeFxPalette.secondary,
-    ];
+    final colors = overridePalette.length >= 3
+        ? overridePalette.take(3).toList()
+        : const [
+            MindRecipeFxPalette.primary,
+            MindRecipeFxPalette.livingGreen,
+            MindRecipeFxPalette.secondary,
+          ];
     for (var i = 0; i < colors.length; i++) {
       final verticalShift = math.sin(phase + i * 1.7) * 34;
       final path = Path()
@@ -501,5 +541,6 @@ class _MindRecipeFxPainter extends CustomPainter {
       oldDelegate.progress != progress ||
       oldDelegate.primary != primary ||
       oldDelegate.secondary != secondary ||
-      oldDelegate.dark != dark;
+      oldDelegate.dark != dark ||
+      oldDelegate.variant != variant;
 }
