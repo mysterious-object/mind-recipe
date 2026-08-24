@@ -23,6 +23,16 @@ class AuthLogin(BaseModel):
     password: str = Field(min_length=1, max_length=128)
 
 
+class AuthResetRequest(BaseModel):
+    email: str = Field(min_length=5, max_length=254)
+
+
+class AuthResetConfirm(BaseModel):
+    email: str = Field(min_length=5, max_length=254)
+    token: str = Field(min_length=16, max_length=200)
+    new_password: str = Field(min_length=10, max_length=128)
+
+
 class AuthUser(BaseModel):
     id: str
     email: str

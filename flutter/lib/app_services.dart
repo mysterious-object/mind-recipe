@@ -40,6 +40,32 @@ class MindRecipeApiClient {
     required String password,
   }) => _authenticate('/v1/auth/login', {'email': email, 'password': password});
 
+  /// Requests a password reset. Returns the reset token in staging so the
+  /// member can finish the flow in-app; production delivers it by email.
+  Future<String?> requestPasswordReset({required String email}) async {
+    final response = await _client
+        .post(
+          Uri.parse('$mindRecipeApiBase/v1/auth/reset/request'),
+          headers: const {'content-type': 'application/json'},
+          body: jsonEncode({'email': email}),
+        )
+        .timeout(const Duration(seconds: 12));
+    if (response.statusCode != 200) return null;
+    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+    return decoded['reset_token']?.toString();
+  }
+
+  /// Confirms a password reset and returns the fresh session.
+  Future<AccountSession> confirmPasswordReset({
+    required String email,
+    required String token,
+    required String newPassword,
+  }) => _authenticate('/v1/auth/reset/confirm', {
+    'email': email,
+    'token': token,
+    'new_password': newPassword,
+  });
+
   /// Confirms that a restored credential still represents a real account.
   /// Mobile secure storage can survive an app reinstall (iOS Keychain) or be
   /// restored from backup (Android), so merely finding a token is not enough
@@ -657,6 +683,22 @@ class SecureAppState extends ChangeNotifier {
       // Keep only last 20 threads
       if (all.length > 20) all.removeRange(20, all.length);
       await _storage.write(key: _savedThreadsKey, value: jsonEncode(all));
+    } catch (_) {}
+  }
+
+  /// Generic raw key-value helpers used by generated lessons and other
+  /// structured payloads that do not need their own accessor.
+  Future<String?> readRaw(String key) async {
+    try {
+      return await _storage.read(key: key);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> writeRaw(String key, String value) async {
+    try {
+      await _storage.write(key: key, value: value);
     } catch (_) {}
   }
 

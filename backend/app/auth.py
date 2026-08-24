@@ -116,6 +116,54 @@ class AccountStore:
             raise HTTPException(status_code=401, detail="email or password is incorrect")
         return account
 
+    def email_exists(self, email: str) -> bool:
+        return email.strip().lower() in self.users_by_email
+
+    def reset_password(self, email: str, token: str, new_password: str) -> UserAccount:
+        normalized = email.strip().lower()
+        account = self.users_by_email.get(normalized)
+        expected = self._consume_reset_token(normalized, token)
+        if account is None or expected is None or not hmac.compare_digest(token, expected):
+            raise HTTPException(status_code=400, detail="reset link is invalid or expired")
+        updated = UserAccount(
+            id=account.id,
+            email=account.email,
+            display_name=account.display_name,
+            password_hash=_hash_password(new_password),
+        )
+        self.users_by_email[normalized] = updated
+        self.users_by_id[updated.id] = updated
+        values = (updated.password_hash, updated.id)
+        if self.uses_postgres:
+            import psycopg
+            with psycopg.connect(self.database_url) as connection:
+                connection.execute(
+                    "UPDATE accounts SET password_hash = %s WHERE id = %s", values
+                )
+        else:
+            with self._sqlite_connect() as connection:
+                connection.execute(
+                    "UPDATE accounts SET password_hash = ? WHERE id = ?", values
+                )
+        return updated
+
+    _reset_tokens: Dict[str, str] = {}
+
+    def create_reset_token(self, email: str) -> Optional[str]:
+        """Return a reset token only when the account exists (never 404-lean)."""
+        normalized = email.strip().lower()
+        if normalized not in self.users_by_email:
+            return None
+        token = secrets.token_urlsafe(24)
+        self._reset_tokens[normalized] = token
+        return token
+
+    def _consume_reset_token(self, email: str, token: str) -> Optional[str]:
+        return self._reset_tokens.get(email)
+
+    def clear_reset_token(self, email: str) -> None:
+        self._reset_tokens.pop(email.strip().lower(), None)
+
 
 def _hash_password(password: str) -> str:
     salt = secrets.token_bytes(16)

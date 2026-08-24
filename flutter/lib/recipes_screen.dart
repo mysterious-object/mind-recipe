@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'app_services.dart';
+import 'lesson_generator.dart';
 import 'on_device_inference.dart';
 import 'recipe_practices.dart';
 
@@ -25,6 +26,26 @@ class RecipeLesson {
   final String summary;
   final String practice;
   final String source;
+
+  factory RecipeLesson.fromJson(Map<String, dynamic> json) => RecipeLesson(
+    json['id']?.toString() ?? '',
+    int.tryParse(json['module']?.toString() ?? '') ?? 4,
+    int.tryParse(json['number']?.toString() ?? '') ?? 16,
+    json['title']?.toString() ?? 'Untitled lesson',
+    json['summary']?.toString() ?? '',
+    json['practice']?.toString() ?? '',
+    json['source']?.toString() ?? 'Navigator-generated',
+  );
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'module': module,
+    'number': number,
+    'title': title,
+    'summary': summary,
+    'practice': practice,
+    'source': source,
+  };
 }
 
 const recipeLessons = <RecipeLesson>[
@@ -179,6 +200,10 @@ class _RecipesScreenState extends State<RecipesScreen> {
   String _current = 'lesson-1';
   bool _loading = true;
   bool _savedPractices = false;
+  List<RecipeLesson> _generated = [];
+  bool _generating = false;
+  String? _generateError;
+  late final LessonGenerator _generator = LessonGenerator(widget.appState);
 
   @override
   void initState() {
@@ -187,6 +212,8 @@ class _RecipesScreenState extends State<RecipesScreen> {
   }
 
   Future<void> _load() async {
+    final generated = await _generator.loadGenerated();
+    if (mounted) setState(() => _generated = generated);
     final local = await widget.appState.loadCurriculumProgress();
     if (local != null) _apply(local);
     if (widget.appState.session != null) {
@@ -201,6 +228,37 @@ class _RecipesScreenState extends State<RecipesScreen> {
       }
     }
     if (mounted) setState(() => _loading = false);
+  }
+
+  bool get _coreComplete => _completed.length >= recipeLessons.length;
+
+  Future<void> _generateLessons() async {
+    if (_generating) return;
+    setState(() {
+      _generating = true;
+      _generateError = null;
+    });
+    try {
+      final added = await _generator.generateBatch(count: 3);
+      if (!mounted) return;
+      if (added.isEmpty) {
+        setState(() => _generateError =
+            'Navigator needs the private model installed (or cloud AI on) to write your next lessons. Install it in Profile, then try again — your progress and reflections are already saved.');
+      } else {
+        final refreshed = await _generator.loadGenerated();
+        setState(() {
+          _generated = refreshed;
+          final firstNew = added.first;
+          _current = firstNew.id;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _generateError = 'Could not write the next lesson right now. Try again in a moment.');
+      }
+    } finally {
+      if (mounted) setState(() => _generating = false);
+    }
   }
 
   Map<String, dynamic> _payload() => {
@@ -264,7 +322,8 @@ class _RecipesScreenState extends State<RecipesScreen> {
   Future<void> _complete(RecipeLesson lesson) async {
     setState(() {
       _completed.add(lesson.id);
-      final next = recipeLessons.where((item) => !_completed.contains(item.id));
+      final allLessons = [...recipeLessons, ..._generated];
+      final next = allLessons.where((item) => !_completed.contains(item.id));
       _current = next.isEmpty ? lesson.id : next.first.id;
     });
     await _persist(sync: true);
@@ -290,7 +349,8 @@ class _RecipesScreenState extends State<RecipesScreen> {
         ],
       );
     if (_loading) return const Center(child: CircularProgressIndicator());
-    final next = recipeLessons.firstWhere(
+    final allLessons = [...recipeLessons, ..._generated];
+    final next = allLessons.firstWhere(
       (lesson) => lesson.id == _current,
       orElse: () => recipeLessons.first,
     );
@@ -383,6 +443,59 @@ class _RecipesScreenState extends State<RecipesScreen> {
             currentLessonId: _current,
             onLessonTap: _open,
           ),
+        if (_coreComplete || _generated.isNotEmpty)
+          _ModuleCard(
+            module: 4,
+            title: _moduleTitle(4),
+            lessons: _generated,
+            completed: _completed,
+            currentLessonId: _current,
+            onLessonTap: _open,
+          ),
+        if (_coreComplete) ...[
+          const SizedBox(height: 8),
+          Card(
+            color: Theme.of(context).colorScheme.tertiaryContainer.withValues(alpha: 0.5),
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(children: [
+                  Icon(Icons.auto_awesome_rounded, size: 18, color: Theme.of(context).colorScheme.primary),
+                  const SizedBox(width: 8),
+                  const Expanded(child: Text('Your path continues', style: TextStyle(fontWeight: FontWeight.w800))),
+                ]),
+                const SizedBox(height: 6),
+                const Text('You finished all 15 core lessons. Navigator can now write new lessons shaped by your daily navigation, reflections, and completed modules — generated privately on your device.'),
+                const SizedBox(height: 10),
+                if (_generateError != null) ...[
+                  Text(_generateError!, style: Theme.of(context).textTheme.bodySmall),
+                  const SizedBox(height: 8),
+                ],
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: _generating ? null : _generateLessons,
+                    icon: _generating
+                        ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Icon(Icons.auto_fix_high_rounded, size: 18),
+                    label: Text(_generating ? 'Writing your next lessons…' : 'Generate next lessons'),
+                  ),
+                ),
+              ]),
+            ),
+          ),
+        ] else if (_completed.length >= recipeLessons.length - 2) ...[
+          const SizedBox(height: 8),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Text(
+                'Almost there — finish the last core lessons and Navigator will start writing personalized lessons for you.',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -390,7 +503,8 @@ class _RecipesScreenState extends State<RecipesScreen> {
   String _moduleTitle(int module) => switch (module) {
     1 => 'Foundations — Notice What Is Present',
     2 => 'Patterns — Work With the Conditions',
-    _ => 'Direction — Choose and Move Forward',
+    3 => 'Direction — Choose and Move Forward',
+    _ => 'Your Path — Navigator-Written',
   };
 
   Future<void> _open(RecipeLesson lesson) async {

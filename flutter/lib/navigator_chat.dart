@@ -80,8 +80,19 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
     )..repeat();
     _startActivityTimer();
     _localInference = widget.localInference ?? OnDeviceInference();
+    // Seed from the broadcast snapshot and follow it live so the header badge
+    // flips to PRIVATE/online the instant the model finishes verifying.
+    if (widget.localInference == null) {
+      _localSnapshot = OnDeviceInference.snapshotNotifier.value;
+      OnDeviceInference.snapshotNotifier.addListener(_onSnapshotChanged);
+    }
     unawaited(_refreshLocalStatus());
     unawaited(_loadVoiceConversationPreference());
+  }
+
+  void _onSnapshotChanged() {
+    if (!mounted) return;
+    setState(() => _localSnapshot = OnDeviceInference.snapshotNotifier.value);
   }
 
   Future<void> _loadVoiceConversationPreference() async {
@@ -191,6 +202,9 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
 
   @override
   void dispose() {
+    if (widget.localInference == null) {
+      OnDeviceInference.snapshotNotifier.removeListener(_onSnapshotChanged);
+    }
     composer.dispose();
     scrollController.dispose();
     _activityTimer?.cancel();
@@ -246,21 +260,32 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
         messagesSent: widget.appState.messagesSent,
         aiReflections: widget.appState.aiReflections,
       );
-      final reply = await _localInference.infer(
+      var reply = await _localInference.infer(
         plan.augment(text),
         history: priorConversation,
       );
+      // Anti-loop guard: if the reply mostly repeats the previous Navigator
+      // turn ("consider the next step…" circles), retry ONCE with an explicit
+      // variation instruction so the model moves somewhere new.
+      if (reply != null && _isRepetitiveOfLastAssistant(reply)) {
+        await _log('REPETITION detected — retrying with variation nudge');
+        reply = await _localInference.infer(
+          '${plan.augment(text)}\n\nImportant: your previous reply repeated what you already said. Respond with ONE concrete, different suggestion or question you have not used in this conversation. Reference the member\'s latest words specifically.',
+          history: priorConversation,
+        );
+      }
+      final replyToUse = reply;
       await _log(
-        'REPLY null=${reply == null} len=${reply?.length ?? 0} preview="${reply?.substring(0, reply != null && reply.length > 100 ? 100 : reply?.length ?? 0)}"',
+        'REPLY null=${replyToUse == null} len=${replyToUse?.length ?? 0} preview="${replyToUse?.substring(0, replyToUse != null && replyToUse.length > 100 ? 100 : replyToUse?.length ?? 0)}"',
       );
-      final localReplyUseful = _isUsefulLocalReply(reply, text);
+      final localReplyUseful = _isUsefulLocalReply(replyToUse, text);
       await _log('USEFUL=$localReplyUseful');
-      if (reply != null && mounted && localReplyUseful) {
+      if (replyToUse != null && mounted && localReplyUseful) {
         setState(() {
           widget.messages.add(
             ChatMessage(
               role: ChatRole.assistant,
-              text: reply,
+              text: replyToUse,
               localGenerated: true,
             ),
           );
@@ -271,7 +296,7 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
         widget.onChanged();
         _scrollToEnd();
         if (_voiceConversationEnabled) {
-          await _speakAndResume(reply);
+          await _speakAndResume(replyToUse);
         }
         return;
       }
@@ -408,6 +433,30 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
     return RegExp(
       r'\b(it|that|this|they|them|he|she|what do you mean|why do i|help me understand)\b',
     ).hasMatch(text.toLowerCase());
+  }
+
+  /// Word-overlap similarity between a candidate reply and the most recent
+  /// Navigator turn. Used to break "consider the next step…" circles.
+  bool _isRepetitiveOfLastAssistant(String reply) {
+    String? lastAssistant;
+    for (var i = widget.messages.length - 1; i >= 0; i--) {
+      if (widget.messages[i].role == ChatRole.assistant) {
+        lastAssistant = widget.messages[i].text;
+        break;
+      }
+    }
+    if (lastAssistant == null || lastAssistant.isEmpty) return false;
+    Set<String> words(String text) => text
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9\s]'), ' ')
+        .split(RegExp(r'\s+'))
+        .where((w) => w.length > 3)
+        .toSet();
+    final a = words(reply);
+    final b = words(lastAssistant);
+    if (a.isEmpty || b.isEmpty) return false;
+    final overlap = a.intersection(b).length / (a.length < b.length ? a.length : b.length);
+    return overlap > 0.6;
   }
 
   bool _isUsefulLocalReply(String? reply, String memberText) {

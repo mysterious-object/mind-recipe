@@ -72,6 +72,8 @@ class _MindRecipeGpuFieldState extends State<MindRecipeGpuField>
     if (loaded == null) return const SizedBox.expand();
     final dark = Theme.of(context).brightness == Brightness.dark;
     final wash = _washForVariant(widget.variant, dark);
+    // Variant-specific progress offset makes the shader animate differently per variant
+    final variantProgress = widget.progress + _variantProgressOffset(widget.variant);
     return IgnorePointer(
       child: RepaintBoundary(
         child: AnimatedBuilder(
@@ -82,17 +84,17 @@ class _MindRecipeGpuFieldState extends State<MindRecipeGpuField>
                 painter: _MindRecipeGpuPainter(
                   program: loaded,
                   time: controller.value * 18,
-                  progress: widget.progress,
+                  progress: variantProgress,
                   dark: dark,
+                  variantIndex: _variantIndex(widget.variant),
                 ),
                 size: Size.infinite,
               ),
-              // Variant tint – makes 12 variants instantly distinct even though
-              // the shader itself only has 4 uniforms. 12 distinct washes.
+              // Strong variant tint – whole moving background changes
               Positioned.fill(
                 child: IgnorePointer(
                   child: Container(
-                    color: wash.withValues(alpha: dark ? 0.10 : 0.06),
+                    color: wash.withValues(alpha: dark ? 0.22 : 0.14),
                   ),
                 ),
               ),
@@ -102,6 +104,40 @@ class _MindRecipeGpuFieldState extends State<MindRecipeGpuField>
       ),
     );
   }
+
+  double _variantProgressOffset(String v) => switch (v) {
+    'field' => 0.0,
+    'nebula' => 0.18,
+    'rivers' => 0.31,
+    'tendrils' => 0.44,
+    'orbs' => 0.59,
+    'lattice' => 0.72,
+    'void' => 0.80,
+    'prism' => 0.93,
+    'aurora' => 1.06,
+    'ember' => 1.21,
+    'ocean' => 1.34,
+    'twilight' => 1.48,
+    _ => 0.0,
+  };
+
+  /// Index passed to the shader's uVariant uniform — must match the GLSL
+  /// branch order in shaders/mind_recipe_field.frag.
+  double _variantIndex(String v) => switch (v) {
+    'field' => 0,
+    'nebula' => 1,
+    'rivers' => 2,
+    'tendrils' => 3,
+    'orbs' => 4,
+    'lattice' => 5,
+    'void' => 6,
+    'prism' => 7,
+    'aurora' => 8,
+    'ember' => 9,
+    'ocean' => 10,
+    'twilight' => 11,
+    _ => 0,
+  }.toDouble();
 
   Color _washForVariant(String v, bool dark) => switch (v) {
     'field' => const Color(0xff001a1a),
@@ -126,12 +162,14 @@ class _MindRecipeGpuPainter extends CustomPainter {
     required this.time,
     required this.progress,
     required this.dark,
+    this.variantIndex = 0,
   });
 
   final ui.FragmentProgram program;
   final double time;
   final double progress;
   final bool dark;
+  final double variantIndex;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -141,7 +179,8 @@ class _MindRecipeGpuPainter extends CustomPainter {
       ..setFloat(1, size.height)
       ..setFloat(2, time)
       ..setFloat(3, progress)
-      ..setFloat(4, dark ? 1 : 0);
+      ..setFloat(4, dark ? 1 : 0)
+      ..setFloat(5, variantIndex);
     canvas.drawRect(Offset.zero & size, Paint()..shader = shader);
     shader.dispose();
   }
@@ -388,11 +427,13 @@ class _MindRecipeFxPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     if (size.isEmpty) return;
-    final phase = progress * 0.72;
+    final phase = progress * 0.72 + _variantPhaseOffset(variant);
     final palette = _paletteForVariant(variant, primary, secondary);
     final wash = _washForVariant(variant, dark);
-    // Strong wash per variant – 12 distinct backgrounds (fixes 'color only' report)
-    canvas.drawRect(Offset.zero & size, Paint()..color = wash.withValues(alpha: dark ? 0.18 : 0.11));
+    // Whole moving background – 12 washes at 0.52/0.36 fill entire screen, not just tint
+    canvas.drawRect(Offset.zero & size, Paint()..color = wash.withValues(alpha: dark ? 0.52 : 0.36));
+    // Add a second wash layer for depth – makes each variant's *motion* distinct
+    canvas.drawRect(Offset.zero & size, Paint()..color = palette[0].withValues(alpha: dark ? 0.07 : 0.04));
 
     // Distinct graphics per variant – not just color, but *shape* (like hummingbot chimera)
     switch (variant) {
@@ -624,6 +665,22 @@ class _MindRecipeFxPainter extends CustomPainter {
     'ocean' => const Color(0xff001a2a),
     'twilight' => const Color(0xff0f0a2a),
     _ => const Color(0xff001a1a),
+  };
+
+  double _variantPhaseOffset(String v) => switch (v) {
+    'field' => 0.0,
+    'nebula' => 1.7,
+    'rivers' => 3.1,
+    'tendrils' => 4.4,
+    'orbs' => 5.9,
+    'lattice' => 7.2,
+    'void' => 8.0,
+    'prism' => 9.3,
+    'aurora' => 10.6,
+    'ember' => 12.1,
+    'ocean' => 13.4,
+    'twilight' => 14.8,
+    _ => 0.0,
   };
 
   void _paintParticleNebula(

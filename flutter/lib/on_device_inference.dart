@@ -146,6 +146,14 @@ class OnDeviceInference implements LocalInference {
   factory OnDeviceInference() => _instance;
   OnDeviceInference._();
 
+  /// Broadcast every snapshot change (checking → verifying → ready …) so any
+  /// screen — e.g. the Navigator header — flips to online the moment the
+  /// model finishes verifying, without waiting for the next send or poll.
+  static final ValueNotifier<LocalInferenceSnapshot> snapshotNotifier =
+      ValueNotifier<LocalInferenceSnapshot>(
+        const LocalInferenceSnapshot(OnDeviceStatus.checking),
+      );
+
   LocalInferenceSnapshot _snapshot = const LocalInferenceSnapshot(
     OnDeviceStatus.checking,
   );
@@ -616,11 +624,12 @@ class OnDeviceInference implements LocalInference {
       ..typeK = LlamaKvCacheType.f16
       ..typeV = LlamaKvCacheType.f16;
     final sampler = SamplerParams()
-      ..temp = 0.6
-      ..topK = 20
+      ..temp = 0.75
+      ..topK = 30
       ..topP = 0.95
       ..minP = 0.0
-      ..penaltyPresent = 1.5;
+      ..penaltyPresent = 1.7
+      ..penaltyRepeat = 1.18;
     final parent = LlamaParent(
       LlamaLoad(
         path: file.path,
@@ -646,6 +655,7 @@ class OnDeviceInference implements LocalInference {
 
   LocalInferenceSnapshot _set(LocalInferenceSnapshot next) {
     _snapshot = next;
+    snapshotNotifier.value = next;
     return next;
   }
 
@@ -681,6 +691,12 @@ class OnDeviceInference implements LocalInference {
   }) {
     final prompt = StringBuffer('''<|im_start|>system
 You are Mind Recipe, a private on-device wellness companion. Understand what the member means in light of the conversation, including short follow-ups such as "yes", "that", or "it". First identify the concrete concern, feeling, event, or request they actually expressed. Then respond directly to that meaning. Ground every reply in a detail the member actually said, without inventing an emotion. Follow the thread forward: when a member answers a question or names a tool such as Google Calendar, explain the next concrete step with that tool instead of repeating the prior suggestion. Do not restart the check-in, repeat a generic greeting, paraphrase every sentence, or force an exercise. Never begin with "You seem to be feeling" or "Thank you for sharing". Never say "It's important to process" or "What would you like to focus on next?" Be warm, specific, and conversational (usually 35 to 100 words). Use at most one genuine question, and make it specific to their words. Never diagnose, prescribe, assess safety, or claim clinical certainty. Treat interpretations as possibilities. If urgent danger is mentioned, encourage contacting local emergency help or 988 in the United States. Never reveal private reasoning or mention internal tools.
+
+Anti-repetition rules (highest priority):
+- Read the earlier assistant turns. Never repeat an idea, phrase, metaphor, or suggestion that already appears there.
+- Never answer with a variation of "notice what you said" or "consider the next step" if a previous turn already said something similar. Move the conversation somewhere new: a concrete memory, a specific body sensation, a decision they face, or a small action for today.
+- If the member gives a short answer like "yes", "ok", or "idk", build on their LAST concrete detail instead of asking another broad question.
+- Each reply must contain exactly one new element (observation, question, or suggestion) that was not in any earlier turn.
 
 Example: If the member says their manager dismissed their work in front of the team and they froze, stay with the dismissal and the unfinished moment. A useful question might ask what they wish they had been able to say. Do not reduce it to a generic emotion check.<|im_end|>
 ''');

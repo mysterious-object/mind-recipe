@@ -17,14 +17,34 @@ class _AccountGatewayState extends State<AccountGateway> {
   final email = TextEditingController();
   final password = TextEditingController();
   final confirmPassword = TextEditingController();
+  final resetToken = TextEditingController();
   bool creating = false;
+  bool resetting = false;
+  bool resetTokenStage = false;
   bool busy = false;
   bool obscure = true;
   bool acceptedTerms = false;
   String? error;
+  String? info;
 
   String? _validationError() {
     final normalizedEmail = email.text.trim();
+    if (resetting) {
+      if (!normalizedEmail.contains('@') || !normalizedEmail.contains('.')) {
+        return 'Enter a valid email address.';
+      }
+      if (!resetTokenStage) return null;
+      if (resetToken.text.trim().length < 16) {
+        return 'Paste the reset code from the link or support message.';
+      }
+      if (password.text.length < 10) {
+        return 'New password must contain at least 10 characters.';
+      }
+      if (password.text != confirmPassword.text) {
+        return 'Passwords do not match.';
+      }
+      return null;
+    }
     if (creating && name.text.trim().length < 2) {
       return 'Enter the name you want Mind Recipe to use.';
     }
@@ -49,10 +69,59 @@ class _AccountGatewayState extends State<AccountGateway> {
     email.dispose();
     password.dispose();
     confirmPassword.dispose();
+    resetToken.dispose();
     super.dispose();
   }
 
+  Future<void> submitReset() async {
+    final validation = _validationError();
+    if (validation != null) {
+      setState(() => error = validation);
+      return;
+    }
+    setState(() {
+      busy = true;
+      error = null;
+    });
+    try {
+      if (!resetTokenStage) {
+        final token = await widget.api.requestPasswordReset(
+          email: email.text.trim(),
+        );
+        if (!mounted) return;
+        setState(() {
+          resetTokenStage = true;
+          info = token != null
+              ? 'Staging reset code ready — it has been filled in for you. Choose a new password below.'
+              : 'If that email has an account, a reset code is on its way. Paste it below with your new password.';
+        });
+        if (token != null && mounted) resetToken.text = token;
+      } else {
+        final session = await widget.api.confirmPasswordReset(
+          email: email.text.trim(),
+          token: resetToken.text.trim(),
+          newPassword: password.text,
+        );
+        await widget.appState.setSession(session);
+      }
+    } on ApiException catch (exception) {
+      if (mounted) setState(() => error = exception.message);
+    } catch (_) {
+      if (mounted) {
+        setState(
+          () => error = 'Mind Recipe could not reach the account service. Check your connection and try again.',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
   Future<void> submit() async {
+    if (resetting) {
+      await submitReset();
+      return;
+    }
     final validation = _validationError();
     if (validation != null) {
       setState(() => error = validation);
@@ -132,7 +201,9 @@ class _AccountGatewayState extends State<AccountGateway> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          creating
+                          resetting
+                              ? (resetTokenStage ? 'Choose a new password' : 'Reset your password')
+                              : creating
                               ? 'Create your private space'
                               : 'Welcome back, navigator',
                           textAlign: TextAlign.center,
@@ -140,7 +211,7 @@ class _AccountGatewayState extends State<AccountGateway> {
                               ?.copyWith(fontWeight: FontWeight.w800),
                         ),
                         const SizedBox(height: 24),
-                        if (creating)
+                        if (creating && !resetting)
                           TextField(
                             controller: name,
                             textInputAction: TextInputAction.next,
@@ -150,7 +221,7 @@ class _AccountGatewayState extends State<AccountGateway> {
                               border: OutlineInputBorder(),
                             ),
                           ),
-                        if (creating) const SizedBox(height: 12),
+                        if (creating && !resetting) const SizedBox(height: 12),
                         TextField(
                           controller: email,
                           keyboardType: TextInputType.emailAddress,
@@ -163,30 +234,44 @@ class _AccountGatewayState extends State<AccountGateway> {
                           ),
                         ),
                         const SizedBox(height: 12),
-                        TextField(
-                          controller: password,
-                          obscureText: obscure,
-                          onSubmitted: (_) => busy ? null : submit(),
-                          decoration: InputDecoration(
-                            labelText: 'Password',
-                            helperText: creating
-                                ? '10 characters minimum'
-                                : null,
-                            prefixIcon: const Icon(Icons.lock_outline),
-                            border: const OutlineInputBorder(),
-                            suffixIcon: IconButton(
-                              onPressed: () =>
-                                  setState(() => obscure = !obscure),
-                              icon: Icon(
-                                obscure
-                                    ? Icons.visibility_outlined
-                                    : Icons.visibility_off_outlined,
+                        if (resetting && resetTokenStage)
+                          TextField(
+                            controller: resetToken,
+                            textInputAction: TextInputAction.next,
+                            autocorrect: false,
+                            decoration: const InputDecoration(
+                              labelText: 'Reset code',
+                              helperText: 'From the reset link or support message',
+                              prefixIcon: Icon(Icons.vpn_key_outlined),
+                              border: OutlineInputBorder(),
+                            ),
+                          ),
+                        if (resetting && resetTokenStage) const SizedBox(height: 12),
+                        if (!resetting || resetTokenStage)
+                          TextField(
+                            controller: password,
+                            obscureText: obscure,
+                            onSubmitted: (_) => busy ? null : submit(),
+                            decoration: InputDecoration(
+                              labelText: resetting ? 'New password' : 'Password',
+                              helperText: (!resetting && creating) || (resetting && resetTokenStage)
+                                  ? '10 characters minimum'
+                                  : null,
+                              prefixIcon: const Icon(Icons.lock_outline),
+                              border: const OutlineInputBorder(),
+                              suffixIcon: IconButton(
+                                onPressed: () =>
+                                    setState(() => obscure = !obscure),
+                                icon: Icon(
+                                  obscure
+                                      ? Icons.visibility_outlined
+                                      : Icons.visibility_off_outlined,
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                        if (creating) const SizedBox(height: 12),
-                        if (creating)
+                        if (creating || (resetting && resetTokenStage)) const SizedBox(height: 12),
+                        if (creating || (resetting && resetTokenStage))
                           TextField(
                             controller: confirmPassword,
                             obscureText: obscure,
@@ -197,7 +282,7 @@ class _AccountGatewayState extends State<AccountGateway> {
                               border: OutlineInputBorder(),
                             ),
                           ),
-                        if (creating)
+                        if (creating && !resetting)
                           CheckboxListTile(
                             contentPadding: EdgeInsets.zero,
                             value: acceptedTerms,
@@ -213,6 +298,16 @@ class _AccountGatewayState extends State<AccountGateway> {
                               'I agree to the Privacy Notice and Terms.',
                             ),
                             controlAffinity: ListTileControlAffinity.leading,
+                          ),
+                        if (info != null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 12),
+                            child: Text(
+                              info!,
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                            ),
                           ),
                         if (error != null)
                           Padding(
@@ -230,6 +325,8 @@ class _AccountGatewayState extends State<AccountGateway> {
                           child: Text(
                             busy
                                 ? 'Connecting…'
+                                : resetting
+                                ? (resetTokenStage ? 'Set new password' : 'Send reset code')
                                 : creating
                                 ? 'Create account'
                                 : 'Sign in',
@@ -239,15 +336,38 @@ class _AccountGatewayState extends State<AccountGateway> {
                           onPressed: busy
                               ? null
                               : () => setState(() {
-                                  creating = !creating;
+                                  if (resetting) {
+                                    // Leaving reset flow back to sign in
+                                    resetting = false;
+                                    resetTokenStage = false;
+                                  } else if (creating) {
+                                    creating = false;
+                                  } else {
+                                    creating = true;
+                                  }
                                   error = null;
+                                  info = null;
                                 }),
                           child: Text(
-                            creating
+                            resetting
+                                ? 'Back to sign in'
+                                : creating
                                 ? 'I already have an account'
                                 : 'Create a new account',
                           ),
                         ),
+                        if (!creating && !resetting)
+                          TextButton(
+                            onPressed: busy
+                                ? null
+                                : () => setState(() {
+                                    resetting = true;
+                                    resetTokenStage = false;
+                                    error = null;
+                                    info = null;
+                                  }),
+                            child: const Text('Forgot password?'),
+                          ),
                         const SizedBox(height: 4),
                         const Text(
                           'Your account keeps Recipes progress available across your devices.',

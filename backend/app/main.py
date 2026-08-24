@@ -11,7 +11,7 @@ from .wellness_assistant import managed_provider_available, respond, get_provide
 from .navigator_agent import agent
 from .config import settings
 from .models import (
-    AiRequest, AiResponse, AuditEvent, AuthLogin, AuthRegister, AuthToken, AuthUser,
+    AiRequest, AiResponse, AuditEvent, AuthLogin, AuthRegister, AuthResetConfirm, AuthResetRequest, AuthToken, AuthUser,
     CheckInInput, CheckInRecord, ConsentGrant, ConsentInput, Role,
     JournalEntry, JournalEntryInput, RecipePracticeItemInput, RecipePracticeItem, RecipePracticePracticeInput,
     CurriculumProgress, CurriculumProgressInput,
@@ -116,6 +116,34 @@ def register(payload: AuthRegister) -> AuthToken:
 @app.post("/v1/auth/login", response_model=AuthToken)
 def login(payload: AuthLogin) -> AuthToken:
     return auth_response(auth_store.authenticate(payload.email, payload.password))
+
+
+@app.post("/v1/auth/reset/request")
+def request_password_reset(payload: AuthResetRequest) -> dict[str, str]:
+    """Start password reset. Always returns 200 to avoid account enumeration.
+
+    In development/staging the token is returned so the member can finish the
+    flow without an email provider. Production wires this to the mailer.
+    """
+    token = auth_store.create_reset_token(payload.email)
+    response: dict[str, str] = {
+        "status": "ok",
+        "message": "If that email has an account, a reset link is on its way.",
+    }
+    if token is not None and settings.development:
+        response["reset_token"] = token
+    if token is not None:
+        audit("anonymous", "password_reset_request", "account", payload.email)
+    return response
+
+
+@app.post("/v1/auth/reset/confirm", response_model=AuthToken)
+def confirm_password_reset(payload: AuthResetConfirm) -> AuthToken:
+    """Complete password reset and sign the member in with the new password."""
+    account = auth_store.reset_password(payload.email, payload.token, payload.new_password)
+    auth_store.clear_reset_token(payload.email)
+    audit(account.id, "password_reset_complete", "account", account.id)
+    return auth_response(account)
 
 
 @app.get("/v1/auth/me", response_model=AuthUser)
