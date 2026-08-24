@@ -1,11 +1,11 @@
 {
-    "name": "mind_nav",
-    "short_name": "mind_nav",
+    "name": "Mind Recipe",
+    "short_name": "Mind Recipe",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#F7F6F1",
+    "theme_color": "#006B60",
+    "description": "Mind Recipe by Context Field — navigate, learn, and practice with Navigator.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

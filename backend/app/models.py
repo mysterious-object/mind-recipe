@@ -42,7 +42,7 @@ class DataCategory(str, Enum):
     trends = "trends"
     journal = "journal"
     ai_summaries = "ai_summaries"
-    toolbox = "toolbox"
+    recipe_practice = "recipe_practice"
     lessons = "lessons"
     appointments = "appointments"
 
@@ -112,7 +112,7 @@ class AiArtifact(BaseModel):
     schema_version: str = "v1"
 
 
-class ToolboxItemInput(BaseModel):
+class RecipePracticeItemInput(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     category: str = Field(min_length=1, max_length=100)  # breathing, grounding, movement, etc.
     description: Optional[str] = Field(default=None, max_length=2000)
@@ -122,7 +122,7 @@ class ToolboxItemInput(BaseModel):
     source: str = Field(default="self-discovered", min_length=1, max_length=80)
 
 
-class ToolboxItem(ToolboxItemInput):
+class RecipePracticeItem(RecipePracticeItemInput):
     id: UUID = Field(default_factory=uuid4)
     member_id: str
     discovered_at: datetime
@@ -133,11 +133,23 @@ class ToolboxItem(ToolboxItemInput):
     contexts: List[str] = Field(default_factory=list)  # when/where used
 
 
-class ToolboxPracticeInput(BaseModel):
+class RecipePracticePracticeInput(BaseModel):
     tool_id: UUID
     effectiveness: int = Field(ge=1, le=5)
     context: Optional[str] = Field(default=None, max_length=200)
     notes: Optional[str] = Field(default=None, max_length=500)
+
+
+class CurriculumProgressInput(BaseModel):
+    curriculum_version: str = Field(min_length=1, max_length=40)
+    completed_lesson_ids: List[str] = Field(default_factory=list, max_length=30)
+    completed_practice_ids: List[str] = Field(default_factory=list, max_length=80)
+    current_lesson_id: Optional[str] = Field(default=None, max_length=80)
+    updated_at: datetime
+
+
+class CurriculumProgress(CurriculumProgressInput):
+    member_id: str
 
 
 class TrackerEventInput(BaseModel):
@@ -295,7 +307,7 @@ class AccountExport(BaseModel):
     check_ins: List[CheckInRecord] = Field(default_factory=list)
     journal_entries: List[JournalEntry] = Field(default_factory=list)
     ai_sessions: List[AiSession] = Field(default_factory=list)
-    toolbox_items: List[ToolboxItem] = Field(default_factory=list)
+    recipe_practice_items: List[RecipePracticeItem] = Field(default_factory=list)
     tracker_events: List[TrackerEvent] = Field(default_factory=list)
     consents: List[ConsentGrant] = Field(default_factory=list)
     appointments: List[Appointment] = Field(default_factory=list)

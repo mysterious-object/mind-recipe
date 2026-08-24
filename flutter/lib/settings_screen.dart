@@ -87,7 +87,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
-        Text('Settings', style: MindNavTokens.displayMedium(context)),
+        Text('Settings', style: MindRecipeTokens.displayMedium(context)),
         const SizedBox(height: 24),
 
         // ── AI Model Selection ────────────────────────────────────
@@ -127,7 +127,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               SwitchListTile(
                 title: const Text('Usage analytics'),
                 subtitle: const Text(
-                  'Help improve Mind Nav (no personal data)',
+                  'Help improve Mind Recipe (no personal data)',
                 ),
                 value: false,
                 onChanged: (v) {},
@@ -150,10 +150,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ),
         const SizedBox(height: 24),
-        Text(
-          'Mind Nav v1.0.0',
-          style: MindNavTokens.bodySmall(context),
-          textAlign: TextAlign.center,
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                Image.asset(
+                  'assets/branding/context-field-wordmark.png',
+                  height: 58,
+                  fit: BoxFit.contain,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Mind Recipe by Context Field',
+                  style: MindRecipeTokens.title(context),
+                  textAlign: TextAlign.center,
+                ),
+                Text(
+                  'Version 1.0.0',
+                  style: MindRecipeTokens.bodySmall(context),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
         ),
       ],
     );
@@ -161,7 +181,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Widget _buildSectionHeader(String title) => Padding(
     padding: const EdgeInsets.only(bottom: 8),
-    child: Text(title, style: MindNavTokens.headlineMedium(context)),
+    child: Text(title, style: MindRecipeTokens.headlineMedium(context)),
   );
 
   Widget _buildPrivateModelCard() {
@@ -181,7 +201,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ListTile(
             leading: Icon(
               ready ? Icons.verified_user_rounded : Icons.phone_android_rounded,
-              color: ready ? MindNavTokens.primary : null,
+              color: ready ? MindRecipeTokens.primary : null,
             ),
             title: const Text('Private on-device AI'),
             subtitle: Text(detail),
@@ -238,7 +258,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               value: m['id']!,
               groupValue: _selectedModel,
               onChanged: (v) => setState(() => _selectedModel = v!),
-              activeColor: MindNavTokens.primary,
+              activeColor: MindRecipeTokens.primary,
             ),
           )
           .toList(),
@@ -254,21 +274,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
           value: ThemeMode.system,
           groupValue: _themeMode,
           onChanged: (v) => setState(() => _themeMode = v!),
-          activeColor: MindNavTokens.primary,
+          activeColor: MindRecipeTokens.primary,
         ),
         RadioListTile<ThemeMode>(
           title: const Text('Light mode'),
           value: ThemeMode.light,
           groupValue: _themeMode,
           onChanged: (v) => setState(() => _themeMode = v!),
-          activeColor: MindNavTokens.primary,
+          activeColor: MindRecipeTokens.primary,
         ),
         RadioListTile<ThemeMode>(
           title: const Text('Dark mode'),
           value: ThemeMode.dark,
           groupValue: _themeMode,
           onChanged: (v) => setState(() => _themeMode = v!),
-          activeColor: MindNavTokens.primary,
+          activeColor: MindRecipeTokens.primary,
         ),
       ],
     ),
@@ -282,7 +302,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           subtitle: const Text('Animated visual effects during conversations'),
           value: _visualMotionEnabled,
           onChanged: (v) => setState(() => _visualMotionEnabled = v),
-          activeColor: MindNavTokens.primary,
+          activeColor: MindRecipeTokens.primary,
         ),
         if (_visualMotionEnabled) ...[
           const Divider(height: 1),
@@ -295,7 +315,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 Slider(
                   value: _fxIntensity,
                   onChanged: (v) => setState(() => _fxIntensity = v),
-                  activeColor: MindNavTokens.primary,
+                  activeColor: MindRecipeTokens.primary,
                 ),
                 const SizedBox(height: 8),
                 Wrap(
@@ -317,7 +337,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _buildFxPreset(String label, double intensity) => ActionChip(
     label: Text(label),
     onPressed: () => setState(() => _fxIntensity = intensity),
-    backgroundColor: MindNavTokens.primary.withAlpha(40),
+    backgroundColor: MindRecipeTokens.primary.withAlpha(40),
   );
 
   Widget _buildVoiceControls() => Card(
@@ -325,7 +345,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       leading: Icon(Icons.mic_none_rounded),
       title: Text('Natural turn-taking'),
       subtitle: Text(
-        'Mind Nav reads its reply, then reopens the microphone. Tap the microphone while it is speaking to interrupt and answer immediately.',
+        'Mind Recipe reads its reply, then reopens the microphone. Tap the microphone while it is speaking to interrupt and answer immediately.',
       ),
     ),
   );

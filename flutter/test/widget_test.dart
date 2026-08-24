@@ -1,14 +1,23 @@
 import 'dart:convert';
 
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
-import 'package:mind_nav/app_services.dart';
-import 'package:mind_nav/daily_navigation_scan.dart';
-import 'package:mind_nav/main.dart';
-import 'package:mind_nav/mind_nav_agent.dart';
+import 'package:mind_recipe/app_services.dart';
+import 'package:mind_recipe/daily_navigation_scan.dart';
+import 'package:mind_recipe/main.dart';
+import 'package:mind_recipe/navigator_agent.dart';
 
-class FakeMindNavApi extends MindNavApiClient {
+class FakeMindRecipeApi extends MindRecipeApiClient {
+  @override
+  Future<AccountSession> register({
+    required String name,
+    required String email,
+    required String password,
+  }) async =>
+      AccountSession(token: 'test-token', displayName: name, email: email);
+
   @override
   Future<bool> aiAvailable() async => true;
 
@@ -36,28 +45,41 @@ void main() {
     }
   }
 
-  MindNavApp testApp({MindNavApiClient? api}) {
+  MindRecipeApp testApp({MindRecipeApiClient? api}) {
     final state = SecureAppState()..loaded = true;
-    return MindNavApp(
+    return MindRecipeApp(
       initialAppState: state,
-      initialApi: api ?? FakeMindNavApi(),
+      initialApi: api ?? FakeMindRecipeApi(),
     );
   }
 
-  Future<void> enterMemberApp(WidgetTester tester) async {
+  Future<void> enterMemberApp(
+    WidgetTester tester, {
+    bool skipOnboarding = true,
+  }) async {
     await tester.pumpWidget(testApp());
     await tester.pump();
-    final localDemo = find.text('Explore local demo');
-    await tester.ensureVisible(localDemo);
-    await tester.tap(localDemo);
+    await tester.tap(find.text('Create a new account'));
     await tester.pump();
-    await tester.tap(find.text('Skip'));
-    await pumpFrames(tester);
+    final fields = find.byType(TextField);
+    await tester.enterText(fields.at(0), 'Test Navigator');
+    await tester.enterText(fields.at(1), 'navigator@example.com');
+    await tester.enterText(fields.at(2), 'long-passphrase');
+    await tester.enterText(fields.at(3), 'long-passphrase');
+    await tester.ensureVisible(find.byType(Checkbox));
+    await tester.tap(find.byType(Checkbox), warnIfMissed: false);
+    await tester.ensureVisible(find.text('Create account'));
+    await tester.tap(find.text('Create account'));
+    await tester.pump();
+    if (skipOnboarding) {
+      await tester.tap(find.text('Skip'));
+      await pumpFrames(tester);
+    }
   }
 
   Future<void> enterCheckIn(WidgetTester tester) async {
     await enterMemberApp(tester);
-    expect(find.bySemanticsLabel('Mind Nav AI, tab 1 of 7'), findsOneWidget);
+    expect(find.bySemanticsLabel('Navigator, tab 1 of 5'), findsOneWidget);
   }
 
   testWidgets('login and registration gateway is the first app surface', (
@@ -90,7 +112,7 @@ void main() {
         200,
       );
     });
-    final api = MindNavApiClient(client: client);
+    final api = MindRecipeApiClient(client: client);
     final registered = await api.register(
       name: 'Navigator',
       email: 'navigator@example.com',
@@ -107,17 +129,12 @@ void main() {
   testWidgets('cinematic onboarding follows the account gateway', (
     tester,
   ) async {
-    await tester.pumpWidget(testApp());
-    await tester.pump();
-    final localDemo = find.text('Explore local demo');
-    await tester.ensureVisible(localDemo);
-    await tester.tap(localDemo);
-    await tester.pump();
+    await enterMemberApp(tester, skipOnboarding: false);
     expect(find.text('The weather of your mind.'), findsOneWidget);
     expect(find.text('A guided path—not a test.'), findsOneWidget);
   });
 
-  testWidgets('Check-in is a full Mind Nav AI conversation', (tester) async {
+  testWidgets('Check-in is a full Navigator conversation', (tester) async {
     await enterCheckIn(tester);
     expect(
       find.text('Cloud guidance ready · consent required per conversation'),
@@ -125,7 +142,7 @@ void main() {
     );
     expect(find.text('CLOUD'), findsOneWidget);
     expect(find.text('Begin daily navigation'), findsOneWidget);
-    expect(find.text('Tell Mind Nav what is present…'), findsOneWidget);
+    expect(find.text('Tell Navigator what is present…'), findsOneWidget);
     expect(find.text('Begin today’s signal scan'), findsNothing);
   });
 
@@ -150,43 +167,10 @@ void main() {
     );
   });
 
-  testWidgets('Today no longer contains a redundant forwarding button', (
-    tester,
-  ) async {
-    await enterMemberApp(tester);
-    await tester.tap(find.bySemanticsLabel('Today, tab 2 of 7'));
-    await pumpFrames(tester);
-    expect(find.text('Assistant activity'), findsOneWidget);
-    expect(find.text('Start check-in'), findsNothing);
-    expect(
-      find.textContaining('No assistant activity yet today'),
-      findsOneWidget,
-    );
-  });
-
-  testWidgets('Today reports activity completed with Mind Nav AI', (
-    tester,
-  ) async {
-    await enterMemberApp(tester);
-    await tester.tap(find.text('Begin daily navigation'));
-    await tester.pump();
-    await pumpFrames(tester);
-    await tester.tap(find.bySemanticsLabel('Today, tab 2 of 7'));
-    await pumpFrames(tester);
-    expect(find.text('Assistant activity'), findsOneWidget);
-    expect(find.text('Navigations'), findsOneWidget);
-    expect(find.text('Messages'), findsOneWidget);
-    expect(find.text('AI reflections'), findsOneWidget);
-    expect(
-      find.textContaining('stored privately on this device'),
-      findsOneWidget,
-    );
-  });
-
-  testWidgets('Mind Nav AI is the first and default tab', (tester) async {
+  testWidgets('Navigator is the first and default tab', (tester) async {
     await enterMemberApp(tester);
     expect(find.text('Begin daily navigation'), findsOneWidget);
-    expect(find.bySemanticsLabel('Mind Nav AI, tab 1 of 7'), findsOneWidget);
+    expect(find.bySemanticsLabel('Navigator, tab 1 of 5'), findsOneWidget);
   });
 
   test('motion summary describes only device movement', () {
@@ -202,7 +186,7 @@ void main() {
   });
 
   test('private agent routes tools and keeps research fail closed', () {
-    const agent = MindNavAgent();
+    const agent = NavigatorAgent();
     final research = agent.plan(
       'Research evidence for breathing exercises',
       externalResearchApproved: false,

@@ -39,7 +39,7 @@ class _NotificationSchedulerState extends State<NotificationScheduler> {
     'discreet': 'Just checking in 🌿',
     'gentle': 'A moment for yourself 💭',
     'encouraging': 'You\'ve got this ✨',
-    'minimal': 'Mind Nav',
+    'minimal': 'Mind Recipe',
   };
 
   static const _days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -51,10 +51,10 @@ class _NotificationSchedulerState extends State<NotificationScheduler> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Notification Scheduler', style: MindNavTokens.displayMedium(context)),
+          Text('Notification Scheduler', style: MindRecipeTokens.displayMedium(context)),
           const SizedBox(height: 8),
           Text('Gentle, discreet reminders. Nothing intrusive. You control when and how often.',
-            style: MindNavTokens.bodyMedium(context)!.copyWith(color: MindNavTokens.gray600),
+            style: MindRecipeTokens.bodyMedium(context)!.copyWith(color: MindRecipeTokens.gray600),
           ),
           const SizedBox(height: 20),
 
@@ -66,7 +66,7 @@ class _NotificationSchedulerState extends State<NotificationScheduler> {
               onChanged: (v) => setState(() => _enabled = v),
               title: const Text('Enable wellness reminders', style: TextStyle(fontWeight: FontWeight.w600)),
               subtitle: Text(_enabled ? 'Active — ${_activeSlotsCount} reminders per week' : 'All reminders paused'),
-              activeColor: MindNavTokens.primary,
+              activeColor: MindRecipeTokens.primary,
             ),
           ),
           const SizedBox(height: 16),
@@ -82,14 +82,14 @@ class _NotificationSchedulerState extends State<NotificationScheduler> {
             const SizedBox(height: 16),
 
             // Days of week
-            Text('Active days', style: MindNavTokens.title(context)),
+            Text('Active days', style: MindRecipeTokens.title(context)),
             const SizedBox(height: 8),
             Wrap(spacing: 4, children: List.generate(7, (i) =>
               FilterChip(
                 label: Text(_days[i]),
                 selected: _slots[i],
                 onSelected: (v) => setState(() => _slots[i] = v),
-                selectedColor: MindNavTokens.primary.withAlpha(40),
+                selectedColor: MindRecipeTokens.primary.withAlpha(40),
               ),
             )),
             const SizedBox(height: 20),
@@ -107,7 +107,7 @@ class _NotificationSchedulerState extends State<NotificationScheduler> {
                         onChanged: (v) => setState(() => _quietHoursEnabled = v),
                         title: const Text('Quiet hours', style: TextStyle(fontWeight: FontWeight.w600)),
                         subtitle: const Text('No notifications during your rest window'),
-                        activeColor: MindNavTokens.primary,
+                        activeColor: MindRecipeTokens.primary,
                       ),
                       if (_quietHoursEnabled) Row(
                         children: [
@@ -142,7 +142,7 @@ class _NotificationSchedulerState extends State<NotificationScheduler> {
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   children: [
-                    Text('Snooze & pause', style: MindNavTokens.title(context)),
+                    Text('Snooze & pause', style: MindRecipeTokens.title(context)),
                     const SizedBox(height: 12),
                     if (_snoozed && _snoozeUntil != null)
                       _buildStatusChip('Snoozed until ${_formatDateTime(_snoozeUntil!)}', Icons.snooze, true)
@@ -173,7 +173,7 @@ class _NotificationSchedulerState extends State<NotificationScheduler> {
             const SizedBox(height: 16),
 
             // Message style
-            Text('Message style', style: MindNavTokens.title(context)),
+            Text('Message style', style: MindRecipeTokens.title(context)),
             const SizedBox(height: 8),
             ...(_styles.entries.map((e) => RadioListTile<String>(
               title: Text(e.value),
@@ -181,7 +181,7 @@ class _NotificationSchedulerState extends State<NotificationScheduler> {
               value: e.key,
               groupValue: _messageStyle,
               onChanged: (v) => setState(() => _messageStyle = v ?? 'discreet'),
-              activeColor: MindNavTokens.primary,
+              activeColor: MindRecipeTokens.primary,
               dense: true,
             ))),
           ],
@@ -207,13 +207,13 @@ class _NotificationSchedulerState extends State<NotificationScheduler> {
   Widget _buildStatusChip(String text, IconData icon, bool isActive) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
     decoration: BoxDecoration(
-      color: (isActive ? MindNavTokens.warning : MindNavTokens.success).withAlpha(20),
+      color: (isActive ? MindRecipeTokens.warning : MindRecipeTokens.success).withAlpha(20),
       borderRadius: BorderRadius.circular(12),
     ),
     child: Row(mainAxisSize: MainAxisSize.min, children: [
-      Icon(icon, size: 16, color: isActive ? MindNavTokens.warning : MindNavTokens.success),
+      Icon(icon, size: 16, color: isActive ? MindRecipeTokens.warning : MindRecipeTokens.success),
       const SizedBox(width: 6),
-      Text(text, style: TextStyle(color: isActive ? MindNavTokens.warning : MindNavTokens.success, fontSize: 13)),
+      Text(text, style: TextStyle(color: isActive ? MindRecipeTokens.warning : MindRecipeTokens.success, fontSize: 13)),
     ]),
   );
 
@@ -242,7 +242,7 @@ class _NotificationSchedulerState extends State<NotificationScheduler> {
   }
 
   Widget _buildWellnessBoundary() => const Text(
-    'Mind Nav is a wellness tool, not medical care. Notifications are not clinical alerts.',
+    'Mind Recipe is a wellness tool, not medical care. Notifications are not clinical alerts.',
     style: TextStyle(fontSize: 12, color: Colors.black54),
   );
 }

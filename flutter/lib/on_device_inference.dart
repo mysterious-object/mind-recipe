@@ -1,4 +1,4 @@
-/// Private, on-device inference for Mind Nav.
+/// Private, on-device inference for Mind Recipe.
 ///
 /// A model is never treated as installed until its full SHA-256 digest matches
 /// the pinned manifest and the local engine has successfully loaded it.
@@ -15,14 +15,19 @@ import 'package:flutter/services.dart';
 import 'package:llama_cpp_dart/llama_cpp_dart.dart';
 import 'package:path_provider/path_provider.dart';
 
-import 'mind_nav_device_harness.dart';
+import 'mind_recipe_device_harness.dart';
 
 Future<void> _inferLog(String msg) async {
   try {
-    final dir = await getExternalStorageDirectory() ?? await getApplicationDocumentsDirectory();
-    final file = File('${dir.path}/mindnav_debug.log');
+    final dir =
+        await getExternalStorageDirectory() ??
+        await getApplicationDocumentsDirectory();
+    final file = File('${dir.path}/mindrecipe_debug.log');
     final timestamp = DateTime.now().toIso8601String();
-    await file.writeAsString('$timestamp [INFER] $msg\n', mode: FileMode.append);
+    await file.writeAsString(
+      '$timestamp [INFER] $msg\n',
+      mode: FileMode.append,
+    );
   } catch (_) {}
 }
 
@@ -81,10 +86,31 @@ class OnDeviceModelManifest {
   final String license;
 }
 
+/// A member-facing description of the private model. Keeping this separate
+/// from the download manifest lets the setup screen explain the trade-offs
+/// without implying that a model is installed before its checksum verifies.
+class OnDeviceModelChoice {
+  const OnDeviceModelChoice({
+    required this.manifest,
+    required this.name,
+    required this.quality,
+    required this.bestFor,
+    required this.memoryNote,
+    this.recommended = false,
+  });
+
+  final OnDeviceModelManifest manifest;
+  final String name;
+  final String quality;
+  final String bestFor;
+  final String memoryNote;
+  final bool recommended;
+}
+
 /// Mobile-first reasoning model. It is deliberately downloaded only after an
 /// explicit member action; it is never bundled in the app.
-final mindNavPrivateModel = OnDeviceModelManifest(
-  id: 'mind-nav-private-reasoning-qwen3-1.7b-q4km',
+final mindRecipePrivateModel = OnDeviceModelManifest(
+  id: 'mind-recipe-private-reasoning-qwen3-1.7b-q4km',
   version: '2026.08.20-qwen3-1.7b-q4km',
   downloadUri: Uri.parse(
     'https://huggingface.co/ggml-org/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q4_K_M.gguf',
@@ -93,6 +119,54 @@ final mindNavPrivateModel = OnDeviceModelManifest(
   sizeBytes: 1282439264,
   license: 'Apache-2.0',
 );
+
+final mindRecipePrivateFastModel = OnDeviceModelManifest(
+  id: 'mind-recipe-private-fast-qwen3-0.6b-q4-0',
+  version: '2026.08.22-qwen3-0.6b-q4-0',
+  downloadUri: Uri.parse(
+    'https://huggingface.co/ggml-org/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q4_0.gguf',
+  ),
+  sha256: 'da2572f16c06133561ce56accaa822216f2391ef4d37fba427801cd6736417d4',
+  sizeBytes: 428970080,
+  license: 'Apache-2.0',
+);
+
+final mindRecipePrivateCompactModel = OnDeviceModelManifest(
+  id: 'mind-recipe-private-compact-qwen3-0.6b-q8-0',
+  version: '2026.08.22-qwen3-0.6b-q8-0',
+  downloadUri: Uri.parse(
+    'https://huggingface.co/ggml-org/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q8_0.gguf',
+  ),
+  sha256: '361cc68159042c36ebff7715dc5a2e4612153e88f3e9c9c234820849d6dc9e1d',
+  sizeBytes: 804753632,
+  license: 'Apache-2.0',
+);
+
+/// Every choice is an explicitly pinned, checksum-verified download.
+final mindRecipePrivateModelChoices = <OnDeviceModelChoice>[
+  OnDeviceModelChoice(
+    manifest: mindRecipePrivateFastModel,
+    name: 'Private Fast',
+    quality: 'Quick, lighter-weight guidance',
+    bestFor: 'Short check-ins and quick resets on phones with less storage.',
+    memoryNote: '409 MB download · needs 4 GB device memory',
+  ),
+  OnDeviceModelChoice(
+    manifest: mindRecipePrivateCompactModel,
+    name: 'Private Compact',
+    quality: 'Better detail in a smaller download',
+    bestFor: 'Everyday reflection with more nuance without the largest model.',
+    memoryNote: '768 MB download · needs 6 GB device memory',
+  ),
+  OnDeviceModelChoice(
+    manifest: mindRecipePrivateModel,
+    name: 'Private Balanced',
+    quality: 'Strong everyday reflection',
+    bestFor: 'Most conversations; a good balance of nuance and speed.',
+    memoryNote: '1.2 GB download · needs 8 GB device memory',
+    recommended: true,
+  ),
+];
 
 /// Computes the digest outside Flutter's UI isolate. A complete model check is
 /// intentionally required before a model can run, but it must never freeze the
@@ -112,26 +186,83 @@ class OnDeviceInference implements LocalInference {
   );
   LlamaParent? _engine;
   bool _refreshing = false;
+  OnDeviceModelManifest _activeManifest = mindRecipePrivateModel;
 
   @override
   LocalInferenceSnapshot get snapshot => _snapshot;
+  OnDeviceModelManifest get activeModel => _activeManifest;
+
+  Future<bool> isModelDownloaded(OnDeviceModelManifest manifest) async {
+    final file = await _modelFile(manifest);
+    if (!await file.exists() || await file.length() != manifest.sizeBytes) {
+      return false;
+    }
+    final receipt = await _verificationReceipt(file);
+    return await receipt.exists() &&
+        await receipt.readAsString() == _receiptContents(manifest);
+  }
+
+  Future<Set<String>> downloadedModelIds() async {
+    final ids = <String>{};
+    for (final choice in mindRecipePrivateModelChoices) {
+      if (await isModelDownloaded(choice.manifest)) {
+        ids.add(choice.manifest.id);
+      }
+    }
+    return ids;
+  }
+
+  Future<LocalInferenceSnapshot> activateModel(
+    OnDeviceModelManifest manifest,
+  ) async {
+    if (!await isModelDownloaded(manifest)) {
+      throw StateError('Download this model before selecting it.');
+    }
+    if (_activeManifest.id != manifest.id) {
+      _disposeEngine();
+      _activeManifest = manifest;
+    }
+    _set(const LocalInferenceSnapshot(OnDeviceStatus.checking));
+    final result = await refreshStatus();
+    if (!result.isReady) {
+      throw StateError(result.detail ?? 'The private model could not start.');
+    }
+    return result;
+  }
 
   double _downloadProgress = 0;
   double get downloadProgress => _downloadProgress;
-  static const _minimumMemoryMiB = 8192;
+  int _downloadedBytes = 0;
+  int get downloadedBytes => _downloadedBytes;
+  int _downloadBytesPerSecond = 0;
+  int get downloadBytesPerSecond => _downloadBytesPerSecond;
+  Duration? get estimatedDownloadRemaining => _downloadBytesPerSecond <= 0
+      ? null
+      : Duration(
+          seconds:
+              ((_activeManifest.sizeBytes - _downloadedBytes) /
+                      _downloadBytesPerSecond)
+                  .ceil(),
+        );
+  int get _minimumMemoryMiB {
+    if (_activeManifest.id == mindRecipePrivateFastModel.id) return 4096;
+    if (_activeManifest.id == mindRecipePrivateCompactModel.id) return 6144;
+    return 8192;
+  }
 
-  Future<File> _modelFile() async {
+  Future<File> _modelFile([OnDeviceModelManifest? manifest]) async {
+    final target = manifest ?? _activeManifest;
     final base = await getApplicationSupportDirectory();
     final directory = Directory('${base.path}/private-models');
     if (!await directory.exists()) await directory.create(recursive: true);
-    return File('${directory.path}/${mindNavPrivateModel.id}.gguf');
+    return File('${directory.path}/${target.id}.gguf');
   }
 
   Future<File> _verificationReceipt(File model) async =>
       File('${model.path}.verified');
 
-  String get _receiptContents =>
-      '${mindNavPrivateModel.version}:${mindNavPrivateModel.sizeBytes}:${mindNavPrivateModel.sha256}';
+  String _receiptContents(OnDeviceModelManifest manifest) =>
+      '${manifest.version}:${manifest.sizeBytes}:${manifest.sha256}';
 
   @override
   Future<LocalInferenceSnapshot> refreshStatus() async {
@@ -145,7 +276,18 @@ class OnDeviceInference implements LocalInference {
     }
     _refreshing = true;
     try {
-      final file = await _modelFile();
+      var file = await _modelFile();
+      if (!await file.exists()) {
+        for (final choice in mindRecipePrivateModelChoices) {
+          final candidate = await _modelFile(choice.manifest);
+          if (await candidate.exists() &&
+              await candidate.length() == choice.manifest.sizeBytes) {
+            _activeManifest = choice.manifest;
+            file = candidate;
+            break;
+          }
+        }
+      }
       final partial = File('${file.path}.partial');
       final stalePartialReceipt = await _verificationReceipt(partial);
       if (!await partial.exists() && await stalePartialReceipt.exists()) {
@@ -165,16 +307,9 @@ class OnDeviceInference implements LocalInference {
           detail: 'Private model is not installed on this device.',
         );
         _set(snapshot);
-        // Background auto-download so PRIVATE is ready by first launch —
-        // matches other companies' bootstrap: small APK + Wi-Fi asset fetch.
-        Future.delayed(const Duration(seconds: 2), () {
-          if (_snapshot.status == OnDeviceStatus.notInstalled) {
-            installModel().catchError((_) {});
-          }
-        });
         return snapshot;
       }
-      final device = await MindNavDeviceHarness().capabilities();
+      final device = await MindRecipeDeviceHarness().capabilities();
       if (device.totalMemoryMiB != null &&
           device.totalMemoryMiB! < _minimumMemoryMiB) {
         _disposeEngine();
@@ -188,7 +323,10 @@ class OnDeviceInference implements LocalInference {
       }
       _set(const LocalInferenceSnapshot(OnDeviceStatus.verifying));
       await _inferLog('verifying ${file.path}');
-      if (!await _matchesManifest(file)) {
+      if (!await _matchesManifest(
+        file,
+        _activeManifest,
+      ).timeout(const Duration(minutes: 4))) {
         await _inferLog('verify failed: hash mismatch');
         _disposeEngine();
         return _set(
@@ -216,8 +354,22 @@ class OnDeviceInference implements LocalInference {
   }
 
   @override
-  Future<void> installModel({bool allowCellular = false}) async {
-    if (_snapshot.status == OnDeviceStatus.downloading) return;
+  Future<void> installModel({
+    bool allowCellular = false,
+    OnDeviceModelManifest? model,
+  }) async {
+    if (_snapshot.status == OnDeviceStatus.downloading ||
+        _snapshot.status == OnDeviceStatus.verifying) {
+      throw StateError('Wait for the current private model setup to finish.');
+    }
+    if (model != null && model.id != _activeManifest.id) {
+      _disposeEngine();
+      _activeManifest = model;
+    }
+    if (await isModelDownloaded(_activeManifest)) {
+      await activateModel(_activeManifest);
+      return;
+    }
     // Connectivity policy is owned by the caller; this method remains explicit
     // about the requested cellular permission for the future scheduler.
     _set(const LocalInferenceSnapshot(OnDeviceStatus.downloading));
@@ -229,25 +381,30 @@ class OnDeviceInference implements LocalInference {
     if (await temporary.exists()) {
       resumeOffset = await temporary.length();
       // If partial is already complete size, don't re-download — go to verify
-      if (resumeOffset >= mindNavPrivateModel.sizeBytes) {
+      if (resumeOffset >= _activeManifest.sizeBytes) {
         _downloadProgress = 1.0;
       } else if (resumeOffset > 0) {
-        _downloadProgress = resumeOffset / mindNavPrivateModel.sizeBytes;
+        _downloadProgress = resumeOffset / _activeManifest.sizeBytes;
       } else {
         _downloadProgress = 0;
       }
     } else {
       _downloadProgress = 0;
     }
+    _downloadedBytes = resumeOffset;
+    _downloadBytesPerSecond = 0;
     // If we are resuming, keep the file; otherwise start fresh
-    var isResume = resumeOffset > 0 && resumeOffset < mindNavPrivateModel.sizeBytes;
+    var isResume = resumeOffset > 0 && resumeOffset < _activeManifest.sizeBytes;
     try {
       final client = HttpClient()..autoUncompress = true;
       client.connectionTimeout = const Duration(seconds: 30);
-      final request = await client.getUrl(mindNavPrivateModel.downloadUri);
+      final request = await client.getUrl(_activeManifest.downloadUri);
       request.followRedirects = true;
       request.maxRedirects = 8;
-      request.headers.set('User-Agent', 'MindNav/1.0 (Flutter; +https://mindnav.app)');
+      request.headers.set(
+        'User-Agent',
+        'MindRecipe/1.0 (Flutter; +https://mindrecipe.app)',
+      );
       request.headers.set('Accept', '*/*');
       if (isResume) {
         request.headers.set('Range', 'bytes=$resumeOffset-');
@@ -271,19 +428,37 @@ class OnDeviceInference implements LocalInference {
       final contentLen = response.contentLength;
       final expected = contentLen > 0
           ? (isResume ? resumeOffset + contentLen : contentLen)
-          : mindNavPrivateModel.sizeBytes;
+          : _activeManifest.sizeBytes;
       var received = resumeOffset;
-      final sink = temporary.openWrite(mode: isResume ? FileMode.append : FileMode.write);
+      var lastSampleBytes = received;
+      var lastSampleAt = DateTime.now();
+      final sink = temporary.openWrite(
+        mode: isResume ? FileMode.append : FileMode.write,
+      );
       await for (final bytes in response) {
         received += bytes.length;
         sink.add(bytes);
         _downloadProgress = received / expected;
+        _downloadedBytes = received;
+        final now = DateTime.now();
+        final elapsedMs = now.difference(lastSampleAt).inMilliseconds;
+        if (elapsedMs >= 750) {
+          _downloadBytesPerSecond =
+              ((received - lastSampleBytes) * 1000 / elapsedMs).round();
+          lastSampleBytes = received;
+          lastSampleAt = now;
+        }
       }
       await sink.close();
       client.close(force: true);
       _set(const LocalInferenceSnapshot(OnDeviceStatus.verifying));
-      await _inferLog('verifying download ${temporary.path} (${await temporary.length()} bytes, expect ${mindNavPrivateModel.sizeBytes})');
-      if (!await _matchesManifest(temporary)) {
+      await _inferLog(
+        'verifying download ${temporary.path} (${await temporary.length()} bytes, expect ${_activeManifest.sizeBytes})',
+      );
+      if (!await _matchesManifest(
+        temporary,
+        _activeManifest,
+      ).timeout(const Duration(minutes: 4))) {
         throw const FileSystemException(
           'Downloaded model did not match the signed manifest.',
         );
@@ -292,8 +467,16 @@ class OnDeviceInference implements LocalInference {
       await temporary.rename(destination.path);
       final temporaryReceipt = await _verificationReceipt(temporary);
       if (await temporaryReceipt.exists()) await temporaryReceipt.delete();
-      await _writeVerificationReceipt(destination);
-      await refreshStatus();
+      await _writeVerificationReceipt(destination, _activeManifest);
+      // Do not call refreshStatus while still marked verifying: that guard
+      // intentionally protects active checks and previously left success stuck.
+      _set(const LocalInferenceSnapshot(OnDeviceStatus.checking));
+      final ready = await refreshStatus();
+      if (!ready.isReady) {
+        throw StateError(
+          ready.detail ?? 'The private model could not be started.',
+        );
+      }
     } catch (error) {
       if (await temporary.exists()) await temporary.delete();
       _set(LocalInferenceSnapshot(OnDeviceStatus.error, detail: '$error'));
@@ -307,7 +490,9 @@ class OnDeviceInference implements LocalInference {
     List<LocalConversationTurn> history = const [],
   }) async {
     final status = await refreshStatus();
-    await _inferLog('infer called status=${status.status} engine=${_engine != null}');
+    await _inferLog(
+      'infer called status=${status.status} engine=${_engine != null}',
+    );
     if (!status.isReady || _engine == null) {
       await _inferLog('infer ABORT: not ready');
       return null;
@@ -324,11 +509,15 @@ class OnDeviceInference implements LocalInference {
           .timeout(const Duration(seconds: 150));
       await subscription.cancel();
       final raw = response.toString();
-      await _inferLog('infer raw length=${raw.length} preview="${raw.substring(0, raw.length > 150 ? 150 : raw.length)}"');
+      await _inferLog(
+        'infer raw length=${raw.length} preview="${raw.substring(0, raw.length > 150 ? 150 : raw.length)}"',
+      );
       final stripped = _stripPrivateReasoning(raw);
       await _inferLog('infer stripped length=${stripped.length}');
       final clean = _enforceWellnessBoundaries(stripped).trim();
-      await _inferLog('infer clean length=${clean.length} preview="${clean.substring(0, clean.length > 150 ? 150 : clean.length)}"');
+      await _inferLog(
+        'infer clean length=${clean.length} preview="${clean.substring(0, clean.length > 150 ? 150 : clean.length)}"',
+      );
       return clean.isEmpty ? null : clean;
     } catch (error) {
       await _inferLog('infer ERROR: $error');
@@ -338,33 +527,57 @@ class OnDeviceInference implements LocalInference {
 
   @override
   Future<void> removeModel() async {
-    _disposeEngine();
-    final file = await _modelFile();
+    await removeDownloadedModel(_activeManifest);
+  }
+
+  Future<void> removeDownloadedModel(OnDeviceModelManifest manifest) async {
+    final removingActive = manifest.id == _activeManifest.id;
+    if (removingActive) _disposeEngine();
+    final file = await _modelFile(manifest);
     if (await file.exists()) await file.delete();
     final partial = File('${file.path}.partial');
     if (await partial.exists()) await partial.delete();
     final receipt = await _verificationReceipt(file);
     if (await receipt.exists()) await receipt.delete();
     _downloadProgress = 0;
-    _set(const LocalInferenceSnapshot(OnDeviceStatus.notInstalled));
+    _downloadedBytes = 0;
+    _downloadBytesPerSecond = 0;
+    if (!removingActive) return;
+    final remaining = await downloadedModelIds();
+    if (remaining.isEmpty) {
+      _set(const LocalInferenceSnapshot(OnDeviceStatus.notInstalled));
+      return;
+    }
+    final fallback = mindRecipePrivateModelChoices
+        .firstWhere((choice) => remaining.contains(choice.manifest.id))
+        .manifest;
+    _activeManifest = fallback;
+    _set(const LocalInferenceSnapshot(OnDeviceStatus.checking));
+    await refreshStatus();
   }
 
-  Future<bool> _matchesManifest(File file) async {
-    if (await file.length() != mindNavPrivateModel.sizeBytes) return false;
+  Future<bool> _matchesManifest(
+    File file,
+    OnDeviceModelManifest manifest,
+  ) async {
+    if (await file.length() != manifest.sizeBytes) return false;
     final receipt = await _verificationReceipt(file);
     if (await receipt.exists() &&
-        await receipt.readAsString() == _receiptContents) {
+        await receipt.readAsString() == _receiptContents(manifest)) {
       return true;
     }
     final digest = await Isolate.run(() => _sha256ForFile(file.path));
-    final matches = digest == mindNavPrivateModel.sha256;
-    if (matches) await _writeVerificationReceipt(file);
+    final matches = digest == manifest.sha256;
+    if (matches) await _writeVerificationReceipt(file, manifest);
     return matches;
   }
 
-  Future<void> _writeVerificationReceipt(File model) async {
+  Future<void> _writeVerificationReceipt(
+    File model,
+    OnDeviceModelManifest manifest,
+  ) async {
     await (await _verificationReceipt(model))
-        .writeAsString(_receiptContents, flush: true);
+        .writeAsString(_receiptContents(manifest), flush: true);
   }
 
   Future<void> _loadEngine(File file) async {
@@ -372,6 +585,10 @@ class OnDeviceInference implements LocalInference {
     // The bundled Android runtime exposes libllama.so. The package defaults to
     // an optional multimodal library which is not part of this text-only app.
     if (Platform.isAndroid) Llama.libraryPath = 'libllama.so';
+    // iOS native symbols are linked into the app process. Explicitly reset a
+    // path left by another platform/test isolate so DynamicLibrary.process()
+    // is used on iPhone and iPad.
+    if (Platform.isIOS) Llama.libraryPath = null;
     final model = ModelParams()
       ..nGpuLayers = 0
       ..mainGpu = -1;
@@ -396,10 +613,12 @@ class OnDeviceInference implements LocalInference {
         modelParams: model,
         contextParams: context,
         samplingParams: sampler,
-        verbose: const bool.fromEnvironment('MIND_NAV_LOCAL_VERBOSE'),
+        verbose: const bool.fromEnvironment('MIND_RECIPE_LOCAL_VERBOSE'),
       ),
     );
-    await _inferLog('loading engine for ${file.path} (${await file.length()} bytes)');
+    await _inferLog(
+      'loading engine for ${file.path} (${await file.length()} bytes)',
+    );
     await parent.init().timeout(const Duration(seconds: 150));
     _engine = parent;
     await _inferLog('engine ready');
@@ -422,7 +641,8 @@ class OnDeviceInference implements LocalInference {
     if (response.contains('<think>')) {
       final open = response.indexOf('<think>');
       final afterOpen = open + '<think>'.length;
-      if (afterOpen < response.length) return response.substring(afterOpen).trim();
+      if (afterOpen < response.length)
+        return response.substring(afterOpen).trim();
       return '';
     }
     return response;
@@ -446,7 +666,7 @@ class OnDeviceInference implements LocalInference {
     List<LocalConversationTurn> history = const [],
   }) {
     final prompt = StringBuffer('''<|im_start|>system
-You are Mind Nav, a private on-device wellness companion. Understand what the member means in light of the conversation, including short follow-ups such as "yes", "that", or "it". First identify the concrete concern, feeling, event, or request they actually expressed. Then respond directly to that meaning. Ground every reply in a detail the member actually said, without inventing an emotion. Do not restart the check-in, repeat a generic greeting, paraphrase every sentence, or force an exercise. Never begin with "You seem to be feeling" or "Thank you for sharing". Never say "It's important to process" or "What would you like to focus on next?" Be warm, specific, and conversational (usually 35 to 100 words). Use at most one genuine question, and make it specific to their words. Never diagnose, prescribe, assess safety, or claim clinical certainty. Treat interpretations as possibilities. If urgent danger is mentioned, encourage contacting local emergency help or 988 in the United States. Never reveal private reasoning or mention internal tools.
+You are Mind Recipe, a private on-device wellness companion. Understand what the member means in light of the conversation, including short follow-ups such as "yes", "that", or "it". First identify the concrete concern, feeling, event, or request they actually expressed. Then respond directly to that meaning. Ground every reply in a detail the member actually said, without inventing an emotion. Follow the thread forward: when a member answers a question or names a tool such as Google Calendar, explain the next concrete step with that tool instead of repeating the prior suggestion. Do not restart the check-in, repeat a generic greeting, paraphrase every sentence, or force an exercise. Never begin with "You seem to be feeling" or "Thank you for sharing". Never say "It's important to process" or "What would you like to focus on next?" Be warm, specific, and conversational (usually 35 to 100 words). Use at most one genuine question, and make it specific to their words. Never diagnose, prescribe, assess safety, or claim clinical certainty. Treat interpretations as possibilities. If urgent danger is mentioned, encourage contacting local emergency help or 988 in the United States. Never reveal private reasoning or mention internal tools.
 
 Example: If the member says their manager dismissed their work in front of the team and they froze, stay with the dismissal and the unfinished moment. A useful question might ask what they wish they had been able to say. Do not reduce it to a generic emotion check.<|im_end|>
 ''');

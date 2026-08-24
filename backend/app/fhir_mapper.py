@@ -1,4 +1,4 @@
-"""FHIR R4 interoperability mappings for Mind Nav.
+"""FHIR R4 interoperability mappings for Mind Recipe.
 
 Maps internal models to HL7 FHIR R4 resources:
 Patient, Practitioner, Consent, Questionnaire, QuestionnaireResponse,
@@ -12,7 +12,7 @@ import json, csv, io
 
 
 class FhirMapper:
-    """Map Mind Nav entities to FHIR R4 resources."""
+    """Map Mind Recipe entities to FHIR R4 resources."""
 
     FHIR_VERSION = "4.0.1"
 

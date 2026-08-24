@@ -1,1 +1,1 @@
-"""Mind Nav backend package."""
+"""Mind Recipe backend package."""

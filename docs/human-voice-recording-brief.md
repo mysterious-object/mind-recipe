@@ -1,8 +1,8 @@
-# Mind Nav human voice recording brief
+# Mind Recipe human voice recording brief
 
 ## Direction
 
-Record one original Black British female voice for Mind Nav. The performance
+Record one original Black British female voice for Mind Recipe. The performance
 should feel warm, grounded, conversational, emotionally alert, and close-mic'd—
 like a trusted person sharing the room, never like an announcer, cartoon, or
 automated assistant.

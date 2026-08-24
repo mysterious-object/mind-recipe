@@ -12,7 +12,7 @@ from uuid import UUID
 from .models import (
     AiArtifact, AiSession, Appointment, AuditEvent, CheckInRecord, ConsentGrant,
     Course, DataCategory, JournalEntry, Lesson, NotificationPreference, SafetyEvent,
-    ToolboxItem, TrackerEvent,
+    RecipePracticeItem, TrackerEvent,
 )
 
 
@@ -24,7 +24,7 @@ class DevelopmentStore:
         self.journal_entries: Dict[str, List[JournalEntry]] = {}
         self.ai_sessions: Dict[str, AiSession] = {}
         self.ai_artifacts: Dict[str, List[AiArtifact]] = {}
-        self.toolbox_items: Dict[str, List[ToolboxItem]] = {}
+        self.recipe_practice_items: Dict[str, List[RecipePracticeItem]] = {}
         self.tracker_events: Dict[str, List[TrackerEvent]] = {}
         self.courses: Dict[str, List[Course]] = {}
         self.lessons: Dict[str, List[Lesson]] = {}
@@ -83,15 +83,15 @@ class DevelopmentStore:
             artifacts = [a for a in artifacts if str(a.session_id) == session_id]
         return artifacts[-limit:]
 
-    def add_toolbox_item(self, item: ToolboxItem) -> ToolboxItem:
-        self.toolbox_items.setdefault(item.member_id, []).append(item)
+    def add_recipe_practice_item(self, item: RecipePracticeItem) -> RecipePracticeItem:
+        self.recipe_practice_items.setdefault(item.member_id, []).append(item)
         return item
 
-    def get_toolbox_items(self, member_id: str) -> List[ToolboxItem]:
-        return self.toolbox_items.get(member_id, [])
+    def get_recipe_practice_items(self, member_id: str) -> List[RecipePracticeItem]:
+        return self.recipe_practice_items.get(member_id, [])
 
-    def update_toolbox_item(self, member_id: str, item_id: str, updates: dict) -> Optional[ToolboxItem]:
-        for item in self.toolbox_items.get(member_id, []):
+    def update_recipe_practice_item(self, member_id: str, item_id: str, updates: dict) -> Optional[RecipePracticeItem]:
+        for item in self.recipe_practice_items.get(member_id, []):
             if str(item.id) == item_id:
                 for key, value in updates.items():
                     if hasattr(item, key):
@@ -153,7 +153,7 @@ class DevelopmentStore:
             "check_ins": [c.model_dump() for c in self.checkins.get(member_id, [])],
             "journal_entries": [j.model_dump() for j in self.journal_entries.get(member_id, [])],
             "ai_sessions": [s.model_dump() for s in self.ai_sessions.values() if s.member_id == member_id],
-            "toolbox_items": [t.model_dump() for t in self.toolbox_items.get(member_id, [])],
+            "recipe_practice_items": [t.model_dump() for t in self.recipe_practice_items.get(member_id, [])],
             "tracker_events": [e.model_dump() for e in self.tracker_events.get(member_id, [])],
             "consents": [g.model_dump() for g in self.consents.values() if g.member_id == member_id],
             "appointments": [a.model_dump() for a in self.appointments.get(member_id, [])],
@@ -161,7 +161,7 @@ class DevelopmentStore:
 
     def delete_account(self, member_id: str) -> bool:
         deleted = False
-        for store_dict in [self.checkins, self.journal_entries, self.toolbox_items,
+        for store_dict in [self.checkins, self.journal_entries, self.recipe_practice_items,
                           self.tracker_events, self.appointments, self.safety_events]:
             if member_id in store_dict:
                 del store_dict[member_id]

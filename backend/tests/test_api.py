@@ -2,7 +2,7 @@ import os
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
-os.environ.setdefault("MIND_NAV_DB_PATH", "/tmp/mind-nav-api-tests.sqlite3")
+os.environ.setdefault("MIND_RECIPE_DB_PATH", "/tmp/mind-recipe-api-tests.sqlite3")
 
 from fastapi.testclient import TestClient
 
@@ -18,7 +18,7 @@ client = TestClient(app)
 
 def reset_store():
     with store._connect() as conn:
-        for table in ("checkins", "consents", "audit_events", "trend_cache", "pattern_alerts", "conversation_memory", "toolbox_items"):
+        for table in ("checkins", "consents", "audit_events", "trend_cache", "pattern_alerts", "conversation_memory", "recipe_practice_items"):
             conn.execute(f"DELETE FROM {table}")
     auth_store.clear()
 
@@ -42,7 +42,7 @@ def test_register_login_and_authenticated_session():
 
 def test_member_checkin_and_consent_scoped_practitioner_read():
     reset_store()
-    headers = {"x-mind-nav-user": "member-a", "x-mind-nav-role": "member"}
+    headers = {"x-mind-recipe-user": "member-a", "x-mind-recipe-role": "member"}
     checkin = client.post("/v1/checkins", headers=headers, json={
         "emotions": ["Anxious"], "activation": 2, "body_areas": ["Chest"],
         "journal": "A difficult meeting.", "zone_label": "steady",
@@ -56,13 +56,13 @@ def test_member_checkin_and_consent_scoped_practitioner_read():
     })
     assert consent.status_code == 201
     shared = client.get("/v1/practitioner/members/member-a/checkins", headers={
-        "x-mind-nav-user": "practitioner-a", "x-mind-nav-role": "practitioner"})
+        "x-mind-recipe-user": "practitioner-a", "x-mind-recipe-role": "practitioner"})
     assert shared.status_code == 200
     assert shared.json()[0]["journal"] == "A difficult meeting."
     revoked = client.delete(f"/v1/consents/{consent.json()['id']}", headers=headers)
     assert revoked.status_code == 204
     assert client.get("/v1/practitioner/members/member-a/checkins", headers={
-        "x-mind-nav-user": "practitioner-a", "x-mind-nav-role": "practitioner"}).status_code == 404
+        "x-mind-recipe-user": "practitioner-a", "x-mind-recipe-role": "practitioner"}).status_code == 404
 
 
 def test_ai_requires_cloud_opt_in_and_interrupts_crisis_language():
@@ -80,8 +80,8 @@ def test_ai_requires_cloud_opt_in_and_interrupts_crisis_language():
     assert crisis.json()["safety_interrupted"] is True
 
 
-def test_voice_presets_are_non_identifying_and_default_to_mind_nav():
-    assert "mind_nav_companion" in VOICE_PRESETS
+def test_voice_presets_are_non_identifying_and_default_to_mind_recipe():
+    assert "navigator_companion" in VOICE_PRESETS
     assert "saved_british" in VOICE_PRESETS
     assert "stewie" not in VOICE_PRESETS
     voices = get_available_voices()
@@ -140,7 +140,7 @@ def test_cloud_assistant_receives_follow_up_as_real_dialogue(monkeypatch):
     monkeypatch.setattr(wellness_assistant, "_call_provider", fake_provider)
     response = client.post(
         "/v1/assistant/respond",
-        headers={"x-mind-nav-provider-key": "ephemeral-test-key"},
+        headers={"x-mind-recipe-provider-key": "ephemeral-test-key"},
         json={
             "text": "That is what bothered me most.",
             "provider": "openrouter",
@@ -162,35 +162,35 @@ def test_cloud_assistant_receives_follow_up_as_real_dialogue(monkeypatch):
     assert "That is what bothered me most." in turns[-1]["content"]
 
 
-def test_authenticated_toolbox_crud_and_practice_persist():
+def test_authenticated_recipe_practice_crud_and_practice_persist():
     reset_store()
     registered = client.post("/v1/auth/register", json={
         "email": "tools@example.com", "display_name": "Tools", "password": "very-secure-passphrase"})
     token = registered.json()["access_token"]
     headers = {"authorization": f"Bearer {token}"}
-    created = client.post("/v1/toolbox", headers=headers, json={
+    created = client.post("/v1/recipes/practices", headers=headers, json={
         "name": "Two-minute reset", "category": "Grounding",
         "description": "Name five neutral details nearby.", "source": "self-discovered",
     })
     assert created.status_code == 201
     item_id = created.json()["id"]
-    assert client.get("/v1/toolbox", headers=headers).json()[0]["name"] == "Two-minute reset"
+    assert client.get("/v1/recipes/practices", headers=headers).json()[0]["name"] == "Two-minute reset"
     favorite = client.patch(
-        f"/v1/toolbox/{item_id}/favorite", headers=headers, json={"favorite": True})
+        f"/v1/recipes/practices/{item_id}/favorite", headers=headers, json={"favorite": True})
     assert favorite.json()["is_favorite"] is True
     practice = client.post(
-        f"/v1/toolbox/{item_id}/practice", headers=headers,
+        f"/v1/recipes/practices/{item_id}/practice", headers=headers,
         json={"tool_id": item_id, "effectiveness": 4, "context": "After work"},
     )
     assert practice.json()["practice_count"] == 1
     assert practice.json()["effectiveness_ratings"] == [4]
-    assert client.delete(f"/v1/toolbox/{item_id}", headers=headers).status_code == 204
-    assert client.get("/v1/toolbox", headers=headers).json() == []
+    assert client.delete(f"/v1/recipes/practices/{item_id}", headers=headers).status_code == 204
+    assert client.get("/v1/recipes/practices", headers=headers).json() == []
 
 
 def test_agent_requires_explicit_approval_for_external_research_and_skill_activation():
     reset_store()
-    headers = {"x-mind-nav-user": "member-a", "x-mind-nav-role": "member"}
+    headers = {"x-mind-recipe-user": "member-a", "x-mind-recipe-role": "member"}
     status = client.get("/v1/agent/status")
     assert status.status_code == 200
     assert status.json()["device_control"] == "disabled"

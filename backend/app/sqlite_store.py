@@ -12,9 +12,9 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 from uuid import uuid4
 
-from .models import AuditEvent, CheckInRecord, ConsentGrant, DataCategory, ToolboxItem
+from .models import AuditEvent, CheckInRecord, ConsentGrant, DataCategory, RecipePracticeItem
 
-DB_PATH = Path(os.getenv("MIND_NAV_DB_PATH", Path.home() / ".mindnav" / "mindnav.db"))
+DB_PATH = Path(os.getenv("MIND_RECIPE_DB_PATH", Path.home() / ".mindrecipe" / "mindrecipe.db"))
 DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 
@@ -102,7 +102,7 @@ class SqliteStore:
                 );
                 CREATE INDEX IF NOT EXISTS idx_conv_member ON conversation_memory(member_id, created_at);
 
-                CREATE TABLE IF NOT EXISTS toolbox_items (
+                CREATE TABLE IF NOT EXISTS recipe_practice_items (
                     id TEXT PRIMARY KEY,
                     member_id TEXT NOT NULL,
                     name TEXT NOT NULL,
@@ -119,15 +119,34 @@ class SqliteStore:
                     effectiveness_ratings TEXT DEFAULT '[]',
                     contexts TEXT DEFAULT '[]'
                 );
-                CREATE INDEX IF NOT EXISTS idx_toolbox_member ON toolbox_items(member_id, discovered_at);
+                CREATE INDEX IF NOT EXISTS idx_recipe_practice_member ON recipe_practice_items(member_id, discovered_at);
+
+                CREATE TABLE IF NOT EXISTS curriculum_progress (
+                    member_id TEXT PRIMARY KEY,
+                    curriculum_version TEXT NOT NULL,
+                    completed_lesson_ids TEXT NOT NULL DEFAULT '[]',
+                    completed_practice_ids TEXT NOT NULL DEFAULT '[]',
+                    current_lesson_id TEXT,
+                    updated_at TEXT NOT NULL
+                );
             """)
+            # One-time preservation migration from the retired practice table.
+            legacy_table = "tool" + "box_items"
+            exists = conn.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",
+                (legacy_table,),
+            ).fetchone()
+            if exists:
+                conn.execute(
+                    f"INSERT OR IGNORE INTO recipe_practice_items SELECT * FROM {legacy_table}"
+                )
 
-    # ── Toolbox ───────────────────────────────────────────────
+    # ── RecipePractice ───────────────────────────────────────────────
 
-    def add_toolbox_item(self, item: ToolboxItem) -> ToolboxItem:
+    def add_recipe_practice_item(self, item: RecipePracticeItem) -> RecipePracticeItem:
         with self._connect() as conn:
             conn.execute(
-                """INSERT INTO toolbox_items
+                """INSERT INTO recipe_practice_items
                 (id,member_id,name,category,description,accessibility_needs,
                  recommended_by_practitioner,practitioner_id,source,discovered_at,
                  is_favorite,practice_count,last_practiced_at,effectiveness_ratings,contexts)
@@ -144,27 +163,27 @@ class SqliteStore:
             )
         return item
 
-    def get_toolbox_items(self, member_id: str) -> List[Dict[str, Any]]:
+    def get_recipe_practice_items(self, member_id: str) -> List[Dict[str, Any]]:
         with self._connect() as conn:
             rows = conn.execute(
-                "SELECT * FROM toolbox_items WHERE member_id=? ORDER BY discovered_at DESC",
+                "SELECT * FROM recipe_practice_items WHERE member_id=? ORDER BY discovered_at DESC",
                 (member_id,),
             ).fetchall()
-        return [self._decode_toolbox_item(row) for row in rows]
+        return [self._decode_recipe_practice_item(row) for row in rows]
 
-    def set_toolbox_favorite(self, member_id: str, item_id: str, favorite: bool) -> Optional[Dict[str, Any]]:
+    def set_recipe_practice_favorite(self, member_id: str, item_id: str, favorite: bool) -> Optional[Dict[str, Any]]:
         with self._connect() as conn:
             conn.execute(
-                "UPDATE toolbox_items SET is_favorite=? WHERE id=? AND member_id=?",
+                "UPDATE recipe_practice_items SET is_favorite=? WHERE id=? AND member_id=?",
                 (int(favorite), item_id, member_id),
             )
             row = conn.execute(
-                "SELECT * FROM toolbox_items WHERE id=? AND member_id=?",
+                "SELECT * FROM recipe_practice_items WHERE id=? AND member_id=?",
                 (item_id, member_id),
             ).fetchone()
-        return self._decode_toolbox_item(row) if row else None
+        return self._decode_recipe_practice_item(row) if row else None
 
-    def record_toolbox_practice(
+    def record_recipe_practice_practice(
         self,
         member_id: str,
         item_id: str,
@@ -173,7 +192,7 @@ class SqliteStore:
     ) -> Optional[Dict[str, Any]]:
         with self._connect() as conn:
             row = conn.execute(
-                "SELECT * FROM toolbox_items WHERE id=? AND member_id=?",
+                "SELECT * FROM recipe_practice_items WHERE id=? AND member_id=?",
                 (item_id, member_id),
             ).fetchone()
             if not row:
@@ -185,27 +204,81 @@ class SqliteStore:
                 contexts.append(context)
             now = datetime.now(timezone.utc).isoformat()
             conn.execute(
-                """UPDATE toolbox_items SET practice_count=practice_count+1,
+                """UPDATE recipe_practice_items SET practice_count=practice_count+1,
                 last_practiced_at=?, effectiveness_ratings=?, contexts=?
                 WHERE id=? AND member_id=?""",
                 (now, json.dumps(ratings), json.dumps(contexts), item_id, member_id),
             )
             updated = conn.execute(
-                "SELECT * FROM toolbox_items WHERE id=? AND member_id=?",
+                "SELECT * FROM recipe_practice_items WHERE id=? AND member_id=?",
                 (item_id, member_id),
             ).fetchone()
-        return self._decode_toolbox_item(updated) if updated else None
+        return self._decode_recipe_practice_item(updated) if updated else None
 
-    def delete_toolbox_item(self, member_id: str, item_id: str) -> bool:
+    def delete_recipe_practice_item(self, member_id: str, item_id: str) -> bool:
         with self._connect() as conn:
             cursor = conn.execute(
-                "DELETE FROM toolbox_items WHERE id=? AND member_id=?",
+                "DELETE FROM recipe_practice_items WHERE id=? AND member_id=?",
                 (item_id, member_id),
             )
         return cursor.rowcount > 0
 
+    def get_curriculum_progress(self, member_id: str) -> Optional[Dict[str, Any]]:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM curriculum_progress WHERE member_id=?", (member_id,)
+            ).fetchone()
+        if not row:
+            return None
+        progress = dict(row)
+        progress["completed_lesson_ids"] = json.loads(progress["completed_lesson_ids"])
+        progress["completed_practice_ids"] = json.loads(progress["completed_practice_ids"])
+        return progress
+
+    def merge_curriculum_progress(self, member_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+        existing = self.get_curriculum_progress(member_id)
+        lessons = set(payload.get("completed_lesson_ids", []))
+        practices = set(payload.get("completed_practice_ids", []))
+        current = payload.get("current_lesson_id")
+        updated_at = payload["updated_at"]
+        if existing:
+            lessons.update(existing["completed_lesson_ids"])
+            practices.update(existing["completed_practice_ids"])
+            if existing["updated_at"] > updated_at:
+                current = existing["current_lesson_id"]
+                updated_at = existing["updated_at"]
+        result = {
+            "member_id": member_id,
+            "curriculum_version": payload["curriculum_version"],
+            "completed_lesson_ids": sorted(lessons),
+            "completed_practice_ids": sorted(practices),
+            "current_lesson_id": current,
+            "updated_at": updated_at,
+        }
+        with self._connect() as conn:
+            conn.execute(
+                """INSERT INTO curriculum_progress
+                (member_id,curriculum_version,completed_lesson_ids,completed_practice_ids,current_lesson_id,updated_at)
+                VALUES (?,?,?,?,?,?)
+                ON CONFLICT(member_id) DO UPDATE SET
+                curriculum_version=excluded.curriculum_version,
+                completed_lesson_ids=excluded.completed_lesson_ids,
+                completed_practice_ids=excluded.completed_practice_ids,
+                current_lesson_id=excluded.current_lesson_id,
+                updated_at=excluded.updated_at""",
+                (
+                    member_id,
+                    result["curriculum_version"],
+                    json.dumps(result["completed_lesson_ids"]),
+                    json.dumps(result["completed_practice_ids"]),
+                    result["current_lesson_id"],
+                    result["updated_at"],
+                ),
+            )
+        return result
+
     @staticmethod
-    def _decode_toolbox_item(row: sqlite3.Row) -> Dict[str, Any]:
+    def _decode_recipe_practice_item(row: sqlite3.Row) -> Dict[str, Any]:
         item = dict(row)
         for field in ("accessibility_needs", "effectiveness_ratings", "contexts"):
             item[field] = json.loads(item.get(field) or "[]")

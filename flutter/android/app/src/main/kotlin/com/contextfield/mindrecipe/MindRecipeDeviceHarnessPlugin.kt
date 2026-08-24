@@ -1,4 +1,4 @@
-package io.mindnav.mind_nav
+package com.contextfield.mindrecipe
 
 import android.content.Context
 import android.app.ActivityManager
@@ -11,18 +11,18 @@ import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 
-class MindNavDeviceHarnessPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
+class MindRecipeDeviceHarnessPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
     private lateinit var context: Context
     private lateinit var channel: MethodChannel
 
     override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         context = binding.applicationContext
-        channel = MethodChannel(binding.binaryMessenger, "mindnav.dev/device_harness")
+        channel = MethodChannel(binding.binaryMessenger, "contextfield.mindrecipe/device_harness")
         channel.setMethodCallHandler(this)
     }
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
-        Log.d("MindNavDevice", "device bridge request: ${call.method}")
+        Log.d("MindRecipeDevice", "device bridge request: ${call.method}")
         when (call.method) {
             "capabilities" -> result.success(mapOf(
                 "hapticsAvailable" to vibrator().hasVibrator(),

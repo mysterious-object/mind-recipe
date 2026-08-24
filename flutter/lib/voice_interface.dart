@@ -10,20 +10,25 @@ import 'app_services.dart';
 
 Future<void> _voiceLog(String msg) async {
   try {
-    final dir = await getExternalStorageDirectory() ?? await getApplicationDocumentsDirectory();
-    final file = File('${dir.path}/mindnav_debug.log');
+    final dir =
+        await getExternalStorageDirectory() ??
+        await getApplicationDocumentsDirectory();
+    final file = File('${dir.path}/mindrecipe_debug.log');
     final timestamp = DateTime.now().toIso8601String();
-    await file.writeAsString('$timestamp [VOICE] $msg\n', mode: FileMode.append);
+    await file.writeAsString(
+      '$timestamp [VOICE] $msg\n',
+      mode: FileMode.append,
+    );
   } catch (_) {}
 }
 
-/// Voice interface for Mind Nav — native recognition and interruptible audio.
+/// Voice interface for Mind Recipe — native recognition and interruptible audio.
 class VoiceInterface {
   static final VoiceInterface _instance = VoiceInterface._();
   factory VoiceInterface() => _instance;
   VoiceInterface._();
 
-  static const _channel = MethodChannel('mindnav.dev/voice');
+  static const _channel = MethodChannel('contextfield.mindrecipe/voice');
 
   bool _isListening = false;
   bool _isSpeaking = false;
@@ -43,7 +48,7 @@ class VoiceInterface {
 
   Future<String?> startListening({
     String language = 'en-US',
-    Duration silenceTimeout = const Duration(seconds: 6),
+    Duration silenceTimeout = const Duration(seconds: 3),
   }) async {
     if (_isListening) return null;
     _isListening = true;
@@ -75,7 +80,7 @@ class VoiceInterface {
 
   /// Plays a licensed human recording and resolves when playback ends.
   ///
-  /// Dynamic AI text is deliberately not accepted here: Mind Nav must never
+  /// Dynamic AI text is deliberately not accepted here: Mind Recipe must never
   /// substitute synthetic speech when the member selected a human voice.
   Future<bool> playRecordedCueAndWait(String filePath) async {
     if (_isSpeaking) await stopSpeaking();
@@ -94,7 +99,7 @@ class VoiceInterface {
     }
   }
 
-  /// Renders the current Mind Nav companion voice, then plays the completed
+  /// Renders the current Mind Recipe companion voice, then plays the completed
   /// audio through the same interruption-safe recorded-audio path.
   /// If the cloud voice is unavailable (offline, 1.2 GB model verifying, or
   /// API error), falls back to the offline system TTS so read-aloud still
@@ -107,10 +112,12 @@ class VoiceInterface {
       await _voiceLog('speakAndWait called len=${text.length}');
       // 1. Try cloud companion voice first
       try {
-        final rendered = await MindNavApiClient().synthesizeVoice(
-          text,
-          speed: 0.97,
-        );
+        // Read-aloud must feel immediate.  The network voice is a nice-to-have;
+        // do not make a member wait through its much longer API timeout before
+        // falling back to the operating system voice.
+        final rendered = await MindRecipeApiClient()
+            .synthesizeVoice(text, speed: 0.97)
+            .timeout(const Duration(seconds: 4));
         if (_speechEpoch != epoch) {
           await _voiceLog('epoch mismatch after synthesize');
           return false;
@@ -119,13 +126,14 @@ class VoiceInterface {
         if (audio != null && audio.isNotEmpty) {
           await _voiceLog('audio received base64_len=${audio.length}');
           final folder = await getTemporaryDirectory();
-          final file = File('${folder.path}/mind_nav_companion.mp3');
+          final file = File('${folder.path}/navigator_companion.mp3');
           await file.writeAsBytes(base64Decode(audio), flush: true);
           if (_speechEpoch != epoch) {
             await _voiceLog('epoch mismatch after write');
             return false;
           }
-          final played = await _channel.invokeMethod<bool>('playAudioAndWait', {
+          final played =
+              await _channel.invokeMethod<bool>('playAudioAndWait', {
                 'path': file.path,
               }) ??
               false;
@@ -133,24 +141,28 @@ class VoiceInterface {
           if (played) return true;
           await _voiceLog('cloud play failed, falling back to system TTS');
         } else {
-          await _voiceLog('no audio_base64 in response, falling back to system TTS');
+          await _voiceLog(
+            'no audio_base64 in response, falling back to system TTS',
+          );
         }
       } catch (error) {
-        await _voiceLog('cloud voice failed: $error, falling back to system TTS');
+        await _voiceLog(
+          'cloud voice failed: $error, falling back to system TTS',
+        );
       }
       // 2. Offline fallback — Android TextToSpeech (no network, works after
       // verifying or when staging API is unreachable)
       if (_speechEpoch != epoch) return false;
       await _voiceLog('trying system TTS offline len=${text.length}');
-      final ok = await _channel.invokeMethod<bool>('speakWithSystemTtsAndWait', {
-        'text': text,
-        'rate': 0.95,
-      });
+      final ok = await _channel.invokeMethod<bool>(
+        'speakWithSystemTtsAndWait',
+        {'text': text, 'rate': 0.95, 'language': 'en-GB'},
+      );
       await _voiceLog('system TTS result=$ok');
       return ok ?? false;
     } catch (error) {
       await _voiceLog('ERROR: $error');
-      debugPrint('Mind Nav voice rendering error: $error');
+      debugPrint('Navigator voice rendering error: $error');
       return false;
     } finally {
       if (_speechEpoch == epoch) _isSpeaking = false;
