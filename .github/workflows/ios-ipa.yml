@@ -11,6 +11,9 @@ on:
 permissions:
   contents: read
 
+env:
+  MIND_RECIPE_STAGING_API_URL: https://staging-api.mindrecipe.142.93.201.156.sslip.io
+
 jobs:
   ipa:
     name: Build unsigned iOS IPA
@@ -29,7 +32,7 @@ jobs:
         working-directory: flutter
 
       - name: Build iOS release (no codesign)
-        run: flutter build ios --release --no-codesign
+        run: flutter build ios --release --no-codesign --dart-define=MIND_RECIPE_API_BASE=${MIND_RECIPE_STAGING_API_URL}
         working-directory: flutter
 
       - name: Verify Runner.app exists

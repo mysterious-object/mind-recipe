@@ -42,7 +42,7 @@ spec:
         seccompProfile: {type: RuntimeDefault}
       containers:
         - name: api
-          image: docker.io/library/fire-agents-local:ember-client-demo-20260808
+          image: docker.io/library/mind-nav-api:staging-20260822
           imagePullPolicy: IfNotPresent
           command: ["sh", "-c"]
           args: ["uvicorn app.main:app --host 0.0.0.0 --port 8080"]

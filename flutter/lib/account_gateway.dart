@@ -162,6 +162,29 @@ class _AccountGatewayState extends State<AccountGateway> {
                             border: OutlineInputBorder(),
                           ),
                         ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: password,
+                          obscureText: obscure,
+                          onSubmitted: (_) => busy ? null : submit(),
+                          decoration: InputDecoration(
+                            labelText: 'Password',
+                            helperText: creating
+                                ? '10 characters minimum'
+                                : null,
+                            prefixIcon: const Icon(Icons.lock_outline),
+                            border: const OutlineInputBorder(),
+                            suffixIcon: IconButton(
+                              onPressed: () =>
+                                  setState(() => obscure = !obscure),
+                              icon: Icon(
+                                obscure
+                                    ? Icons.visibility_outlined
+                                    : Icons.visibility_off_outlined,
+                              ),
+                            ),
+                          ),
+                        ),
                         if (creating) const SizedBox(height: 12),
                         if (creating)
                           TextField(
@@ -191,29 +214,6 @@ class _AccountGatewayState extends State<AccountGateway> {
                             ),
                             controlAffinity: ListTileControlAffinity.leading,
                           ),
-                        const SizedBox(height: 12),
-                        TextField(
-                          controller: password,
-                          obscureText: obscure,
-                          onSubmitted: (_) => busy ? null : submit(),
-                          decoration: InputDecoration(
-                            labelText: 'Password',
-                            helperText: creating
-                                ? '10 characters minimum'
-                                : null,
-                            prefixIcon: const Icon(Icons.lock_outline),
-                            border: const OutlineInputBorder(),
-                            suffixIcon: IconButton(
-                              onPressed: () =>
-                                  setState(() => obscure = !obscure),
-                              icon: Icon(
-                                obscure
-                                    ? Icons.visibility_outlined
-                                    : Icons.visibility_off_outlined,
-                              ),
-                            ),
-                          ),
-                        ),
                         if (error != null)
                           Padding(
                             padding: const EdgeInsets.only(top: 12),
