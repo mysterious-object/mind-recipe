@@ -1,0 +1,108 @@
+// Mind Recipe CI — mirrors the GitHub Actions workflows exactly
+// (.github/workflows/android-apk.yml + ios-ipa.yml), so builds are identical
+// whether they run in Actions (billing permitting) or here on Jenkins.
+//
+// Stages:
+//   APK  — always (Linux or mac agent with Flutter + Android SDK)
+//   IPA  — only when Xcode is present (macOS agent); unsigned, same as Actions
+//
+// Agent requirement: label 'flutter' with Flutter SDK + Android SDK on PATH.
+// For IPA: macOS agent with full Xcode (xcode-select -s /Applications/Xcode.app).
+
+pipeline {
+  agent { label 'flutter' }
+
+  environment {
+    MIND_RECIPE_STAGING_API_URL = 'https://staging-api.mindrecipe.142.93.201.156.sslip.io'
+    FLUTTER_DIR = 'flutter'
+  }
+
+  options {
+    timestamps()
+    disableConcurrentBuilds()
+    buildDiscarder(logRotator(numToKeepStr: '30'))
+  }
+
+  stages {
+    stage('Checkout') {
+      steps {
+        checkout scm
+      }
+    }
+
+    stage('Pub get') {
+      steps {
+        dir("${FLUTTER_DIR}") {
+          sh 'flutter pub get'
+        }
+      }
+    }
+
+    stage('Analyze') {
+      steps {
+        dir("${FLUTTER_DIR}") {
+          sh 'flutter analyze --no-fatal-infos --no-fatal-warnings || true'
+        }
+      }
+    }
+
+    stage('Build APK (arm64, unsigned staging)') {
+      steps {
+        dir("${FLUTTER_DIR}") {
+          sh '''
+            flutter build apk --release --target-platform android-arm64 \
+              --dart-define=MIND_RECIPE_API_BASE=${MIND_RECIPE_STAGING_API_URL}
+          '''
+        }
+        stash(name: 'apk', includes: 'flutter/build/app/outputs/flutter-apk/app-release.apk')
+      }
+    }
+
+    stage('Build IPA (unsigned — same as Actions)') {
+      when {
+        expression {
+          return sh(
+            returnStdout: true,
+            script: 'xcodebuild -version >/dev/null 2>&1 && echo yes || echo no',
+          ).trim() == 'yes'
+        }
+      }
+      steps {
+        dir("${FLUTTER_DIR}") {
+          sh '''
+            flutter build ios --release --no-codesign \
+              --dart-define=MIND_RECIPE_API_BASE=${MIND_RECIPE_STAGING_API_URL}
+            # Package unsigned IPA exactly like .github/workflows/ios-ipa.yml
+            mkdir -p build/ios/ipa/Payload
+            cp -R build/ios/iphoneos/Runner.app build/ios/ipa/Payload/
+            cd build/ios/ipa && zip -qry mind-recipe-ios-unsigned.ipa Payload
+          '''
+        }
+        stash(name: 'ipa', includes: 'flutter/build/ios/ipa/mind-recipe-ios-unsigned.ipa')
+      }
+    }
+  }
+
+  post {
+    always {
+      unstash('apk')
+      archiveArtifacts(
+        artifacts: 'flutter/build/app/outputs/flutter-apk/app-release.apk',
+        fingerprint: true,
+        allowEmptyArchive: true,
+      )
+      archiveArtifacts(
+        artifacts: 'flutter/build/ios/ipa/mind-recipe-ios-unsigned.ipa',
+        fingerprint: true,
+        allowEmptyArchive: true,
+      )
+      sh 'rm -rf flutter/build/ios/ipa/Payload || true'
+    }
+    success {
+      echo "Mind Recipe build #${env.BUILD_NUMBER} — artifacts archived in Jenkins."
+    }
+    failure {
+      echo 'Mind Recipe build failed — check the stage that failed.'
+    }
+  }
+}

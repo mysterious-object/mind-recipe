@@ -1,0 +1,50 @@
+# Mind Recipe — Jenkins + Argo CD pipeline
+#
+# GitHub Actions is billing-blocked; this is the replacement path using the
+# cluster's existing CI/CD stack (fire-jenkins + argocd).
+#
+# ── Jenkins ──────────────────────────────────────────────────────────────────
+# UI:    https://jenkins.mysteriousobject.xyz   (ingress → fire-cicd/fire-jenkins:8080)
+# Creds: kubectl -n fire-cicd get secret jenkins-admin -o jsonpath='{.data.password}' | base64 -d
+#
+# One-time setup:
+#   1. Manage Jenkins → Nodes → New Node: name "mac-builder", labels "flutter",
+#      launch via "Launch agent by connecting it to the controller"
+#      (JNLP, agent port 50000 → svc fire-jenkins-agent).
+#   2. On this Mac (has Flutter + Android SDK; add full Xcode to enable IPA):
+#        curl -sO http://jenkins.mysteriousobject.xyz/jnlpJars/agent.jar
+#        java -jar agent.jar -url https://jenkins.mysteriousobject.xyz \
+#          -secret <NODE_SECRET> -name mac-builder -workDir ~/jenkins-agent
+#      (run under launchd/keepalive for a permanent agent)
+#   3. New Item → Pipeline → "mind-recipe-build" → Pipeline from SCM →
+#      https://github.com/mysterious-object/mind-recipe (main) →
+#      Script Path: ci/Jenkinsfile
+#   4. Build Now. Artifacts (APK always; IPA when Xcode present) are archived
+#      per build and downloadable from the job page.
+#
+# ── Argo CD (GitOps for the backend staging deploy) ─────────────────────────
+#   kubectl -n argocd apply -f deploy/argo/mind-recipe-staging.yaml
+#   argocd app list   # or via UI at the argocd-server ingress
+#
+# The Application watches this repo's deploy/staging/ path and keeps the
+# mind-recipe-staging namespace in sync (configmap, PVC, deployment, ingress).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mind-recipe-staging
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/mysterious-object/mind-recipe
+    targetRevision: main
+    path: deploy/staging
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mind-recipe-staging
+  syncPolicy:
+    automated:
+      prune: false
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
