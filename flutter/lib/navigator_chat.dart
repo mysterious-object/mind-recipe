@@ -58,6 +58,7 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
   LocalInferenceSnapshot _localSnapshot = const LocalInferenceSnapshot(
     OnDeviceStatus.checking,
   );
+  List<Map<String, dynamic>> _savedThreads = [];
 
   Future<void> _log(String msg) async {
     try {
@@ -91,6 +92,84 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
       if (mounted && value == 'true')
         setState(() => _voiceConversationEnabled = true);
     } catch (_) {}
+    try {
+      final threads = await widget.appState.loadSavedThreads();
+      if (mounted) setState(() => _savedThreads = threads);
+    } catch (_) {}
+  }
+
+  Future<void> _saveCurrentThread() async {
+    if (widget.messages.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No conversation to save yet.')));
+      return;
+    }
+    final title = widget.messages.firstWhere((m) => m.role == ChatRole.member, orElse: () => widget.messages.first).text;
+    final shortTitle = title.length > 48 ? '${title.substring(0, 48)}…' : title;
+    final msgs = widget.messages.map((m) => {'role': m.role.name, 'text': m.text}).toList();
+    await widget.appState.saveThread(shortTitle, msgs);
+    final threads = await widget.appState.loadSavedThreads();
+    if (mounted) setState(() => _savedThreads = threads);
+    if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Thread saved — find it in Saved threads')));
+  }
+
+  Future<void> _showSavedThreads() async {
+    final threads = await widget.appState.loadSavedThreads();
+    if (!mounted) return;
+    setState(() => _savedThreads = threads);
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (ctx) => FractionallySizedBox(
+        heightFactor: 0.85,
+        child: Column(children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+            child: Row(children: [
+              const Icon(Icons.bookmark_rounded),
+              const SizedBox(width: 8),
+              const Text('Saved threads', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+              const Spacer(),
+              Text('${threads.length} saved'),
+            ]),
+          ),
+          const Divider(height: 1),
+          Expanded(
+            child: threads.isEmpty
+                ? const Center(child: Text('No saved threads yet — tap Save thread in chat to keep one.'))
+                : ListView.separated(
+                    padding: const EdgeInsets.all(12),
+                    itemCount: threads.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 8),
+                    itemBuilder: (ctx, i) {
+                      final t = threads[i];
+                      final msgs = (t['messages'] as List).length;
+                      return Card(
+                        child: ListTile(
+                          title: Text(t['title']?.toString() ?? 'Untitled', maxLines: 2, overflow: TextOverflow.ellipsis),
+                          subtitle: Text('$msgs messages · ${t['saved_at']?.toString().substring(0, 10) ?? ''}'),
+                          trailing: const Icon(Icons.chevron_right_rounded),
+                          onTap: () {
+                            Navigator.pop(ctx);
+                            // Restore thread: replace current messages
+                            setState(() {
+                              widget.messages
+                                ..clear()
+                                ..addAll((t['messages'] as List).map((m) => ChatMessage(
+                                      role: m['role'] == 'assistant' ? ChatRole.assistant : m['role'] == 'member' ? ChatRole.member : ChatRole.status,
+                                      text: m['text']?.toString() ?? '',
+                                    )));
+                            });
+                            widget.onChanged();
+                          },
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ]),
+      ),
+    );
   }
 
   Future<void> _refreshLocalStatus() async {
@@ -517,6 +596,31 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
               localReady: _localSnapshot.isReady,
               thinking: sending,
               turn: turn,
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
+              child: Row(children: [
+                OutlinedButton.icon(
+                  onPressed: widget.messages.isEmpty ? null : _saveCurrentThread,
+                  icon: const Icon(Icons.bookmark_add_outlined, size: 16),
+                  label: const Text('Save thread', style: TextStyle(fontSize: 12)),
+                  style: OutlinedButton.styleFrom(visualDensity: VisualDensity.compact),
+                ),
+                const SizedBox(width: 8),
+                OutlinedButton.icon(
+                  onPressed: _showSavedThreads,
+                  icon: const Icon(Icons.bookmarks_outlined, size: 16),
+                  label: Text('Saved (${_savedThreads.length})', style: const TextStyle(fontSize: 12)),
+                  style: OutlinedButton.styleFrom(visualDensity: VisualDensity.compact),
+                ),
+                const Spacer(),
+                if (widget.messages.isNotEmpty)
+                  IconButton(
+                    icon: const Icon(Icons.delete_sweep_outlined, size: 18),
+                    tooltip: 'Clear chat',
+                    onPressed: () => setState(() => widget.messages.clear()),
+                  ),
+              ]),
             ),
             Expanded(
               child: ListView.builder(

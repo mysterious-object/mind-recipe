@@ -216,11 +216,20 @@ class _MemberHomeState extends State<MemberHome> {
     _voiceBubbleTimer = Timer.periodic(const Duration(milliseconds: 350), (_) {
       final speaking = VoiceInterface().isSpeaking;
       final listening = VoiceInterface().isListening;
-      if (speaking != _voiceIsSpeaking || listening != _voiceIsListening) {
+      String? snippet;
+      for (var i = chatMessages.length - 1; i >= 0; i--) {
+        if (chatMessages[i].role == ChatRole.assistant) { snippet = chatMessages[i].text; break; }
+      }
+      if (snippet != _lastAssistantSnippet || speaking != _voiceIsSpeaking || listening != _voiceIsListening) {
         if (mounted) setState(() {
           _voiceIsSpeaking = speaking;
           _voiceIsListening = listening;
+          _lastAssistantSnippet = snippet;
         });
+      }
+      // Also keep bubble visible for 12s after last assistant message even when not speaking
+      if (snippet != null && snippet != _lastAssistantSnippet) {
+        if (mounted) setState(() => _lastAssistantSnippet = snippet);
       }
     });
   }
@@ -404,7 +413,7 @@ class _MemberHomeState extends State<MemberHome> {
                         },
                         children: screens,
                       ),
-                      if ((_voiceIsSpeaking || _voiceIsListening) && index != 0)
+                      if (((_voiceIsSpeaking || _voiceIsListening) || _lastAssistantSnippet != null) && index != 0)
                         Positioned(
                           left: 12,
                           right: 12,
@@ -425,7 +434,9 @@ class _MemberHomeState extends State<MemberHome> {
                                       height: 22,
                                       child: _voiceIsSpeaking
                                           ? const CircularProgressIndicator(strokeWidth: 2)
-                                          : const Icon(Icons.mic_rounded, size: 18),
+                                          : _voiceIsListening
+                                              ? const Icon(Icons.mic_rounded, size: 18)
+                                              : const Icon(Icons.chat_bubble_rounded, size: 18),
                                     ),
                                     const SizedBox(width: 10),
                                     Expanded(
@@ -434,12 +445,20 @@ class _MemberHomeState extends State<MemberHome> {
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
                                           Text(
-                                            _voiceIsSpeaking ? 'Navigator is speaking…' : 'Navigator is listening…',
+                                            _voiceIsSpeaking
+                                                ? 'Navigator is speaking…'
+                                                : _voiceIsListening
+                                                    ? 'Navigator is listening…'
+                                                    : 'Navigator replied — tap to view',
                                             style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
                                           ),
-                                          const Text(
-                                            'Tap to return to chat — audio continues in background',
-                                            style: TextStyle(fontSize: 11),
+                                          Text(
+                                            _lastAssistantSnippet != null
+                                                ? (_lastAssistantSnippet!.length > 92 ? '${_lastAssistantSnippet!.substring(0, 92)}…' : _lastAssistantSnippet!)
+                                                : 'Tap to return to chat — audio continues in background',
+                                            style: const TextStyle(fontSize: 11),
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
                                           ),
                                         ],
                                       ),
