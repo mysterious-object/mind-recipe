@@ -159,6 +159,11 @@ class OnDeviceInference implements LocalInference {
   );
   LlamaParent? _engine;
   bool _refreshing = false;
+
+  /// True only while a download loop is actually running in this process.
+  /// A `.partial` on disk from a previous session must not block a new
+  /// installModel — that was the restart-from-zero deadlock.
+  bool _downloadActive = false;
   OnDeviceModelManifest _activeManifest = mindRecipePrivateModel;
 
   @override
@@ -262,9 +267,13 @@ class OnDeviceInference implements LocalInference {
       if (!await partial.exists() && await stalePartialReceipt.exists()) {
         await stalePartialReceipt.delete();
       }
-      // If a .partial exists with bytes, we are mid-download — report downloading
-      // so the progress bar survives tab switches / PageView rebuilds.
-      if (await partial.exists() && await partial.length() > 0) {
+      // If a .partial exists with bytes we are mid-download — report
+      // downloading so the progress bar survives tab switches / PageView
+      // rebuilds. BUT only when a download is live in THIS process: a
+      // partial left by a killed session must not deadlock installModel.
+      if (_downloadActive &&
+          await partial.exists() &&
+          await partial.length() > 0) {
         // Keep the existing snapshot if it already reflects downloading
         if (_snapshot.status == OnDeviceStatus.downloading) return _snapshot;
         return _set(const LocalInferenceSnapshot(OnDeviceStatus.downloading));
@@ -327,8 +336,7 @@ class OnDeviceInference implements LocalInference {
     bool allowCellular = false,
     OnDeviceModelManifest? model,
   }) async {
-    if (_snapshot.status == OnDeviceStatus.downloading ||
-        _snapshot.status == OnDeviceStatus.verifying) {
+    if (_downloadActive) {
       throw StateError('Wait for the current private model setup to finish.');
     }
     if (model != null && model.id != _activeManifest.id) {
@@ -369,6 +377,7 @@ class OnDeviceInference implements LocalInference {
     var received = resumeOffset;
     const maxDownloadAttempts = 8;
     var attempt = 0;
+    _downloadActive = true;
     try {
       while (true) {
         attempt++;
@@ -543,6 +552,7 @@ class OnDeviceInference implements LocalInference {
       // intentionally protects active checks and previously left success stuck.
       _set(const LocalInferenceSnapshot(OnDeviceStatus.checking));
       final ready = await refreshStatus();
+      _downloadActive = false;
       if (!ready.isReady) {
         throw StateError(
           ready.detail ?? 'The private model could not be started.',
@@ -562,6 +572,7 @@ class OnDeviceInference implements LocalInference {
         await _inferLog('install failed kept partial $len bytes for resume: $error');
         // Keep partial so tab switch / retry can resume via Range.
       }
+      _downloadActive = false;
       _set(LocalInferenceSnapshot(OnDeviceStatus.error, detail: '$error'));
       rethrow;
     }

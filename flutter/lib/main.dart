@@ -351,15 +351,9 @@ class _MemberHomeState extends State<MemberHome> {
             : index.toDouble();
         return Scaffold(
           appBar: AppBar(
-            title: Flexible(
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerLeft,
-                child: MindRecipePageTitle(
-                  title: labels[index],
-                  forward: index >= previousIndex,
-                ),
-              ),
+            title: MindRecipePageTitle(
+              title: labels[index],
+              forward: index >= previousIndex,
             ),
             actions: [
               // The Chat/Steps switch only exists on the Navigator tab, so the
