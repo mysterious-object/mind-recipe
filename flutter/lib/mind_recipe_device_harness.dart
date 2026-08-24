@@ -1,9 +1,9 @@
-/// Mind Nav's native device bridge.
+/// Mind Recipe's native device bridge.
 ///
 /// This is a custom mobile implementation inspired by the development-only
 /// phone harness reference. It never drives other apps, reads a device ID, or
 /// performs a network request. It exposes only deliberate local feedback and
-/// a coarse device-capability snapshot to approved Mind Nav tools.
+/// a coarse device-capability snapshot to approved Mind Recipe tools.
 import 'package:flutter/services.dart';
 
 class DeviceHarnessSnapshot {
@@ -25,8 +25,8 @@ class DeviceHarnessSnapshot {
       );
 }
 
-class MindNavDeviceHarness {
-  static const _channel = MethodChannel('mindnav.dev/device_harness');
+class MindRecipeDeviceHarness {
+  static const _channel = MethodChannel('contextfield.mindrecipe/device_harness');
 
   Future<DeviceHarnessSnapshot> capabilities() async {
     try {

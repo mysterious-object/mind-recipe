@@ -6,15 +6,16 @@ build-backend = "setuptools.build_meta"
 include = ["app*"]
 
 [project]
-name = "mind-nav-api"
+name = "mind-recipe-api"
 version = "0.1.0"
-description = "Bounded wellness API for Mind Nav"
+description = "Bounded wellness API for Mind Recipe"
 requires-python = ">=3.9"
 dependencies = [
   "fastapi>=0.115,<1",
   "pydantic>=2.7,<3",
   "uvicorn[standard]>=0.30,<1",
   "httpx>=0.27,<1",
+  "psycopg[binary]>=3.2,<4",
 ]
 
 [project.optional-dependencies]

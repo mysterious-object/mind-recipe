@@ -8,7 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'app_services.dart';
 import 'check_in_state.dart';
 import 'cinematic_experience.dart';
-import 'mind_nav_fx.dart';
+import 'mind_recipe_fx.dart';
 
 enum DailyScanStage { invitation, sensing, feeling, body, context, synthesis }
 
@@ -23,7 +23,7 @@ class DailyNavigationScan extends StatefulWidget {
 
   final CheckInState state;
   final VoidCallback onChanged;
-  final MindNavApiClient api;
+  final MindRecipeApiClient api;
   final SecureAppState appState;
 
   @override
@@ -243,20 +243,20 @@ class _DailyNavigationScanState extends State<DailyNavigationScan> {
           Row(
             children: [
               Icon(connected ? Icons.auto_awesome_rounded : Icons.hub_outlined,
-                  color: connected ? MindNavFxPalette.livingGreen : Theme.of(context).colorScheme.outline),
+                  color: connected ? MindRecipeFxPalette.livingGreen : Theme.of(context).colorScheme.outline),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(connected ? 'Mind Nav AI ready' : 'Structured guide active', style: const TextStyle(fontWeight: FontWeight.w800)),
+                    Text(connected ? 'Navigator ready' : 'Structured guide active', style: const TextStyle(fontWeight: FontWeight.w800)),
                     Text(connected ? 'OpenRouter · your key · consent required below' : 'No AI provider is connected. Connect one in Profile.', style: Theme.of(context).textTheme.bodySmall),
                   ],
                 ),
               ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-                decoration: BoxDecoration(color: (connected ? MindNavFxPalette.livingGreen : Colors.grey).withValues(alpha: 0.13), borderRadius: BorderRadius.circular(99)),
+                decoration: BoxDecoration(color: (connected ? MindRecipeFxPalette.livingGreen : Colors.grey).withValues(alpha: 0.13), borderRadius: BorderRadius.circular(99)),
                 child: Text(connected ? 'AI READY' : 'NO AI', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1)),
               ),
             ],
@@ -278,7 +278,7 @@ class _DailyNavigationScanState extends State<DailyNavigationScan> {
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                border: Border.all(color: aiReply!.isCloudAi ? MindNavFxPalette.livingGreen.withValues(alpha: 0.5) : Theme.of(context).colorScheme.outlineVariant),
+                border: Border.all(color: aiReply!.isCloudAi ? MindRecipeFxPalette.livingGreen.withValues(alpha: 0.5) : Theme.of(context).colorScheme.outlineVariant),
                 borderRadius: BorderRadius.circular(18),
               ),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -298,12 +298,12 @@ class _DailyNavigationScanState extends State<DailyNavigationScan> {
             enabled: connected && !aiLoading,
             onSubmitted: (_) => sendToAi(),
             decoration: InputDecoration(
-              labelText: connected ? 'Talk with Mind Nav' : 'Connect AI in Profile to chat',
+              labelText: connected ? 'Talk with Navigator' : 'Connect Navigator in Settings to chat',
               hintText: 'What should I pay attention to today?',
               border: const OutlineInputBorder(),
               suffixIcon: aiLoading
                   ? const Padding(padding: EdgeInsets.all(14), child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)))
-                  : IconButton(onPressed: connected && cloudConsent ? sendToAi : null, icon: const Icon(Icons.arrow_upward_rounded), tooltip: 'Send to Mind Nav AI'),
+                  : IconButton(onPressed: connected && cloudConsent ? sendToAi : null, icon: const Icon(Icons.arrow_upward_rounded), tooltip: 'Send to Navigator'),
             ),
           ),
           if (connected)
@@ -349,7 +349,7 @@ class _DailyNavigationScanState extends State<DailyNavigationScan> {
           children: [
             Icon(widget.appState.hasProviderKey ? Icons.auto_awesome_rounded : Icons.hub_outlined, size: 19),
             const SizedBox(width: 8),
-            Text(widget.appState.hasProviderKey ? 'Mind Nav AI ready' : 'Structured guide active', style: const TextStyle(fontWeight: FontWeight.w800)),
+            Text(widget.appState.hasProviderKey ? 'Navigator ready' : 'Structured guide active', style: const TextStyle(fontWeight: FontWeight.w800)),
             const Spacer(),
             Text(widget.appState.hasProviderKey ? 'AI READY' : 'NO AI', style: Theme.of(context).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w900)),
           ],
@@ -599,7 +599,7 @@ class _DailyNavigationScanState extends State<DailyNavigationScan> {
         _SynthesisCard(
           label: 'YOU REPORTED',
           icon: Icons.person_outline_rounded,
-          color: MindNavFxPalette.primary,
+          color: MindRecipeFxPalette.primary,
           title: reported,
           detail: widget.state.contextTags.isEmpty
               ? 'No context selected.'
@@ -609,7 +609,7 @@ class _DailyNavigationScanState extends State<DailyNavigationScan> {
         _SynthesisCard(
           label: 'PHONE OBSERVED',
           icon: Icons.phone_iphone_rounded,
-          color: MindNavFxPalette.secondary,
+          color: MindRecipeFxPalette.secondary,
           title: motion.label,
           detail: motion.detail,
         ),
@@ -617,7 +617,7 @@ class _DailyNavigationScanState extends State<DailyNavigationScan> {
         _SynthesisCard(
           label: 'GUIDE SUGGESTS',
           icon: Icons.navigation_rounded,
-          color: MindNavFxPalette.livingGreen,
+          color: MindRecipeFxPalette.livingGreen,
           title: _suggestedTool(),
           detail: 'A wellness option based on today’s selected inputs. It is not treatment direction.',
         ),
@@ -798,7 +798,7 @@ class _ScanStatus extends StatelessWidget {
     children: [
       Row(
         children: [
-          const Icon(Icons.radar_rounded, color: MindNavFxPalette.primary),
+          const Icon(Icons.radar_rounded, color: MindRecipeFxPalette.primary),
           const SizedBox(width: 8),
           Text(
             'DAILY NAVIGATION',
@@ -833,7 +833,7 @@ class _ScanSurface extends StatelessWidget {
           .withValues(alpha: 0.88),
       borderRadius: BorderRadius.circular(24),
       border: Border.all(
-        color: MindNavFxPalette.primary.withValues(alpha: 0.18),
+        color: MindRecipeFxPalette.primary.withValues(alpha: 0.18),
       ),
     ),
     child: child,
@@ -857,7 +857,7 @@ class _EvidenceDisclosure extends StatelessWidget {
         ),
         const SizedBox(height: 10),
         const Text(
-          'Validated measures belong in a separate, less-frequent assessment with exact wording, scoring, licensing, age, and clinical-review controls. Mind Nav will not silently blend one into an AI conversation.',
+          'Validated measures belong in a separate, less-frequent assessment with exact wording, scoring, licensing, age, and clinical-review controls. Mind Recipe will not silently blend one into an AI conversation.',
         ),
         const SizedBox(height: 8),
         TextButton.icon(

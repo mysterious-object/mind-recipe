@@ -1,12 +1,18 @@
-name: Mind Nav iOS IPA (unsigned)
+name: Mind Recipe iOS IPA (unsigned)
 
 on:
   workflow_dispatch:
+  pull_request:
+    branches: ['main']
   push:
+    branches: ['codex/mobile-build-*']
     tags: ['v*']
 
 permissions:
   contents: read
+
+env:
+  MIND_RECIPE_STAGING_API_URL: https://staging-api.mindrecipe.142.93.201.156.sslip.io
 
 jobs:
   ipa:
@@ -26,7 +32,7 @@ jobs:
         working-directory: flutter
 
       - name: Build iOS release (no codesign)
-        run: flutter build ios --release --no-codesign
+        run: flutter build ios --release --no-codesign --dart-define=MIND_RECIPE_API_BASE=${MIND_RECIPE_STAGING_API_URL}
         working-directory: flutter
 
       - name: Verify Runner.app exists
@@ -38,13 +44,13 @@ jobs:
           cd flutter
           mkdir -p Payload
           cp -R build/ios/iphoneos/Runner.app Payload/
-          zip -r mind-nav-ios-unsigned.ipa Payload
-          ls -lh mind-nav-ios-unsigned.ipa
-          unzip -l mind-nav-ios-unsigned.ipa | head -n 20
+          zip -r mind-recipe-ios-unsigned.ipa Payload
+          ls -lh mind-recipe-ios-unsigned.ipa
+          unzip -l mind-recipe-ios-unsigned.ipa | head -n 20
 
       - uses: actions/upload-artifact@v4
         with:
-          name: mind-nav-ios-unsigned-ipa
-          path: flutter/mind-nav-ios-unsigned.ipa
+          name: mind-recipe-ios-unsigned-ipa
+          path: flutter/mind-recipe-ios-unsigned.ipa
           if-no-files-found: error
           retention-days: 14

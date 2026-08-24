@@ -1,6 +1,6 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: mind-nav
+  name: mind-recipe
   labels:
-    app.kubernetes.io/part-of: mind-nav
+    app.kubernetes.io/part-of: mind-recipe

@@ -1,4 +1,4 @@
-package io.mindnav.mind_nav
+package com.contextfield.mindrecipe
 
 import android.Manifest
 import android.app.Activity
@@ -35,7 +35,7 @@ class VoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamHandler
     ActivityAware, PluginRegistry.RequestPermissionsResultListener {
     companion object {
         private const val RECORD_AUDIO_REQUEST = 4407
-        private const val LOG_TAG = "MindNavVoice"
+        private const val LOG_TAG = "MindRecipeVoice"
     }
 
     private lateinit var methodChannel: MethodChannel
@@ -52,7 +52,7 @@ class VoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamHandler
     private var eventSink: EventChannel.EventSink? = null
     private var listeningResult: Result? = null
     private var pendingLanguage = "en-US"
-    private var pendingSilenceTimeoutMs = 3000
+    private var pendingSilenceTimeoutMs = 2500
     private var latestTranscript: String? = null
     private var recognitionRetries = 0
     private var recognitionRetryPending = false
@@ -71,14 +71,14 @@ class VoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamHandler
 
     override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         context = binding.applicationContext
-        methodChannel = MethodChannel(binding.binaryMessenger, "mindnav.dev/voice")
-        eventChannel = EventChannel(binding.binaryMessenger, "mindnav.dev/voice_stream")
+        methodChannel = MethodChannel(binding.binaryMessenger, "contextfield.mindrecipe/voice")
+        eventChannel = EventChannel(binding.binaryMessenger, "contextfield.mindrecipe/voice_stream")
         methodChannel.setMethodCallHandler(this)
         eventChannel.setStreamHandler(this)
         textToSpeech = TextToSpeech(binding.applicationContext) { status ->
             ttsReady = status == TextToSpeech.SUCCESS
             if (ttsReady) {
-                textToSpeech?.language = Locale.US
+                textToSpeech?.language = Locale.UK
                 textToSpeech?.setSpeechRate(0.95f)
                 Log.i(LOG_TAG, "system TTS ready")
             } else {
@@ -94,13 +94,13 @@ class VoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamHandler
             )
             "startListening" -> {
                 if (listeningResult != null) {
-                    result.error("ALREADY_LISTENING", "Mind Nav is already listening.", null)
+                    result.error("ALREADY_LISTENING", "Mind Recipe is already listening.", null)
                     return
                 }
                 listeningResult = result
                 pendingLanguage = call.argument<String>("language") ?: "en-US"
                 pendingSilenceTimeoutMs =
-                    (call.argument<Int>("silenceTimeoutMs") ?: 6000).coerceIn(3000, 12_000)
+                    (call.argument<Int>("silenceTimeoutMs") ?: 3000).coerceIn(1800, 8_000)
                 recognitionRetries = 0
                 recognitionRetryPending = false
                 requestPermissionThenListen()
@@ -119,11 +119,13 @@ class VoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamHandler
             "speakWithSystemTts" -> speakWithSystemTts(
                 call.argument<String>("text") ?: "",
                 call.argument<Double>("rate")?.toFloat() ?: 0.95f,
+                call.argument<String>("language") ?: "en-GB",
                 result
             )
             "speakWithSystemTtsAndWait" -> speakWithSystemTts(
                 call.argument<String>("text") ?: "",
                 call.argument<Double>("rate")?.toFloat() ?: 0.95f,
+                call.argument<String>("language") ?: "en-GB",
                 result
             )
             "getLanguages" -> result.success(listOf("en-US", "en-GB", "es-ES", "fr-FR", "de-DE"))
@@ -195,7 +197,10 @@ class VoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamHandler
                     // stopListening here can cancel that final transcript on
                     // some Samsung/Google service combinations.
                     Log.i(LOG_TAG, "speech ended; awaiting final transcript")
-                    voiceHandler.postDelayed(finishAfterPause, 5000)
+                    // Results normally arrive immediately.  A short safety
+                    // completion keeps the turn responsive on recognizers
+                    // that occasionally never send a final callback.
+                    voiceHandler.postDelayed(finishAfterPause, 1500)
                 }
             }
             override fun onError(error: Int) {
@@ -322,7 +327,7 @@ class VoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamHandler
         completeAudioPlayback(false)
     }
 
-    private fun speakWithSystemTts(text: String, rate: Float, result: Result) {
+    private fun speakWithSystemTts(text: String, rate: Float, language: String, result: Result) {
         if (text.isBlank()) {
             result.error("EMPTY_TEXT", "No text to speak", null)
             return
@@ -344,15 +349,17 @@ class VoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamHandler
                     if (doneId == utteranceId) completeTtsPlayback(true)
                 }
                 @Deprecated("Deprecated in Java")
-                override fun onError(utteranceId: String?) {
-                    if (utteranceId == utteranceId) completeTtsPlayback(false)
+                override fun onError(failedId: String?) {
+                    if (failedId == utteranceId) completeTtsPlayback(false)
                 }
-                override fun onError(utteranceId: String?, errorCode: Int) {
-                    if (utteranceId == utteranceId) completeTtsPlayback(false)
+                override fun onError(failedId: String?, errorCode: Int) {
+                    if (failedId == utteranceId) completeTtsPlayback(false)
                 }
             })
             tts.setSpeechRate(rate.coerceIn(0.5f, 2.0f))
-            tts.language = Locale.US
+            val locale = Locale.forLanguageTag(language)
+            tts.language = if (tts.isLanguageAvailable(locale) >= TextToSpeech.LANG_AVAILABLE) locale else Locale.UK
+            tts.voices?.firstOrNull { it.locale.language == "en" && it.locale.country == "GB" }?.let { tts.voice = it }
             val speakResult = tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, utteranceId)
             if (speakResult == TextToSpeech.ERROR) {
                 completeTtsPlayback(false)

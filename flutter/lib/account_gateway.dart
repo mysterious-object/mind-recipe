@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 
 import 'app_services.dart';
-import 'cinematic_experience.dart';
-import 'mind_nav_fx.dart';
+import 'mind_recipe_fx.dart';
 
 class AccountGateway extends StatefulWidget {
   const AccountGateway({super.key, required this.api, required this.appState});
-  final MindNavApiClient api;
+  final MindRecipeApiClient api;
   final SecureAppState appState;
 
   @override
@@ -17,21 +16,29 @@ class _AccountGatewayState extends State<AccountGateway> {
   final name = TextEditingController();
   final email = TextEditingController();
   final password = TextEditingController();
+  final confirmPassword = TextEditingController();
   bool creating = false;
   bool busy = false;
   bool obscure = true;
+  bool acceptedTerms = false;
   String? error;
 
   String? _validationError() {
     final normalizedEmail = email.text.trim();
     if (creating && name.text.trim().length < 2) {
-      return 'Enter the name you want Mind Nav to use.';
+      return 'Enter the name you want Mind Recipe to use.';
     }
     if (!normalizedEmail.contains('@') || !normalizedEmail.contains('.')) {
       return 'Enter a valid email address.';
     }
     if (password.text.length < 10) {
       return 'Password must contain at least 10 characters.';
+    }
+    if (creating && password.text != confirmPassword.text) {
+      return 'Passwords do not match.';
+    }
+    if (creating && !acceptedTerms) {
+      return 'Review and accept the privacy and wellness terms to continue.';
     }
     return null;
   }
@@ -41,6 +48,7 @@ class _AccountGatewayState extends State<AccountGateway> {
     name.dispose();
     email.dispose();
     password.dispose();
+    confirmPassword.dispose();
     super.dispose();
   }
 
@@ -71,7 +79,7 @@ class _AccountGatewayState extends State<AccountGateway> {
     } catch (_) {
       if (mounted) {
         setState(
-          () => error = 'Mind Nav could not reach the account service. Check your connection and try again.',
+          () => error = 'Mind Recipe could not reach the account service. Check your connection and try again.',
         );
       }
     } finally {
@@ -83,8 +91,8 @@ class _AccountGatewayState extends State<AccountGateway> {
   Widget build(BuildContext context) => Scaffold(
     body: Stack(
       children: [
-        const Positioned.fill(child: MindNavGpuField(progress: 0.16)),
-        const Positioned.fill(child: MindNavFxBackdrop(progress: 0.16)),
+        const Positioned.fill(child: MindRecipeGpuField(progress: 0.16)),
+        const Positioned.fill(child: MindRecipeFxBackdrop(progress: 0.16)),
         SafeArea(
           child: Center(
             child: SingleChildScrollView(
@@ -99,21 +107,28 @@ class _AccountGatewayState extends State<AccountGateway> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        const Center(
-                          child: CinematicPresence(
-                            size: 96,
-                            icon: Icons.navigation_rounded,
+                        Center(
+                          child: Image.asset(
+                            'assets/branding/mind-recipe-mark.png',
+                            height: 92,
+                            fit: BoxFit.contain,
                           ),
                         ),
                         const SizedBox(height: 18),
                         Text(
-                          'MIND NAV',
+                          'MIND RECIPE',
                           textAlign: TextAlign.center,
                           style: Theme.of(context).textTheme.labelLarge
                               ?.copyWith(
                                 letterSpacing: 3,
                                 fontWeight: FontWeight.w900,
                               ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          'by Context Field',
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.bodySmall,
                         ),
                         const SizedBox(height: 8),
                         Text(
@@ -170,6 +185,35 @@ class _AccountGatewayState extends State<AccountGateway> {
                             ),
                           ),
                         ),
+                        if (creating) const SizedBox(height: 12),
+                        if (creating)
+                          TextField(
+                            controller: confirmPassword,
+                            obscureText: obscure,
+                            onSubmitted: (_) => busy ? null : submit(),
+                            decoration: const InputDecoration(
+                              labelText: 'Confirm password',
+                              prefixIcon: Icon(Icons.lock_reset_rounded),
+                              border: OutlineInputBorder(),
+                            ),
+                          ),
+                        if (creating)
+                          CheckboxListTile(
+                            contentPadding: EdgeInsets.zero,
+                            value: acceptedTerms,
+                            onChanged: busy
+                                ? null
+                                : (value) => setState(
+                                    () => acceptedTerms = value ?? false,
+                                  ),
+                            title: const Text(
+                              'I understand Mind Recipe is a wellness tool, not therapy or emergency care.',
+                            ),
+                            subtitle: const Text(
+                              'I agree to the Privacy Notice and Terms.',
+                            ),
+                            controlAffinity: ListTileControlAffinity.leading,
+                          ),
                         if (error != null)
                           Padding(
                             padding: const EdgeInsets.only(top: 12),
@@ -204,15 +248,9 @@ class _AccountGatewayState extends State<AccountGateway> {
                                 : 'Create a new account',
                           ),
                         ),
-                        const Divider(height: 28),
-                        OutlinedButton.icon(
-                          onPressed: busy ? null : widget.appState.useLocalDemo,
-                          icon: const Icon(Icons.phone_android_rounded),
-                          label: const Text('Explore local demo'),
-                        ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 4),
                         const Text(
-                          'Local demo data stays on this installation and does not create an account.',
+                          'Your account keeps Recipes progress available across your devices.',
                           textAlign: TextAlign.center,
                           style: TextStyle(fontSize: 12),
                         ),

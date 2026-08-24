@@ -1,20 +1,28 @@
-name: Mind Nav Android APK
+name: Mind Recipe Android APK
 
 on:
   workflow_dispatch:
+  pull_request:
+    branches: ['main']
   push:
+    branches: ['codex/mobile-build-*']
     tags: ['v*']
 
 permissions:
   contents: read
 
 env:
-  MIND_NAV_STAGING_API_URL: https://staging-api.mindnav.142.93.201.156.sslip.io
+  MIND_RECIPE_STAGING_API_URL: https://staging-api.mindrecipe.142.93.201.156.sslip.io
+
+concurrency:
+  group: mind-recipe-android-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
 
 jobs:
   apk:
     name: Build downloadable staging APK
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
@@ -24,13 +32,14 @@ jobs:
           cache: true
       - run: flutter pub get
         working-directory: flutter
-      - run: flutter build apk --release --target-platform android-arm64 --dart-define=MIND_NAV_API_BASE=${MIND_NAV_STAGING_API_URL}
+      - name: Build ARM64 staging APK
+        run: flutter build apk --release --target-platform android-arm64 --no-pub --verbose --dart-define=MIND_RECIPE_API_BASE=${MIND_RECIPE_STAGING_API_URL}
         working-directory: flutter
       - name: Verify APK exists
         run: test -s flutter/build/app/outputs/flutter-apk/app-release.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: mind-nav-android-apk
+          name: mind-recipe-android-apk
           path: flutter/build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
           retention-days: 14

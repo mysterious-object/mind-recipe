@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "io.mindnav.mind_nav"
+    namespace = "com.contextfield.mindrecipe"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -15,7 +15,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "io.mindnav.mind_nav"
+        applicationId = "com.contextfield.mindrecipe"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode

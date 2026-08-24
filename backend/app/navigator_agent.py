@@ -1,4 +1,4 @@
-"""Bounded autonomous planning for Mind Nav.
+"""Bounded autonomous planning for Mind Recipe.
 
 This module is deliberately independent from external agent frameworks. It can
 select approved, read-only wellness tools, run a short quality loop, research
@@ -30,13 +30,13 @@ class SkillProposal:
     created_at: str
 
 
-class MindNavAgent:
+class NavigatorAgent:
     """Local-first tool planner with explicit external-action boundaries."""
 
     max_refinement_passes = 2
     tools = (
         ToolSpec("check_in", "Organize a voluntary daily reflection."),
-        ToolSpec("toolbox", "Find a relevant Mind Recipe practice."),
+        ToolSpec("recipe_practice", "Find a relevant Mind Recipe practice."),
         ToolSpec("lesson", "Retrieve a Mind Recipe lesson."),
         ToolSpec("progress", "Explain member-owned wellness trends."),
         ToolSpec("booking", "Open the labelled booking destination."),
@@ -62,7 +62,7 @@ class MindNavAgent:
         elif any(word in lowered for word in ("progress", "trend", "pattern", "history")):
             selected.append(self._tool("progress"))
         elif any(word in lowered for word in ("exercise", "practice", "ground", "breathe", "tool")):
-            selected.append(self._tool("toolbox"))
+            selected.append(self._tool("recipe_practice"))
         else:
             selected.append(self._tool("check_in"))
 
@@ -162,4 +162,4 @@ class MindNavAgent:
         return datetime.now(timezone.utc).isoformat()
 
 
-agent = MindNavAgent()
+agent = NavigatorAgent()

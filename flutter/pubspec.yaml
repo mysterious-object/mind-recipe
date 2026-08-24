@@ -1,5 +1,5 @@
-name: mind_nav
-description: "Mind Nav daily wellness navigator."
+name: mind_recipe
+description: "Mind Recipe daily wellness navigator."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.0+2036
+version: 1.0.0+2037
 
 environment:
   sdk: ^3.13.0
@@ -63,7 +63,7 @@ dev_dependencies:
 flutter:
 
   shaders:
-    - shaders/mind_nav_field.frag
+    - shaders/mind_recipe_field.frag
     - shaders/conversation_viz.frag
 
   # The following line ensures that the Material Icons font is
@@ -72,8 +72,11 @@ flutter:
   uses-material-design: true
 
   # To add assets to your application, add an assets section, like this:
-  # assets:
-  #   - images/a_dot_burr.jpeg
+  assets:
+    - assets/branding/mind-recipe-mark.png
+    - assets/branding/mind-recipe-app-icon.png
+    - assets/branding/navigator-compass.png
+    - assets/branding/context-field-wordmark.png
   #   - images/a_dot_ham.jpeg
 
   # An image asset can refer to one or more resolution-specific "variants", see

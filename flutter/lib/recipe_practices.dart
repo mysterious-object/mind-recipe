@@ -5,22 +5,22 @@ import 'package:flutter/material.dart';
 import 'app_services.dart';
 import 'design_tokens.dart';
 
-/// Wellness toolbox — record discovery, practice, effectiveness, context,
+/// Wellness recipe practice — record discovery, practice, effectiveness, context,
 /// favorites, accessibility needs, and recommendation provenance.
 
-class WellnessToolbox extends StatefulWidget {
-  const WellnessToolbox({super.key, required this.appState});
+class WellnessRecipePractice extends StatefulWidget {
+  const WellnessRecipePractice({super.key, required this.appState});
   final SecureAppState appState;
 
   @override
-  State<WellnessToolbox> createState() => _WellnessToolboxState();
+  State<WellnessRecipePractice> createState() => _WellnessRecipePracticeState();
 }
 
-class _WellnessToolboxState extends State<WellnessToolbox> {
+class _WellnessRecipePracticeState extends State<WellnessRecipePractice> {
   final _tools = <ToolEntry>[];
   final _nameController = TextEditingController();
   final _descriptionController = TextEditingController();
-  final _api = MindNavApiClient();
+  final _api = MindRecipeApiClient();
   String _filterCategory = 'All';
   String _newCategory = 'Breathing';
   String _newSource = 'self-discovered';
@@ -57,7 +57,7 @@ class _WellnessToolboxState extends State<WellnessToolbox> {
 
   Future<void> _loadTools() async {
     try {
-      final records = await _api.fetchToolbox(token: _token);
+      final records = await _api.fetchRecipePractice(token: _token);
       if (!mounted) return;
       setState(() {
         _tools
@@ -102,7 +102,7 @@ class _WellnessToolboxState extends State<WellnessToolbox> {
   Widget _buildAddButton() => Padding(
     padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
     child: Semantics(
-      label: 'Add a new wellness practice to your toolbox',
+      label: 'Add a new wellness practice to your saved practices',
       child: FilledButton.icon(
         onPressed: () => setState(() => _showAddForm = !_showAddForm),
         icon: Icon(_showAddForm ? Icons.close : Icons.add),
@@ -122,7 +122,7 @@ class _WellnessToolboxState extends State<WellnessToolbox> {
         label: Text(_categories[i]),
         selected: _filterCategory == _categories[i],
         onSelected: (_) => setState(() => _filterCategory = _categories[i]),
-        selectedColor: MindNavTokens.primary.withAlpha(40),
+        selectedColor: MindRecipeTokens.primary.withAlpha(40),
       ),
     ),
   );
@@ -227,7 +227,7 @@ class _WellnessToolboxState extends State<WellnessToolbox> {
     }
     setState(() => _saving = true);
     try {
-      final record = await _api.createToolboxItem(
+      final record = await _api.createRecipePracticeItem(
         token: _token,
         name: name,
         description: _descriptionController.text.trim(),
@@ -242,7 +242,9 @@ class _WellnessToolboxState extends State<WellnessToolbox> {
         _descriptionController.clear();
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Practice saved to your toolbox.')),
+        const SnackBar(
+          content: Text('Practice saved to your saved practices.'),
+        ),
       );
     } catch (error) {
       if (mounted) _showError(error);
@@ -303,8 +305,8 @@ class _WellnessToolboxState extends State<WellnessToolbox> {
     );
 
     try {
-      final api = MindNavApiClient();
-      final data = await api.createAiToolboxItem(
+      final api = MindRecipeApiClient();
+      final data = await api.createAiRecipePracticeItem(
         token: _token,
         description: description,
         providerKey: widget.appState.openRouterKey,
@@ -313,13 +315,15 @@ class _WellnessToolboxState extends State<WellnessToolbox> {
       if (!mounted) return;
       Navigator.pop(context); // Close loading
 
-      final item = data['toolbox_item'] as Map<String, dynamic>;
+      final item = data['recipe_practice_item'] as Map<String, dynamic>;
       setState(() {
         _tools.insert(0, ToolEntry.fromJson(item));
         _showAddForm = false;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('AI-created tool added to your toolbox!')),
+        const SnackBar(
+          content: Text('AI-created tool added to your saved practices!'),
+        ),
       );
     } catch (e) {
       if (!mounted) return;
@@ -336,16 +340,16 @@ class _WellnessToolboxState extends State<WellnessToolbox> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.construction, size: 64, color: MindNavTokens.gray400),
+            Icon(Icons.construction, size: 64, color: MindRecipeTokens.gray400),
             const SizedBox(height: 12),
             Text(
-              'Your toolbox is empty',
-              style: MindNavTokens.headlineMedium(context),
+              'Your Saved practices are empty',
+              style: MindRecipeTokens.headlineMedium(context),
             ),
             const SizedBox(height: 4),
             Text(
               'Add practices you discover to track what works for you.',
-              style: MindNavTokens.bodyMedium(context),
+              style: MindRecipeTokens.bodyMedium(context),
               textAlign: TextAlign.center,
             ),
           ],
@@ -371,7 +375,7 @@ class _WellnessToolboxState extends State<WellnessToolbox> {
     String practiceContext,
   ) async {
     try {
-      final record = await _api.recordToolboxPractice(
+      final record = await _api.recordRecipePracticePractice(
         token: _token,
         itemId: tool.id,
         effectiveness: rating,
@@ -388,7 +392,7 @@ class _WellnessToolboxState extends State<WellnessToolbox> {
 
   Future<void> _toggleFavorite(ToolEntry tool) async {
     try {
-      final record = await _api.setToolboxFavorite(
+      final record = await _api.setRecipePracticeFavorite(
         token: _token,
         itemId: tool.id,
         favorite: !tool.isFavorite,
@@ -401,7 +405,7 @@ class _WellnessToolboxState extends State<WellnessToolbox> {
 
   Future<void> _deleteTool(ToolEntry tool) async {
     try {
-      await _api.deleteToolboxItem(token: _token, itemId: tool.id);
+      await _api.deleteRecipePracticeItem(token: _token, itemId: tool.id);
       if (mounted)
         setState(() => _tools.removeWhere((item) => item.id == tool.id));
     } catch (error) {
@@ -531,12 +535,12 @@ class _ToolCardState extends State<_ToolCard> {
                 children: [
                   Icon(
                     t.isFavorite ? Icons.star : Icons.star_border,
-                    color: t.isFavorite ? MindNavTokens.warning : null,
+                    color: t.isFavorite ? MindRecipeTokens.warning : null,
                     size: 20,
                   ),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: Text(t.name, style: MindNavTokens.title(context)),
+                    child: Text(t.name, style: MindRecipeTokens.title(context)),
                   ),
                   IconButton(
                     icon: const Icon(Icons.favorite_border, size: 20),
@@ -552,7 +556,7 @@ class _ToolCardState extends State<_ToolCard> {
                       builder: (ctx) => AlertDialog(
                         title: const Text('Remove practice?'),
                         content: Text(
-                          'Remove "${t.name}" from your toolbox? History will be lost.',
+                          'Remove "${t.name}" from your saved practices? History will be lost.',
                         ),
                         actions: [
                           TextButton(
@@ -578,7 +582,7 @@ class _ToolCardState extends State<_ToolCard> {
                   padding: const EdgeInsets.only(top: 4, bottom: 8),
                   child: Text(
                     t.description,
-                    style: MindNavTokens.bodySmall(context),
+                    style: MindRecipeTokens.bodySmall(context),
                   ),
                 ),
               Wrap(
@@ -620,13 +624,13 @@ class _ToolCardState extends State<_ToolCard> {
                           ? Icons.circle
                           : Icons.circle_outlined,
                       size: 12,
-                      color: MindNavTokens.primary,
+                      color: MindRecipeTokens.primary,
                     ),
                   ),
                 ),
                 Text(
                   'Avg effectiveness: ${t.avgEffectiveness.toStringAsFixed(1)}/5',
-                  style: MindNavTokens.bodySmall(context),
+                  style: MindRecipeTokens.bodySmall(context),
                 ),
               ],
               const SizedBox(height: 8),
@@ -643,7 +647,7 @@ class _ToolCardState extends State<_ToolCard> {
                     Icon(
                       Icons.accessibility_new,
                       size: 16,
-                      color: MindNavTokens.primary,
+                      color: MindRecipeTokens.primary,
                     ),
                 ],
               ),
@@ -662,7 +666,7 @@ class _ToolCardState extends State<_ToolCard> {
         children: [
           Text(
             'How effective was this?',
-            style: MindNavTokens.bodySmall(context),
+            style: MindRecipeTokens.bodySmall(context),
           ),
           Slider(
             value: _rating.toDouble(),
@@ -671,7 +675,7 @@ class _ToolCardState extends State<_ToolCard> {
             divisions: 4,
             label: '$_rating',
             onChanged: (v) => setState(() => _rating = v.round()),
-            activeColor: MindNavTokens.primary,
+            activeColor: MindRecipeTokens.primary,
           ),
           TextField(
             controller: _practiceContext,
