@@ -23,8 +23,11 @@ enum NavStep {
 }
 
 class DailyNavigation extends StatefulWidget {
-  const DailyNavigation({super.key, required this.onComplete, required this.onSeePulse});
+  const DailyNavigation({super.key, required this.onComplete, required this.onSeePulse, this.syncSummary = ''});
   final VoidCallback onComplete;
+
+  /// Live activity summary shown on the greeting step (chat ↔ nav sync).
+  final String syncSummary;
 
   /// Fires after the completion confirmation — lands the member on Pulse.
   final VoidCallback onSeePulse;
@@ -150,7 +153,10 @@ class _DailyNavigationState extends State<DailyNavigation> {
 
   Widget _buildCurrentStep() {
     return switch (_current) {
-      NavStep.greeting => _GreetingStep(onContinue: _advance),
+      NavStep.greeting => _GreetingStep(
+            onContinue: _advance,
+            syncSummary: widget.syncSummary,
+          ),
       NavStep.consent => _ConsentStep(
           consentGiven: _consentGiven,
           cloudOptIn: _cloudOptIn,
@@ -244,8 +250,9 @@ class _DailyNavigationState extends State<DailyNavigation> {
 // ── Step widgets ───────────────────────────────────────────────────
 
 class _GreetingStep extends StatelessWidget {
-  const _GreetingStep({required this.onContinue});
+  const _GreetingStep({required this.onContinue, this.syncSummary = ''});
   final VoidCallback onContinue;
+  final String syncSummary;
   @override
   Widget build(BuildContext context) => Semantics(
     label: 'Mind Recipe greeting. Tap to begin your daily navigation.',
@@ -267,6 +274,21 @@ class _GreetingStep extends StatelessWidget {
               style: MindRecipeTokens.bodyMedium(context),
               textAlign: TextAlign.center,
             ),
+            if (syncSummary.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: MindRecipeTokens.primary.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  syncSummary,
+                  textAlign: TextAlign.center,
+                  style: MindRecipeTokens.bodySmall(context),
+                ),
+              ),
+            ],
             const SizedBox(height: 24),
             FilledButton.icon(
               onPressed: onContinue,

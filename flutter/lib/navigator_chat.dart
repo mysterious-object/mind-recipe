@@ -27,7 +27,12 @@ class NavigatorChatExperience extends StatefulWidget {
     required this.appState,
     required this.messages,
     this.localInference,
+    required this.onStartDailyNav,
   });
+
+  /// Opens the manual daily-navigation flow; completion syncs back into
+  /// this thread and the Pulse tab.
+  final VoidCallback onStartDailyNav;
 
   final CheckInState state;
   final VoidCallback onChanged;
@@ -779,6 +784,13 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
               child: Row(children: [
+                OutlinedButton.icon(
+                  onPressed: widget.onStartDailyNav,
+                  icon: const Icon(Icons.route_rounded, size: 16),
+                  label: const Text('Daily nav', style: TextStyle(fontSize: 12)),
+                  style: OutlinedButton.styleFrom(visualDensity: VisualDensity.compact),
+                ),
+                const SizedBox(width: 8),
                 OutlinedButton.icon(
                   onPressed: widget.messages.isEmpty ? null : _saveCurrentThread,
                   icon: const Icon(Icons.bookmark_add_outlined, size: 16),

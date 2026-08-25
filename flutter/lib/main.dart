@@ -178,7 +178,6 @@ class MemberHome extends StatefulWidget {
 class _MemberHomeState extends State<MemberHome> {
   int index = 0;
   int previousIndex = 0;
-  bool useStructuredNav = false;
   final checkIn = CheckInState();
   final tools = <String>{};
   final chatMessages = <ChatMessage>[];
@@ -292,6 +291,51 @@ class _MemberHomeState extends State<MemberHome> {
     }
   }
 
+  /// Daily navigation stays manual — launched from the chat header — and
+  /// stays in sync: completion records the pulse, posts a status message
+  /// into this thread, and lands on the Pulse tab.
+  Future<void> _showDailyNav() async {
+    final pulses = await widget.appState.loadMoodPulses();
+    final lastPulse = pulses.isEmpty
+        ? null
+        : DateTime.tryParse(pulses.last['t']?.toString() ?? '');
+    final lastPulseText = lastPulse == null
+        ? 'no pulse yet'
+        : 'last pulse ${DateTime.now().difference(lastPulse).inHours}h ago';
+    final summary =
+        'Today: ${widget.appState.navigationSessions} navigation(s) · '
+        '${widget.appState.messagesSent} chat messages · $lastPulseText';
+    if (!mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => DailyNavigation(
+          syncSummary: summary,
+          onSeePulse: () {
+            Navigator.of(context).pop();
+            goToPage(2);
+          },
+          onComplete: () {
+            widget.appState.recordAssistantMessage(startsSession: true);
+            widget.appState.recordAiReflection();
+            final mood = MoodState.fromCheckIn(checkIn);
+            widget.appState.recordMoodPulse(
+              valence: mood.valence,
+              activation: mood.activation,
+              source: 'navigation',
+            );
+            chatMessages.add(
+              const ChatMessage(
+                role: ChatRole.status,
+                text: 'Daily navigation complete — your pulse was updated.',
+              ),
+            );
+            setState(() {});
+          },
+        ),
+      ),
+    );
+  }
+
   void _onRecipeAskNavigator(String prompt, String response) {
     setState(() {
       chatMessages.add(ChatMessage(role: ChatRole.member, text: prompt));
@@ -307,30 +351,14 @@ class _MemberHomeState extends State<MemberHome> {
   Widget build(BuildContext context) {
     final screens = [
       _KeepAlivePage(
-        child: useStructuredNav
-            ? DailyNavigation(
-                onSeePulse: () => goToPage(2),
-                onComplete: () {
-                  widget.appState.recordAssistantMessage(startsSession: true);
-                  widget.appState.recordAiReflection();
-                  // Steps navigation feeds Pulse: derive valence/activation
-                  // from this check-in and log a pulse point.
-                  final mood = MoodState.fromCheckIn(checkIn);
-                  widget.appState.recordMoodPulse(
-                    valence: mood.valence,
-                    activation: mood.activation,
-                    source: 'navigation',
-                  );
-                  setState(() {});
-                },
-              )
-            : NavigatorChatExperience(
-                state: checkIn,
-                onChanged: () => setState(() {}),
-                api: widget.api,
-                appState: widget.appState,
-                messages: chatMessages,
-              ),
+        child: NavigatorChatExperience(
+          state: checkIn,
+          onChanged: () => setState(() {}),
+          api: widget.api,
+          appState: widget.appState,
+          messages: chatMessages,
+          onStartDailyNav: _showDailyNav,
+        ),
       ),
       _KeepAlivePage(child: RecipesScreen(api: widget.api, appState: widget.appState, onAskNavigator: _onRecipeAskNavigator)),
       _KeepAlivePage(
@@ -386,24 +414,6 @@ class _MemberHomeState extends State<MemberHome> {
             child: Column(
               children: [
                 const PrivateModelDownloadBanner(),
-                if (index == 0)
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 2),
-                    child: Row(
-                      children: [
-                        SegmentedButton<bool>(
-                          segments: const [
-                            ButtonSegment(value: false, label: Text('Chat'), icon: Icon(Icons.chat_bubble_rounded, size: 18)),
-                            ButtonSegment(value: true, label: Text('Steps'), icon: Icon(Icons.view_list_rounded, size: 18)),
-                          ],
-                          selected: {useStructuredNav},
-                          onSelectionChanged: (v) => setState(() => useStructuredNav = v.first),
-                          style: const ButtonStyle(visualDensity: VisualDensity.compact),
-                          showSelectedIcon: false,
-                        ),
-                      ],
-                    ),
-                  ),
                 Expanded(
                   child: Stack(
                     children: [
@@ -492,6 +502,7 @@ class _MemberHomeState extends State<MemberHome> {
                                       onPressed: () async {
                                         await VoiceInterface().stopSpeaking();
                                         await VoiceInterface().stopListening();
+                                        setState(() => _lastAssistantSnippet = null);
                                       },
                                     ),
                                     const Icon(Icons.chevron_right_rounded, size: 18),
