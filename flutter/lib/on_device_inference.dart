@@ -726,16 +726,18 @@ class OnDeviceInference implements LocalInference {
       if ((device.totalMemoryMiB ?? 8192) < 6144) nCtx = 2048;
     } catch (_) {}
 
-    // Load ladder: some devices' GPU drivers fail mid-init instead of
-    // falling back cleanly — retry without GPU, then with a smaller window.
+    // Load ladder: GPU first, then progressively conservative CPU configs.
+    // The final attempt drops flash attention + q8_0 KV — the most common
+    // cause of init failures on older CPU backends.
     final attempts = [
-      ('GPU accelerated', 99, nCtx),
-      ('CPU', 0, nCtx),
-      ('CPU · reduced memory', 0, 1536),
+      ('GPU accelerated', 99, nCtx, LlamaFlashAttnType.enabled, LlamaKvCacheType.q8_0),
+      ('CPU', 0, nCtx, LlamaFlashAttnType.enabled, LlamaKvCacheType.q8_0),
+      ('CPU · conservative', 0, nCtx, LlamaFlashAttnType.disabled, LlamaKvCacheType.f16),
+      ('CPU · reduced memory', 0, 1536, LlamaFlashAttnType.disabled, LlamaKvCacheType.f16),
     ];
     Object? lastError;
     for (var i = 0; i < attempts.length; i++) {
-      final (label, gpuLayers, ctx) = attempts[i];
+      final (label, gpuLayers, ctx, flash, kvType) = attempts[i];
       try {
         final model = ModelParams()
           ..nGpuLayers = gpuLayers
@@ -749,9 +751,9 @@ class OnDeviceInference implements LocalInference {
           ..nThreads = 4
           ..nThreadsBatch = 4
           ..nPredict = 512
-          ..flashAttention = LlamaFlashAttnType.enabled
-          ..typeK = LlamaKvCacheType.q8_0
-          ..typeV = LlamaKvCacheType.q8_0;
+          ..flashAttention = flash
+          ..typeK = kvType
+          ..typeV = kvType;
         final sampler = SamplerParams()
           ..temp = 0.75
           ..topK = 30
@@ -783,9 +785,9 @@ class OnDeviceInference implements LocalInference {
       }
     }
     throw StateError(
-      'The private model could not start on this device '
-      '(tried GPU and CPU modes). Free up memory and try again. '
-      'Last error: ${_friendlyError(lastError)}',
+      'The private model could not start on this device after trying '
+      'GPU and three CPU configurations. Restart the phone and try once '
+      'more — if it still fails, this device cannot run the model.',
     );
   }
 

@@ -795,6 +795,11 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
               localReady: _localSnapshot.isReady,
               thinking: sending,
               turn: turn,
+              cloudAiEnabled: widget.appState.cloudAiEnabled,
+              onToggleCloudAi: (v) async {
+                await widget.appState.setCloudAiEnabled(v);
+                if (mounted) setState(() {});
+              },
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
@@ -803,12 +808,6 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
                 runSpacing: 6,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  OutlinedButton.icon(
-                    onPressed: widget.onStartDailyNav,
-                    icon: const Icon(Icons.route_rounded, size: 16),
-                    label: const Text('Daily nav', style: TextStyle(fontSize: 12)),
-                    style: OutlinedButton.styleFrom(visualDensity: VisualDensity.compact),
-                  ),
                   OutlinedButton.icon(
                     onPressed: widget.messages.isEmpty ? null : _saveCurrentThread,
                     icon: const Icon(Icons.bookmark_add_outlined, size: 16),
@@ -821,18 +820,6 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
                     label: Text('Saved (${_savedThreads.length})', style: const TextStyle(fontSize: 12)),
                     style: OutlinedButton.styleFrom(visualDensity: VisualDensity.compact),
                   ),
-                  // Cloud consent lives here, on the chat page — no Steps detour.
-                  SwitchListTile.adaptive(
-                    value: widget.appState.cloudAiEnabled,
-                    onChanged: (v) async {
-                      await widget.appState.setCloudAiEnabled(v);
-                    if (mounted) setState(() {});
-                  },
-                  title: const Text('Cloud AI', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
-                  subtitle: const Text('Optional · journal excluded', style: TextStyle(fontSize: 11)),
-                  contentPadding: EdgeInsets.zero,
-                  dense: true,
-                ),
                 if (widget.messages.isNotEmpty)
                   IconButton(
                     icon: const Icon(Icons.delete_sweep_outlined, size: 18),
@@ -1003,12 +990,16 @@ class _PresenceHeader extends StatelessWidget {
     required this.localReady,
     required this.thinking,
     required this.turn,
+    required this.cloudAiEnabled,
+    required this.onToggleCloudAi,
   });
   final Animation<double> animation;
   final bool cloudAvailable;
   final bool localReady;
   final bool thinking;
   final int turn;
+  final bool cloudAiEnabled;
+  final ValueChanged<bool> onToggleCloudAi;
 
   @override
   Widget build(BuildContext context) => Container(
@@ -1065,6 +1056,26 @@ class _PresenceHeader extends StatelessWidget {
                     ? 'Cloud guidance ready · consent required per conversation'
                     : 'Private model not installed · cloud unavailable',
                 style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  Transform.scale(
+                    scale: 0.7,
+                    child: Switch.adaptive(
+                      value: cloudAiEnabled,
+                      onChanged: onToggleCloudAi,
+                    ),
+                  ),
+                  const SizedBox(width: 2),
+                  Text(
+                    'Cloud AI',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
+                ],
               ),
             ],
           ),
