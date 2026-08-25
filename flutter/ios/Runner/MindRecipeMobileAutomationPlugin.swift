@@ -96,7 +96,7 @@ public class MindRecipeMobileAutomationPlugin: NSObject, FlutterPlugin {
                 }
             }
             return
-        } else if status == .authorized || status == .fullAccess {
+        } else if status == .authorized || (status == .fullAccess && #available(iOS 17.0, *)) {
             insertEvent(title: title, start: start, end: end, description: description, location: location, allDay: allDay, alarmMinutes: alarmMinutes?.intValue, result: result)
             return
         } else {
@@ -189,7 +189,7 @@ public class MindRecipeMobileAutomationPlugin: NSObject, FlutterPlugin {
                 }
             }
             return
-        } else if status == .authorized || status == .fullAccess {
+        } else if status == .authorized || (status == .fullAccess && #available(iOS 17.0, *)) {
             insertReminder(title: title, dueDate: dueDate, notes: notes, alarmMinutes: alarmMinutes?.intValue, result: result)
         } else {
             fallbackOpenReminders(payload: args, result: result)
