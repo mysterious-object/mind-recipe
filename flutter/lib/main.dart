@@ -1580,7 +1580,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Choose from 12 chimera-fx backgrounds. They stay subtle and react to swipes.',
+                      'Choose from 12 animated backgrounds. They stay subtle and react to swipes and movement.',
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                     const SizedBox(height: 10),

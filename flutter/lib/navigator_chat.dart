@@ -289,6 +289,21 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
     unawaited(
       widget.appState.recordAssistantMessage(startsSession: startsSession),
     );
+    // Ground the conversation in real navigation data when a session starts.
+    String navigationContext = '';
+    if (startsSession) {
+      try {
+        final lastNav = await widget.appState.lastNavigationSummary();
+        if (lastNav.isNotEmpty) {
+          navigationContext =
+              '\n\n(For context — my latest daily navigation: $lastNav)';
+          if (lastNav.contains('0h ago') || lastNav.contains('1h ago')) {
+            navigationContext +=
+                "\n(I already completed today's daily navigation.)";
+          }
+        }
+      } catch (_) {}
+    }
     widget.onChanged();
     _scrollToEnd();
     unawaited(MindRecipeDeviceHarness().acknowledgeTurn());
@@ -341,7 +356,7 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
       _scrollToEnd();
 
       var reply = await _localInference.infer(
-        plan.augment(text),
+        plan.augment(text) + navigationContext,
         history: priorConversation,
         onToken: onToken,
       );

@@ -575,7 +575,7 @@ class OnDeviceInference implements LocalInference {
         // Keep partial so tab switch / retry can resume via Range.
       }
       _downloadActive = false;
-      _set(LocalInferenceSnapshot(OnDeviceStatus.error, detail: '$error'.replaceFirst('Bad state: ', '')));
+      _set(LocalInferenceSnapshot(OnDeviceStatus.error, detail: _friendlyError(error).replaceFirst('Bad state: ', '')));
       rethrow;
     }
   }
@@ -718,11 +718,6 @@ class OnDeviceInference implements LocalInference {
     // path left by another platform/test isolate so DynamicLibrary.process()
     // is used on iPhone and iPad.
     if (Platform.isIOS) Llama.libraryPath = null;
-    final model = ModelParams()
-      // Offload every layer to the GPU: OpenCL on Adreno/Mali Android,
-      // Metal on iOS. Falls back to CPU silently where no backend exists.
-      ..nGpuLayers = 99
-      ..mainGpu = 0;
     // Low-RAM devices: halve the context window — smaller KV cache, faster
     // prefill, and the trimmed prompt still fits comfortably.
     var nCtx = 4096;
@@ -730,40 +725,81 @@ class OnDeviceInference implements LocalInference {
       final device = await MindRecipeDeviceHarness().capabilities();
       if ((device.totalMemoryMiB ?? 8192) < 6144) nCtx = 2048;
     } catch (_) {}
-    final context = ContextParams()
-      ..nCtx = nCtx
-      ..nBatch = 512
-      ..nUbatch = 512
-      // Performance cores only — little cores add contention and slow
-      // token generation on big.LITTLE phones.
-      ..nThreads = 4
-      ..nThreadsBatch = 4
-      ..nPredict = 512
-      ..flashAttention = LlamaFlashAttnType.enabled
-      ..typeK = LlamaKvCacheType.q8_0
-      ..typeV = LlamaKvCacheType.q8_0;
-    final sampler = SamplerParams()
-      ..temp = 0.75
-      ..topK = 30
-      ..topP = 0.95
-      ..minP = 0.0
-      ..penaltyPresent = 1.7
-      ..penaltyRepeat = 1.18;
-    final parent = LlamaParent(
-      LlamaLoad(
-        path: file.path,
-        modelParams: model,
-        contextParams: context,
-        samplingParams: sampler,
-        verbose: const bool.fromEnvironment('MIND_RECIPE_LOCAL_VERBOSE'),
-      ),
+
+    // Load ladder: some devices' GPU drivers fail mid-init instead of
+    // falling back cleanly — retry without GPU, then with a smaller window.
+    final attempts = [
+      ('GPU accelerated', 99, nCtx),
+      ('CPU', 0, nCtx),
+      ('CPU · reduced memory', 0, 1536),
+    ];
+    Object? lastError;
+    for (var i = 0; i < attempts.length; i++) {
+      final (label, gpuLayers, ctx) = attempts[i];
+      try {
+        final model = ModelParams()
+          ..nGpuLayers = gpuLayers
+          ..mainGpu = 0;
+        final context = ContextParams()
+          ..nCtx = ctx
+          ..nBatch = 512
+          ..nUbatch = 512
+          // Performance cores only — little cores add contention and slow
+          // token generation on big.LITTLE phones.
+          ..nThreads = 4
+          ..nThreadsBatch = 4
+          ..nPredict = 512
+          ..flashAttention = LlamaFlashAttnType.enabled
+          ..typeK = LlamaKvCacheType.q8_0
+          ..typeV = LlamaKvCacheType.q8_0;
+        final sampler = SamplerParams()
+          ..temp = 0.75
+          ..topK = 30
+          ..topP = 0.95
+          ..minP = 0.0
+          ..penaltyPresent = 1.7
+          ..penaltyRepeat = 1.18;
+        final parent = LlamaParent(
+          LlamaLoad(
+            path: file.path,
+            modelParams: model,
+            contextParams: context,
+            samplingParams: sampler,
+            verbose:
+                const bool.fromEnvironment('MIND_RECIPE_LOCAL_VERBOSE'),
+          ),
+        );
+        await _inferLog(
+          'loading engine [$label] for ${file.path} (${await file.length()} bytes)',
+        );
+        await parent.init().timeout(const Duration(seconds: 150));
+        _engine = parent;
+        await _inferLog('engine ready [$label]');
+        return;
+      } catch (error) {
+        lastError = error;
+        await _inferLog('engine load failed [$label]: $error');
+        _disposeEngine();
+      }
+    }
+    throw StateError(
+      'The private model could not start on this device '
+      '(tried GPU and CPU modes). Free up memory and try again. '
+      'Last error: ${_friendlyError(lastError)}',
     );
-    await _inferLog(
-      'loading engine for ${file.path} (${await file.length()} bytes)',
-    );
-    await parent.init().timeout(const Duration(seconds: 150));
-    _engine = parent;
-    await _inferLog('engine ready');
+  }
+
+  /// Strips internal exception noise (repeated LlamaException prefixes,
+  /// absolute file paths) so device-facing errors stay readable.
+  String _friendlyError(Object? error) {
+    var text = '$error';
+    while (text.contains('LlamaException:')) {
+      text = text.replaceFirst('LlamaException:', '').trim();
+    }
+    text = text.replaceFirst('Error loading model:', 'could not load —');
+    final pathIdx = text.indexOf('/data/user/0/');
+    if (pathIdx > 0) text = text.substring(0, pathIdx);
+    return text.isEmpty ? 'unknown engine error' : text;
   }
 
   void _disposeEngine() {
