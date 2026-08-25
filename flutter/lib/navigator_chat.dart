@@ -27,12 +27,12 @@ class NavigatorChatExperience extends StatefulWidget {
     required this.appState,
     required this.messages,
     this.localInference,
-    required this.onStartDailyNav,
+    this.onStartDailyNav,
   });
 
   /// Opens the manual daily-navigation flow; completion syncs back into
   /// this thread and the Pulse tab.
-  final VoidCallback onStartDailyNav;
+  final VoidCallback? onStartDailyNav;
 
   final CheckInState state;
   final VoidCallback onChanged;
@@ -1002,110 +1002,118 @@ class _PresenceHeader extends StatelessWidget {
   final ValueChanged<bool> onToggleCloudAi;
 
   @override
-  Widget build(BuildContext context) => Container(
-    margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-    padding: const EdgeInsets.all(14),
-    decoration: BoxDecoration(
-      color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.82),
-      borderRadius: BorderRadius.circular(28),
-      border: Border.all(
-        color: MindRecipeFxPalette.primary.withValues(alpha: 0.34),
+  Widget build(BuildContext context) {
+    final online = localReady || cloudAvailable;
+    final statusColor = online
+        ? MindRecipeFxPalette.livingGreen
+        : Colors.orange;
+    final statusLabel = localReady ? 'PRIVATE' : cloudAvailable ? 'CLOUD' : 'OFFLINE';
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.82),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: statusColor.withValues(alpha: 0.30),
+        ),
       ),
-      boxShadow: [
-        BoxShadow(
-          color: MindRecipeFxPalette.primary.withValues(alpha: 0.12),
-          blurRadius: 26,
-        ),
-      ],
-    ),
-    child: Row(
-      children: [
-        AnimatedBuilder(
-          animation: animation,
-          builder: (context, child) => Transform.scale(
-            scale: 0.94 + math.sin(animation.value * math.pi * 2) * 0.04,
-            child: child,
-          ),
-          child: ClipOval(
-            child: Image.asset(
-              'assets/branding/navigator-compass.png',
-              width: 58,
-              height: 58,
-              fit: BoxFit.cover,
-            ),
-          ),
-        ),
-        const SizedBox(width: 13),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'NAVIGATOR',
-                style: TextStyle(
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 2.2,
+      child: Row(
+        children: [
+          // Breathing orb — the only visual, no image
+          AnimatedBuilder(
+            animation: animation,
+            builder: (context, _) => Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    statusColor.withValues(alpha: 0.85),
+                    statusColor.withValues(alpha: 0.25),
+                  ],
                 ),
-              ),
-              Text(
-                thinking
-                    ? 'Reading the shape of your words…'
-                    : localReady
-                    ? 'Private guidance ready · stays on this device'
-                    : cloudAvailable
-                    ? 'Cloud guidance ready · consent required per conversation'
-                    : 'Private model not installed · cloud unavailable',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              const SizedBox(height: 6),
-              Row(
-                children: [
-                  Transform.scale(
-                    scale: 0.7,
-                    child: Switch.adaptive(
-                      value: cloudAiEnabled,
-                      onChanged: onToggleCloudAi,
-                    ),
-                  ),
-                  const SizedBox(width: 2),
-                  Text(
-                    'Cloud AI',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                        ),
+                boxShadow: [
+                  BoxShadow(
+                    color: statusColor.withValues(
+                        alpha: 0.30 + math.sin(animation.value * math.pi * 2) * 0.10),
+                    blurRadius: 16,
                   ),
                 ],
               ),
-            ],
-          ),
-        ),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: BoxDecoration(
-            color:
-                ((localReady || cloudAvailable)
-                        ? MindRecipeFxPalette.livingGreen
-                        : Colors.orange)
-                    .withValues(alpha: 0.14),
-            borderRadius: BorderRadius.circular(99),
-          ),
-          child: Text(
-            localReady
-                ? 'PRIVATE'
-                : cloudAvailable
-                ? 'CLOUD'
-                : 'OFFLINE',
-            style: const TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 1.2,
+              child: Icon(
+                thinking
+                    ? Icons.hourglass_empty_rounded
+                    : localReady
+                        ? Icons.shield_rounded
+                        : cloudAvailable
+                            ? Icons.cloud_rounded
+                            : Icons.cloud_off_rounded,
+                size: 22,
+                color: Colors.white,
+              ),
             ),
           ),
-        ),
-      ],
-    ),
-  );
+          const SizedBox(width: 12),
+          // Status text
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  thinking
+                      ? 'Thinking…'
+                      : online
+                          ? 'Navigator online'
+                          : 'Navigator offline',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                  ),
+                ),
+                Text(
+                  localReady
+                      ? 'Private · on device'
+                      : cloudAvailable
+                          ? 'Cloud · connected'
+                          : 'Tap Cloud AI to connect',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 11.5),
+                ),
+              ],
+            ),
+          ),
+          // Status pill
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: statusColor.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(99),
+            ),
+            child: Text(
+              statusLabel,
+              style: TextStyle(
+                fontSize: 9,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 1,
+                color: statusColor,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          // Compact cloud toggle
+          Transform.scale(
+            scale: 0.65,
+            child: Switch.adaptive(
+              value: cloudAiEnabled,
+              onChanged: onToggleCloudAi,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _ChatBubble extends StatelessWidget {

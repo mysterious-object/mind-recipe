@@ -183,17 +183,17 @@ class _MemberHomeState extends State<MemberHome> {
   final tools = <String>{};
   final chatMessages = <ChatMessage>[];
   final labels = const [
+    'Daily Nav',
     'Navigator',
     'Recipes',
-    'Daily Nav',
     'Pulse',
     'Booking',
     'Settings',
   ];
   final icons = const [
-    Icons.explore_rounded, // Compass brand (closest material; replaced by ImageIcon below on desktop)
-    Icons.menu_book,
     Icons.route_rounded,
+    Icons.explore_rounded,
+    Icons.menu_book,
     Icons.monitor_heart,
     Icons.calendar_month,
     Icons.settings,
@@ -356,7 +356,7 @@ class _MemberHomeState extends State<MemberHome> {
       chatMessages.add(ChatMessage(role: ChatRole.member, text: prompt));
       chatMessages.add(ChatMessage(role: ChatRole.assistant, text: response, localGenerated: true));
     });
-    goToPage(0);
+    goToPage(1);
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Added to Navigator — continue the conversation there')),
     );
@@ -365,17 +365,6 @@ class _MemberHomeState extends State<MemberHome> {
   @override
   Widget build(BuildContext context) {
     final screens = [
-      _KeepAlivePage(
-        child: NavigatorChatExperience(
-          state: checkIn,
-          onChanged: () => setState(() {}),
-          api: widget.api,
-          appState: widget.appState,
-          messages: chatMessages,
-          onStartDailyNav: _showDailyNav,
-        ),
-      ),
-      _KeepAlivePage(child: RecipesScreen(api: widget.api, appState: widget.appState, onAskNavigator: _onRecipeAskNavigator)),
       _KeepAlivePage(
         child: DailyNavigation(
           appState: widget.appState,
@@ -401,6 +390,16 @@ class _MemberHomeState extends State<MemberHome> {
         ),
       ),
       _KeepAlivePage(
+        child: NavigatorChatExperience(
+          state: checkIn,
+          onChanged: () => setState(() {}),
+          api: widget.api,
+          appState: widget.appState,
+          messages: chatMessages,
+        ),
+      ),
+      _KeepAlivePage(child: RecipesScreen(api: widget.api, appState: widget.appState, onAskNavigator: _onRecipeAskNavigator)),
+      _KeepAlivePage(
         child: PulseScreen(
           checkIn: checkIn,
           appState: widget.appState,
@@ -408,7 +407,7 @@ class _MemberHomeState extends State<MemberHome> {
             setState(() {
               chatMessages.add(ChatMessage(role: ChatRole.member, text: message));
             });
-            goToPage(0);
+            goToPage(1);
           },
         ),
       ),
