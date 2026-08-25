@@ -23,6 +23,11 @@ import EventKit
 
 public class MindRecipeMobileAutomationPlugin: NSObject, FlutterPlugin {
     private let eventStore = EKEventStore()
+    private static var fullAccessAvailable: Bool {
+        if #available(iOS 17.0, *) { return true }
+        return false
+    }
+
     private static let channelName = "contextfield.mindrecipe/mobile_automation"
 
     public static func register(with registrar: FlutterPluginRegistrar) {
@@ -96,7 +101,7 @@ public class MindRecipeMobileAutomationPlugin: NSObject, FlutterPlugin {
                 }
             }
             return
-        } else if status == .authorized || (status == .fullAccess && #available(iOS 17.0, *)) {
+        } else if status == .authorized || (status == .fullAccess && Self.fullAccessAvailable) {
             insertEvent(title: title, start: start, end: end, description: description, location: location, allDay: allDay, alarmMinutes: alarmMinutes?.intValue, result: result)
             return
         } else {
@@ -189,7 +194,7 @@ public class MindRecipeMobileAutomationPlugin: NSObject, FlutterPlugin {
                 }
             }
             return
-        } else if status == .authorized || (status == .fullAccess && #available(iOS 17.0, *)) {
+        } else if status == .authorized || (status == .fullAccess && Self.fullAccessAvailable) {
             insertReminder(title: title, dueDate: dueDate, notes: notes, alarmMinutes: alarmMinutes?.intValue, result: result)
         } else {
             fallbackOpenReminders(payload: args, result: result)
