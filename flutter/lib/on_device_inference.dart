@@ -796,7 +796,7 @@ class OnDeviceInference implements LocalInference {
   String _friendlyError(Object? error) {
     var text = '$error';
     // Strip Dart/Flutter state prefixes that leak into UI.
-    text = text.replaceFirst('Bad state: ', '');
+    text = text.replaceAll(RegExp(r'^(Bad state: |StateError: )'), '');
     while (text.contains('LlamaException:')) {
       text = text.replaceFirst('LlamaException:', '').trim();
     }

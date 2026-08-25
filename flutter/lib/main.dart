@@ -184,6 +184,7 @@ class _MemberHomeState extends State<MemberHome> {
   final labels = const [
     'Navigator',
     'Recipes',
+    'Daily Nav',
     'Pulse',
     'Booking',
     'Settings',
@@ -191,6 +192,7 @@ class _MemberHomeState extends State<MemberHome> {
   final icons = const [
     Icons.explore_rounded, // Compass brand (closest material; replaced by ImageIcon below on desktop)
     Icons.menu_book,
+    Icons.route_rounded,
     Icons.monitor_heart,
     Icons.calendar_month,
     Icons.settings,
@@ -373,6 +375,30 @@ class _MemberHomeState extends State<MemberHome> {
         ),
       ),
       _KeepAlivePage(child: RecipesScreen(api: widget.api, appState: widget.appState, onAskNavigator: _onRecipeAskNavigator)),
+      _KeepAlivePage(
+        child: DailyNavigation(
+          appState: widget.appState,
+          syncSummary: '',
+          onSeePulse: () => goToPage(3),
+          onComplete: () {
+            widget.appState.recordAssistantMessage(startsSession: true);
+            widget.appState.recordAiReflection();
+            final mood = MoodState.fromCheckIn(checkIn);
+            widget.appState.recordMoodPulse(
+              valence: mood.valence,
+              activation: mood.activation,
+              source: 'navigation',
+            );
+            chatMessages.add(
+              const ChatMessage(
+                role: ChatRole.status,
+                text: 'Daily navigation complete — your pulse was updated.',
+              ),
+            );
+            setState(() {});
+          },
+        ),
+      ),
       _KeepAlivePage(
         child: PulseScreen(
           checkIn: checkIn,
