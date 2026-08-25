@@ -779,11 +779,14 @@ class _LessonDetailState extends State<_LessonDetail> {
   bool _useAi = false;
   bool _aiLoading = false;
   String? _aiResponse;
+  bool _navigatorOnline = false;
   final _practiceController = TextEditingController();
   @override
   void initState() {
     super.initState();
     completed = widget.completed;
+    OnDeviceInference.snapshotNotifier.addListener(_updateOnline);
+    _updateOnline();
     // Load persisted reflection for this lesson (stays on device)
     widget.appState.loadLessonReflections().then((all) {
       final saved = all[widget.lesson.id];
@@ -793,8 +796,16 @@ class _LessonDetailState extends State<_LessonDetail> {
     });
   }
 
+  void _updateOnline() {
+    if (!mounted) return;
+    final local = OnDeviceInference.snapshotNotifier.value.isReady;
+    final cloud = widget.appState.cloudAiEnabled && widget.appState.aiAvailable;
+    setState(() => _navigatorOnline = local || cloud);
+  }
+
   @override
   void dispose() {
+    OnDeviceInference.snapshotNotifier.removeListener(_updateOnline);
     // Persist reflection on dispose
     unawaited(widget.appState.saveLessonReflection(widget.lesson.id, _practiceController.text));
     _practiceController.dispose();
@@ -923,15 +934,25 @@ class _LessonDetailState extends State<_LessonDetail> {
                           'Ask Navigator for a brief, private reflection on this lesson. On-device if installed, otherwise cloud if enabled.',
                         ),
                         secondary: const Icon(Icons.auto_awesome_outlined),
-                        value: _useAi,
-                        onChanged: (v) => setState(() => _useAi = v),
+                        value: _useAi && _navigatorOnline,
+                        onChanged: _navigatorOnline
+                            ? (v) => setState(() => _useAi = v)
+                            : null,
                       ),
+                      if (!_navigatorOnline)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            'Navigator is offline — install the private model (Profile) or enable cloud AI to use Ask Navigator.',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.error),
+                          ),
+                        ),
                       if (_useAi) ...[
                         const SizedBox(height: 8),
                         SizedBox(
                           width: double.infinity,
                           child: FilledButton.tonalIcon(
-                            onPressed: _aiLoading ? null : _askNavigator,
+                            onPressed: _navigatorOnline && !_aiLoading ? _askNavigator : null,
                             icon: _aiLoading
                                 ? const SizedBox(
                                     width: 16,

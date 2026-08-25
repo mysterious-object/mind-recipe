@@ -624,6 +624,29 @@ class OnDeviceInference implements LocalInference {
     await removeDownloadedModel(_activeManifest);
   }
 
+  /// Auto-resumes a download interrupted by an app kill: if a `.partial`
+  /// with bytes exists and nothing is active in this process, restart the
+  /// install — it continues from the on-disk bytes via a Range request.
+  Future<void> resumeIfInterrupted() async {
+    if (_downloadActive) return;
+    if (_snapshot.status == OnDeviceStatus.downloading ||
+        _snapshot.status == OnDeviceStatus.verifying) {
+      return;
+    }
+    try {
+      final destination = await _modelFile();
+      final temporary = File('${destination.path}.partial');
+      if (await temporary.exists() && await temporary.length() > 0) {
+        await _inferLog(
+          'auto-resuming interrupted download from ${await temporary.length()} bytes',
+        );
+        await installModel();
+      }
+    } catch (_) {
+      // The member can always start manually from Profile.
+    }
+  }
+
   Future<void> removeDownloadedModel(OnDeviceModelManifest manifest) async {
     final removingActive = manifest.id == _activeManifest.id;
     if (removingActive) _disposeEngine();

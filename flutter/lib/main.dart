@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'dart:io';
+import 'mobile_automation.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'account_gateway.dart';
@@ -188,7 +190,7 @@ class _MemberHomeState extends State<MemberHome> {
     'Settings',
   ];
   final icons = const [
-    Icons.navigation,
+    Icons.explore_rounded,
     Icons.menu_book,
     Icons.monitor_heart,
     Icons.calendar_month,
@@ -310,6 +312,14 @@ class _MemberHomeState extends State<MemberHome> {
                 onComplete: () {
                   widget.appState.recordAssistantMessage(startsSession: true);
                   widget.appState.recordAiReflection();
+                  // Steps navigation feeds Pulse: derive valence/activation
+                  // from this check-in and log a pulse point.
+                  final mood = MoodState.fromCheckIn(checkIn);
+                  widget.appState.recordMoodPulse(
+                    valence: mood.valence,
+                    activation: mood.activation,
+                    source: 'navigation',
+                  );
                   setState(() {});
                 },
               )
@@ -356,22 +366,6 @@ class _MemberHomeState extends State<MemberHome> {
               forward: index >= previousIndex,
             ),
             actions: [
-              // The Chat/Steps switch only exists on the Navigator tab, so the
-              // title keeps full width on every other screen (fixes cramming).
-              if (index == 0)
-                Tooltip(
-                  message: useStructuredNav ? 'Navigator: structured steps' : 'Navigator: free chat',
-                  child: SegmentedButton<bool>(
-                    segments: const [
-                      ButtonSegment(value: false, label: Text('Chat'), icon: Icon(Icons.chat_bubble_rounded, size: 18)),
-                      ButtonSegment(value: true, label: Text('Steps'), icon: Icon(Icons.view_list_rounded, size: 18)),
-                    ],
-                    selected: {useStructuredNav},
-                    onSelectionChanged: (v) => setState(() => useStructuredNav = v.first),
-                    style: ButtonStyle(visualDensity: VisualDensity.compact),
-                    showSelectedIcon: false,
-                  ),
-                ),
               IconButton(
                 icon: Icon(
                   Theme.of(context).brightness == Brightness.dark
@@ -391,6 +385,24 @@ class _MemberHomeState extends State<MemberHome> {
             child: Column(
               children: [
                 const PrivateModelDownloadBanner(),
+                if (index == 0)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 2),
+                    child: Row(
+                      children: [
+                        SegmentedButton<bool>(
+                          segments: const [
+                            ButtonSegment(value: false, label: Text('Chat'), icon: Icon(Icons.chat_bubble_rounded, size: 18)),
+                            ButtonSegment(value: true, label: Text('Steps'), icon: Icon(Icons.view_list_rounded, size: 18)),
+                          ],
+                          selected: {useStructuredNav},
+                          onSelectionChanged: (v) => setState(() => useStructuredNav = v.first),
+                          style: const ButtonStyle(visualDensity: VisualDensity.compact),
+                          showSelectedIcon: false,
+                        ),
+                      ],
+                    ),
+                  ),
                 Expanded(
                   child: Stack(
                     children: [
@@ -444,14 +456,9 @@ class _MemberHomeState extends State<MemberHome> {
                                 padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
                                 child: Row(
                                   children: [
-                                    SizedBox(
-                                      width: 22,
-                                      height: 22,
-                                      child: _voiceIsSpeaking
-                                          ? const CircularProgressIndicator(strokeWidth: 2)
-                                          : _voiceIsListening
-                                              ? const Icon(Icons.mic_rounded, size: 18)
-                                              : const Icon(Icons.chat_bubble_rounded, size: 18),
+                                    MindRecipeOrbBadge(
+                                      size: 26,
+                                      active: _voiceIsSpeaking || _voiceIsListening,
                                     ),
                                     const SizedBox(width: 10),
                                     Expanded(
@@ -571,6 +578,9 @@ class _PrivateModelDownloadBannerState
         // Keep polling for auto-start (refreshStatus is safe now — it won't
         // clobber downloading) so banner appears as soon as download begins
         setState(() => _snap = cur);
+        // A .partial left by a killed session resumes automatically —
+        // the download persists across app restarts.
+        OnDeviceInference().resumeIfInterrupted();
       }
     });
     // Also seed once from refreshStatus in case a .partial already exists
@@ -1063,11 +1073,39 @@ class _ProgressScreenState extends State<ProgressScreen> {
 class BookingScreen extends StatelessWidget {
   const BookingScreen({super.key});
   static const bookingUrl = String.fromEnvironment('BOOKING_URL');
+
+  static const _healthApps = [
+    ('MyChart', 'Health records & visits', 'com.epic.mychart', 'https://apps.apple.com/us/app/mychart/id1040635943', 'https://play.google.com/store/apps/details?id=com.epic.mychart'),
+    ('Down Dog', 'Yoga & movement', 'com.downdogapp', 'https://apps.apple.com/us/app/down-dog-great-yoga-workouts/id1312878494', 'https://play.google.com/store/apps/details?id=com.downdogapp'),
+    ('Insight Timer', 'Meditation & sleep', 'com.spotlightsix.zentimerlite2', 'https://apps.apple.com/us/app/insight-timer-meditation/id337502354', 'https://play.google.com/store/apps/details?id=com.spotlightsix.zentimerlite2'),
+    ('Calm', 'Sleep & calm', 'com.calm.android', 'https://apps.apple.com/us/app/calm/id571800810', 'https://play.google.com/store/apps/details?id=com.calm.android'),
+  ];
+
+  Future<void> _openApp(BuildContext context, String name) async {
+    final auto = MindRecipeMobileAutomation();
+    // Try the native calendar/app surface first; the plugin falls back to
+    // store links when the app is not installed.
+    if (name == 'Calendar') {
+      await auto.openCalendar();
+      return;
+    }
+    final match = _healthApps.firstWhere((a) => a.$1 == name);
+    final result = await auto.setReminder(
+      title: 'Opened from Mind Recipe Booking',
+      notes: '$name — continue in the app if installed.',
+    );
+    if (!result.success && mounted(context)) {
+      final url = Platform.isIOS ? match.$4 : match.$5;
+      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    }
+  }
+
+  static bool mounted(BuildContext context) => context.mounted;
+
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.all(20),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    child: ListView(
       children: [
         const Text(
           'Booking & levels of care',
@@ -1075,37 +1113,54 @@ class BookingScreen extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         const Text(
-          'Booking opens your scheduling provider in a secure external browser. This app does not decide what level of care you need.',
+          'Open your device calendar, or continue in a health app you already use. This app does not decide what level of care you need.',
         ),
         const SizedBox(height: 20),
         FilledButton.icon(
-          onPressed: () async {
-            if (bookingUrl.isEmpty) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Booking is not configured yet.')),
-              );
-              return;
-            }
-            final launched = await launchUrl(
-              Uri.parse(bookingUrl),
-              mode: LaunchMode.externalApplication,
-            );
-            if (!launched && context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Unable to open the booking link.'),
-                ),
-              );
-            }
-          },
-          icon: const Icon(Icons.open_in_new),
-          label: const Text('Open booking calendar'),
+          onPressed: () => _openApp(context, 'Calendar'),
+          icon: const Icon(Icons.calendar_month_rounded),
+          label: const Text('Open device calendar'),
+        ),
+        if (bookingUrl.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          OutlinedButton.icon(
+            onPressed: () => launchUrl(Uri.parse(bookingUrl), mode: LaunchMode.externalApplication),
+            icon: const Icon(Icons.open_in_new_rounded),
+            label: const Text('Open scheduling provider'),
+          ),
+        ],
+        const SizedBox(height: 24),
+        const Text(
+          'CONTINUE IN A HEALTH APP',
+          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, letterSpacing: 1.1),
+        ),
+        const SizedBox(height: 4),
+        const Text(
+          'Pick up where it suits you — appointments, movement, or mind.',
+          style: TextStyle(fontSize: 12.5),
+        ),
+        const SizedBox(height: 10),
+        ..._healthApps.map(
+          (app) => Card(
+            margin: const EdgeInsets.only(bottom: 8),
+            child: ListTile(
+              leading: const Icon(Icons.health_and_safety_rounded),
+              title: Text(app.$1, style: const TextStyle(fontWeight: FontWeight.w700)),
+              subtitle: Text(app.$2),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () => _openApp(context, app.$1),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        const Text(
+          'Wellness support — not diagnosis or emergency care.',
+          style: TextStyle(fontSize: 12),
         ),
       ],
     ),
   );
 }
-
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({
     super.key,

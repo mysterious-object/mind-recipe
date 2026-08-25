@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import 'app_services.dart';
 import 'check_in_state.dart';
+import 'on_device_inference.dart';
 
 /// The Pulse tab — a live "mood ring" driven by the member's check-in state.
 ///
@@ -35,12 +36,15 @@ class _PulseScreenState extends State<PulseScreen>
   late final AnimationController _breath;
   List<Map<String, dynamic>> _pulses = const [];
   bool _logging = false;
+  bool _navigatorOnline = false;
   bool _inBreathWork = false;
   int _breathCycle = 0;
 
   @override
   void initState() {
     super.initState();
+    OnDeviceInference.snapshotNotifier.addListener(_updateOnline);
+    _updateOnline();
     _breath = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 5),
@@ -48,8 +52,16 @@ class _PulseScreenState extends State<PulseScreen>
     _loadAndRecord();
   }
 
+  void _updateOnline() {
+    if (!mounted) return;
+    final local = OnDeviceInference.snapshotNotifier.value.isReady;
+    final cloud = widget.appState.cloudAiEnabled && widget.appState.aiAvailable;
+    setState(() => _navigatorOnline = local || cloud);
+  }
+
   @override
   void dispose() {
+    OnDeviceInference.snapshotNotifier.removeListener(_updateOnline);
     _breath.dispose();
     super.dispose();
   }
@@ -183,9 +195,9 @@ class _PulseScreenState extends State<PulseScreen>
                     const SizedBox(width: 8),
                     Expanded(
                       child: OutlinedButton.icon(
-                        onPressed: _askNavigator,
+                        onPressed: _navigatorOnline ? _askNavigator : null,
                         icon: const Icon(Icons.chat_bubble_outline_rounded),
-                        label: const Text('Ask Navigator'),
+                        label: Text(_navigatorOnline ? 'Ask Navigator' : 'Navigator offline'),
                       ),
                     ),
                   ]),
@@ -354,8 +366,8 @@ class _PulseRing extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 220,
-      height: 220,
+      width: 264,
+      height: 264,
       child: AnimatedBuilder(
         animation: breath,
         builder: (context, _) => CustomPaint(

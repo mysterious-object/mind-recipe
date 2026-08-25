@@ -203,7 +203,7 @@ class _DailyNavigationState extends State<DailyNavigation> {
       padding: const EdgeInsets.all(16),
       child: Row(
         children: [
-          if (_current != NavStep.greeting)
+          if (_current != NavStep.greeting && _current != NavStep.complete)
             OutlinedButton(
               onPressed: _goBack,
               child: const Text('Back'),
@@ -541,7 +541,7 @@ class _CompleteStep extends StatelessWidget {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
-            Text('You can view your progress in the Today tab.',
+            Text('Your pulse has been updated in the Pulse tab.',
               style: MindRecipeTokens.bodySmall(context),
               textAlign: TextAlign.center,
             ),

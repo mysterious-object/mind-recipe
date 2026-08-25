@@ -289,8 +289,115 @@ class _MindRecipeFxBackdropState extends State<MindRecipeFxBackdrop>
   }
 }
 
-class MindRecipePageRail extends StatelessWidget {
-  const MindRecipePageRail({
+/// Compact animated orb — the Navigator's signature mark. Used as the
+/// bubble icon and anywhere a small living presence is needed.
+class MindRecipeOrbBadge extends StatefulWidget {
+  const MindRecipeOrbBadge({
+    super.key,
+    this.size = 24,
+    this.active = false,
+  });
+
+  final double size;
+
+  /// When active (speaking/listening) the orb breathes faster and brighter.
+  final bool active;
+
+  @override
+  State<MindRecipeOrbBadge> createState() => _MindRecipeOrbBadgeState();
+}
+
+class _MindRecipeOrbBadgeState extends State<MindRecipeOrbBadge>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController controller;
+
+  @override
+  void initState() {
+    super.initState();
+    controller = AnimationController(
+      vsync: this,
+      duration: Duration(milliseconds: widget.active ? 1800 : 4200),
+    );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.disableAnimationsOf(context)) {
+      controller.stop();
+      controller.value = 0.4;
+    } else if (!controller.isAnimating) {
+      controller.repeat();
+    }
+  }
+
+  @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => SizedBox.square(
+        dimension: widget.size,
+        child: AnimatedBuilder(
+          animation: controller,
+          builder: (context, _) => CustomPaint(
+            painter: _OrbBadgePainter(
+              t: controller.value,
+              active: widget.active,
+            ),
+          ),
+        ),
+      );
+}
+
+class _OrbBadgePainter extends CustomPainter {
+  const _OrbBadgePainter({required this.t, required this.active});
+
+  final double t;
+  final bool active;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (size.isEmpty) return;
+    final center = size.center(Offset.zero);
+    final base = size.shortestSide * 0.34;
+    final breathe = 1 + math.sin(t * math.pi * 2) * (active ? 0.14 : 0.07);
+    final core = active ? const Color(0xff00e5cc) : const Color(0xff00b399);
+
+    canvas.drawCircle(
+      center,
+      base * 1.7 * breathe,
+      Paint()
+        ..shader = RadialGradient(colors: [
+          core.withValues(alpha: active ? 0.35 : 0.18),
+          core.withValues(alpha: 0),
+        ]).createShader(Rect.fromCircle(center: center, radius: base * 1.7 * breathe)),
+    );
+    canvas.drawCircle(
+      center,
+      base * breathe,
+      Paint()
+        ..shader = RadialGradient(colors: [
+          core.withValues(alpha: 0.95),
+          const Color(0xff7c3aed).withValues(alpha: 0.55),
+          core.withValues(alpha: 0.1),
+        ]).createShader(Rect.fromCircle(center: center, radius: base * breathe)),
+    );
+    canvas.drawCircle(
+      center - Offset(base * 0.22, base * 0.28),
+      base * 0.2 * breathe,
+      Paint()..color = Colors.white.withValues(alpha: 0.35),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _OrbBadgePainter old) =>
+      old.t != t || old.active != active;
+}
+
+class MindRecipePageRail extends StatelessWidget {  const MindRecipePageRail({
     super.key,
     required this.labels,
     required this.icons,
