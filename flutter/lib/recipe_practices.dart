@@ -315,15 +315,14 @@ class _WellnessRecipePracticeState extends State<WellnessRecipePractice> {
       if (!mounted) return;
       Navigator.pop(context); // Close loading
 
-      final item = data['recipe_practice_item'] as Map<String, dynamic>;
-      setState(() {
-        _tools.insert(0, ToolEntry.fromJson(item));
-        _showAddForm = false;
-      });
+      final proposal = data['recipe_proposal'] as Map<String, dynamic>?;
+      setState(() => _showAddForm = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('AI-created tool added to your saved practices!'),
-        ),
+        SnackBar(content: Text(
+          proposal == null
+              ? 'Navigator could not prepare that Recipe.'
+              : 'Navigator drafted “${proposal['name']}”. Review it in your Mind Recipe journey before it is added.',
+        )),
       );
     } catch (e) {
       if (!mounted) return;

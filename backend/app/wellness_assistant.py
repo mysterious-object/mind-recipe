@@ -18,7 +18,7 @@ from .safety import evaluate
 from .sqlite_store import store
 from .navigator_agent import agent
 
-ALLOWED_CONTEXT = {"emotions", "activation", "body_areas", "context_tags", "zone_label", "recipe_practice", "conversation", "curriculum_progress"}
+ALLOWED_CONTEXT = {"emotions", "activation", "body_areas", "context_tags", "zone_label", "recipe_practice", "conversation", "curriculum_progress", "journey", "pulse"}
 
 CURRICULUM_LESSONS = {
     "lesson-1": (1, "Mindfulness"), "lesson-2": (1, "Emotional Data"),
@@ -113,8 +113,14 @@ def build_personalized_prompt(member_id: str, display_name: str = "") -> str:
     if not context:
         context = "This is your first session with this user. Greet them warmly and invite them to share what's present."
 
+    memory_cards = store.list_memory_cards(member_id)
+    approved_memory = "\n".join(
+        f"- {card['kind']}: {card['content']}"
+        for card in memory_cards[:12]
+    ) or "No saved memory cards."
     personalization = (
         f"{greeting}\n## User History\n{context}\n\n"
+        f"## User-approved memory\n{approved_memory}\n\n"
         f"## Instructions\n"
         "Use the supplied history only when it directly helps. Be familiar but not presumptuous. "
         "Never claim to know what the user feels, and do not fabricate a pattern from sparse data."
@@ -468,8 +474,9 @@ async def respond(request: AiRequest, provider_key: Optional[str]) -> AiResponse
     client_history = _client_conversation(
         request.context.get("conversation"), request.text,
     )
-    memory = get_memory(member_id) if member_id else []
-    recent_memory = client_history or (memory[-8:] if len(memory) > 8 else memory)
+    # Raw transcripts are deliberately session-only. Cross-device continuity
+    # comes from editable memory cards, never a hidden transcript archive.
+    recent_memory = client_history
 
     messages = [
         {"role": "system", "content": system_prompt},
@@ -494,10 +501,6 @@ async def respond(request: AiRequest, provider_key: Optional[str]) -> AiResponse
             provider=request.provider,
             model=model,
         )
-
-    if member_id:
-        save_to_memory(member_id, "user", request.text)
-        save_to_memory(member_id, "assistant", message)
 
     return AiResponse(
         mode="cloud_ai",

@@ -247,7 +247,9 @@ class OnDeviceInference implements LocalInference {
   int get _minimumMemoryMiB {
     if (_activeManifest.id == mindRecipePrivateFastModel.id) return 4096;
     if (_activeManifest.id == mindRecipePrivateCompactModel.id) return 6144;
-    return 8192;
+    // The pinned 1.7B weights are unchanged. This budget reflects the
+    // smaller mobile runtime context below, not a hidden model substitution.
+    return 6144;
   }
 
   Future<File> _modelFile([OnDeviceModelManifest? manifest]) async {
@@ -317,7 +319,7 @@ class OnDeviceInference implements LocalInference {
           LocalInferenceSnapshot(
             OnDeviceStatus.error,
             detail:
-                'This device has ${device.totalMemoryMiB} MB of memory. Private reasoning needs at least $_minimumMemoryMiB MB; cloud guidance remains available if you choose it.',
+                'Private AI needs more available memory on this phone. Your private model stays downloaded; you can use structured navigation or choose cloud guidance for this conversation.',
           ),
         );
       }
@@ -593,12 +595,12 @@ class OnDeviceInference implements LocalInference {
       ..nGpuLayers = 0
       ..mainGpu = -1;
     final context = ContextParams()
-      ..nCtx = 2048
-      ..nBatch = 512
-      ..nUbatch = 512
-      ..nThreads = 6
-      ..nThreadsBatch = 6
-      ..nPredict = 220
+      ..nCtx = 1024
+      ..nBatch = 128
+      ..nUbatch = 128
+      ..nThreads = Platform.numberOfProcessors.clamp(2, 4).toInt()
+      ..nThreadsBatch = Platform.numberOfProcessors.clamp(2, 4).toInt()
+      ..nPredict = 160
       ..typeK = LlamaKvCacheType.f16
       ..typeV = LlamaKvCacheType.f16;
     final sampler = SamplerParams()

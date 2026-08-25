@@ -7,7 +7,7 @@ import 'account_gateway.dart';
 import 'app_services.dart';
 import 'check_in_state.dart';
 import 'cinematic_experience.dart';
-import 'daily_navigation.dart';
+import 'adaptive_daily_navigation.dart';
 import 'design_tokens.dart';
 import 'navigator_chat.dart';
 import 'mind_recipe_fx.dart';
@@ -15,6 +15,7 @@ import 'on_device_inference.dart';
 import 'notification_scheduler.dart';
 import 'practitioner_sharing.dart';
 import 'recipes_screen.dart';
+import 'pulse_screen.dart';
 
 void main() => runApp(const MindRecipeApp());
 
@@ -180,16 +181,16 @@ class _MemberHomeState extends State<MemberHome> {
   final chatMessages = <ChatMessage>[];
   final labels = const [
     'Navigator',
-    'Recipes',
-    'Progress',
-    'Booking',
+    'Mind Recipe',
+    'Pulse',
+    'Actions',
     'Settings',
   ];
   final icons = const [
     Icons.navigation,
-    Icons.menu_book,
-    Icons.insights,
-    Icons.calendar_month,
+    Icons.auto_awesome_rounded,
+    Icons.favorite_outline_rounded,
+    Icons.task_alt_rounded,
     Icons.settings,
   ];
   late final PageController pageController;
@@ -268,7 +269,9 @@ class _MemberHomeState extends State<MemberHome> {
   Widget build(BuildContext context) {
     final screens = [
       useStructuredNav
-          ? DailyNavigation(
+          ? AdaptiveDailyNavigation(
+              api: widget.api,
+              appState: widget.appState,
               onComplete: () {
                 widget.appState.recordAssistantMessage(startsSession: true);
                 widget.appState.recordAiReflection();
@@ -283,7 +286,7 @@ class _MemberHomeState extends State<MemberHome> {
               messages: chatMessages,
             ),
       RecipesScreen(api: widget.api, appState: widget.appState),
-      ProgressScreen(checkIn: checkIn, tools: tools),
+      PulseScreen(api: widget.api, appState: widget.appState),
       const BookingScreen(),
       ProfileScreen(
         onPractitioner: widget.onPractitioner,
@@ -383,6 +386,14 @@ class _MemberHomeState extends State<MemberHome> {
             scrollController: railController,
             onSelected: goToPage,
           ),
+          floatingActionButton: index == 0
+              ? null
+              : FloatingActionButton.extended(
+                  heroTag: 'navigator-anywhere',
+                  onPressed: () => goToPage(0),
+                  icon: const Icon(Icons.navigation_rounded),
+                  label: const Text('Ask Navigator'),
+                ),
         );
       },
     );
@@ -1070,6 +1081,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (value != null) await widget.appState.saveProviderKey(value);
   }
 
+  void _openMemory() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => _MemoryScreen(appState: widget.appState),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) => ListView(
     padding: const EdgeInsets.all(20),
@@ -1252,6 +1272,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
             onPressed: configureAi,
             child: Text(widget.appState.hasProviderKey ? 'Manage' : 'Connect'),
           ),
+        ),
+      ),
+      Card(
+        child: ListTile(
+          leading: const Icon(Icons.psychology_alt_outlined),
+          title: const Text('Navigator memory'),
+          subtitle: const Text('Review, pin, edit, or forget the details Navigator can use across devices.'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: _openMemory,
         ),
       ),
       Card(
@@ -1630,5 +1659,64 @@ class _WellnessBoundary extends StatelessWidget {
   Widget build(BuildContext context) => const Text(
     'Mind Recipe supports wellness and self-reflection. It is not therapy, medical care, diagnosis, or emergency response.',
     style: TextStyle(fontSize: 12, color: Colors.black54),
+  );
+}
+
+class _MemoryScreen extends StatefulWidget {
+  const _MemoryScreen({required this.appState});
+  final SecureAppState appState;
+  @override
+  State<_MemoryScreen> createState() => _MemoryScreenState();
+}
+
+class _MemoryScreenState extends State<_MemoryScreen> {
+  List<Map<String, dynamic>> _cards = [];
+  bool _loading = true;
+  @override
+  void initState() { super.initState(); _load(); }
+  Future<void> _load() async {
+    final session = widget.appState.session;
+    if (session == null) return;
+    try { _cards = await MindRecipeApiClient().getMemory(session.token); } catch (_) {}
+    if (mounted) setState(() => _loading = false);
+  }
+  Future<void> _add() async {
+    final controller = TextEditingController();
+    final value = await showDialog<String>(context: context, builder: (context) => AlertDialog(
+      title: const Text('Remember something'),
+      content: TextField(controller: controller, maxLength: 500, decoration: const InputDecoration(hintText: 'For example: I prefer short evening practices.')),
+      actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(context, controller.text), child: const Text('Save'))],
+    ));
+    final session = widget.appState.session;
+    if (value == null || value.trim().isEmpty || session == null) return;
+    try {
+      await MindRecipeApiClient().createMemory(session.token, {'kind': 'preference', 'content': value.trim(), 'pinned': false});
+      await _load();
+    } catch (_) {}
+  }
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('Navigator memory')),
+    floatingActionButton: FloatingActionButton.extended(onPressed: _add, icon: const Icon(Icons.add), label: const Text('Add memory')),
+    body: _loading ? const Center(child: CircularProgressIndicator()) : ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        const Text('Only the notes shown here can guide Navigator across devices. Journal entries and full chat transcripts are not stored as memory.'),
+        const SizedBox(height: 12),
+        if (_cards.isEmpty)
+          const Card(
+            child: Padding(
+              padding: EdgeInsets.all(16),
+              child: Text(
+                'No saved memory yet. Add a preference, goal, or commitment when it is useful.',
+              ),
+            ),
+          ),
+        for (final card in _cards) Card(child: ListTile(
+          leading: Icon(card['pinned'] == true ? Icons.push_pin : Icons.psychology_alt_outlined),
+          title: Text(card['content']?.toString() ?? ''), subtitle: Text(card['kind']?.toString() ?? 'memory'),
+        )),
+      ],
+    ),
   );
 }

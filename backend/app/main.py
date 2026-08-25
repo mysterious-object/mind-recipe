@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+import json
 from typing import List, Optional, Tuple
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Response, status
+from fastapi.responses import StreamingResponse
 
 from .auth import auth_store, issue_token, verify_token
 from .wellness_assistant import managed_provider_available, respond, get_provider_status
@@ -17,6 +19,8 @@ from .models import (
     CurriculumProgress, CurriculumProgressInput,
     TrackerEventInput, TrackerEvent, AppointmentInput, Appointment,
     NotificationPreferenceInput, NotificationPreference, AccountExport,
+    JourneySettings, JourneySettingsInput, RecipeProposal, RecipeProposalInput,
+    RecipeProposalDecision, MemoryCard, MemoryCardInput, MemberEventInput,
 )
 from .sqlite_store import store
 
@@ -191,12 +195,38 @@ async def assistant(
     progress = store.get_curriculum_progress(actor_id)
     if progress is not None:
         assistant_context["curriculum_progress"] = progress
+    assistant_context["journey"] = store.get_journey_settings(actor_id)
+    assistant_context["pulse"] = store.pulse_summary(actor_id)
     result = await respond(
         payload.model_copy(update={"context": assistant_context}),
         x_mind_recipe_provider_key,
     )
     audit(actor_id, "ai_process", "assistant_session", result.mode)
     return result
+
+
+@app.post("/v1/navigator/turn")
+async def navigator_turn(
+    payload: AiRequest,
+    identity: Tuple[str, Role] = Depends(actor),
+    x_mind_recipe_provider_key: Optional[str] = Header(default=None),
+) -> StreamingResponse:
+    """A stable event stream so the app can show progress without waiting on a full reply."""
+    actor_id, _ = identity
+
+    async def events():
+        yield "event: accepted\ndata: {}\n\n"
+        context = dict(payload.context)
+        context["member_id"] = actor_id
+        context["journey"] = store.get_journey_settings(actor_id)
+        context["pulse"] = store.pulse_summary(actor_id)
+        result = await respond(payload.model_copy(update={"context": context}), x_mind_recipe_provider_key)
+        safe = result.model_dump(mode="json")
+        yield f"event: delta\ndata: {json.dumps({'text': safe['message']})}\n\n"
+        yield f"event: done\ndata: {json.dumps(safe)}\n\n"
+        audit(actor_id, "ai_stream", "navigator_turn", result.mode)
+
+    return StreamingResponse(events(), media_type="text/event-stream", headers={"Cache-Control": "no-cache"})
 
 # ── Trends & Patterns ──────────────────────────────────────────
 
@@ -250,6 +280,121 @@ def put_curriculum_progress(
     )
     audit(member_id, "update", "curriculum_progress", payload.curriculum_version)
     return CurriculumProgress(**merged)
+
+
+# ── Personal Journey, memory, and Pulse ────────────────────────────
+
+@app.get("/v1/journey", response_model=JourneySettings)
+def get_journey(identity: Tuple[str, Role] = Depends(actor)) -> JourneySettings:
+    member_id, _ = identity
+    return JourneySettings(**store.get_journey_settings(member_id))
+
+
+@app.put("/v1/journey", response_model=JourneySettings)
+def put_journey(
+    payload: JourneySettingsInput,
+    identity: Tuple[str, Role] = Depends(actor),
+) -> JourneySettings:
+    member_id, role = identity
+    if role != Role.member:
+        raise HTTPException(status_code=403, detail="member role required")
+    result = store.save_journey_settings(member_id, payload.model_dump(mode="json"))
+    audit(member_id, "update", "journey", result["mode"])
+    return JourneySettings(**result)
+
+
+@app.get("/v1/recipes/proposals", response_model=List[RecipeProposal])
+def list_recipe_proposals(identity: Tuple[str, Role] = Depends(actor)) -> List[RecipeProposal]:
+    member_id, _ = identity
+    return [RecipeProposal(**proposal) for proposal in store.get_recipe_proposals(member_id)]
+
+
+@app.post("/v1/recipes/proposals", response_model=RecipeProposal, status_code=status.HTTP_201_CREATED)
+def create_recipe_proposal(
+    payload: RecipeProposalInput,
+    identity: Tuple[str, Role] = Depends(actor),
+) -> RecipeProposal:
+    member_id, role = identity
+    if role != Role.member:
+        raise HTTPException(status_code=403, detail="member role required")
+    proposal = store.create_recipe_proposal(member_id, payload.model_dump(mode="json"))
+    audit(member_id, "propose", "recipe", proposal["id"])
+    return RecipeProposal(**proposal)
+
+
+@app.post("/v1/recipes/proposals/{proposal_id}/decision", response_model=RecipeProposal)
+def decide_recipe_proposal(
+    proposal_id: str,
+    payload: RecipeProposalDecision,
+    identity: Tuple[str, Role] = Depends(actor),
+) -> RecipeProposal:
+    member_id, role = identity
+    if role != Role.member:
+        raise HTTPException(status_code=403, detail="member role required")
+    edits = payload.edits.model_dump(mode="json") if payload.edits else None
+    proposal = store.decide_recipe_proposal(member_id, proposal_id, payload.approved, edits)
+    if not proposal:
+        raise HTTPException(status_code=404, detail="pending recipe proposal not found")
+    if payload.approved:
+        item = RecipePracticeItem(
+            name=proposal["name"], category="Personalized", description="\n".join(proposal["steps"]),
+            accessibility_needs=[], source="navigator-approved", member_id=member_id,
+            discovered_at=datetime.now(timezone.utc),
+        )
+        store.add_recipe_practice_item(item)
+    audit(member_id, "approve" if payload.approved else "decline", "recipe_proposal", proposal_id)
+    return RecipeProposal(**proposal)
+
+
+@app.get("/v1/memory", response_model=List[MemoryCard])
+def list_memory(identity: Tuple[str, Role] = Depends(actor)) -> List[MemoryCard]:
+    member_id, _ = identity
+    return [MemoryCard(**item) for item in store.list_memory_cards(member_id)]
+
+
+@app.post("/v1/memory", response_model=MemoryCard, status_code=status.HTTP_201_CREATED)
+def create_memory(payload: MemoryCardInput, identity: Tuple[str, Role] = Depends(actor)) -> MemoryCard:
+    member_id, _ = identity
+    item = store.save_memory_card(member_id, payload.model_dump())
+    audit(member_id, "create", "memory_card", item["id"])
+    return MemoryCard(**item)
+
+
+@app.put("/v1/memory/{card_id}", response_model=MemoryCard)
+def update_memory(card_id: str, payload: MemoryCardInput, identity: Tuple[str, Role] = Depends(actor)) -> MemoryCard:
+    member_id, _ = identity
+    item = store.save_memory_card(member_id, payload.model_dump(), card_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="memory card not found")
+    audit(member_id, "update", "memory_card", card_id)
+    return MemoryCard(**item)
+
+
+@app.delete("/v1/memory/{card_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_memory(card_id: str, identity: Tuple[str, Role] = Depends(actor)) -> Response:
+    member_id, _ = identity
+    if not store.delete_memory_card(member_id, card_id):
+        raise HTTPException(status_code=404, detail="memory card not found")
+    audit(member_id, "forget", "memory_card", card_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@app.post("/v1/member-events")
+def add_member_events(payload: List[MemberEventInput], identity: Tuple[str, Role] = Depends(actor)) -> dict[str, int]:
+    member_id, role = identity
+    if role != Role.member:
+        raise HTTPException(status_code=403, detail="member role required")
+    added = store.add_member_events(member_id, [
+        {**event.model_dump(mode="json"), "occurred_at": event.occurred_at.isoformat()} for event in payload
+    ])
+    audit(member_id, "ingest", "member_events", str(added))
+    return {"accepted": added}
+
+
+@app.get("/v1/pulse/today")
+def get_pulse(identity: Tuple[str, Role] = Depends(actor)) -> dict[str, object]:
+    member_id, _ = identity
+    return store.pulse_summary(member_id)
 
 
 @app.post("/v1/recipes/practices", response_model=RecipePracticeItem, status_code=status.HTTP_201_CREATED)
@@ -361,17 +506,19 @@ async def ai_create_recipe_practice_item(
         "Reflection" if any(word in lowered for word in ("journal", "reflect", "thought")) else
         "Grounding"
     )
-    item = RecipePracticeItem(
-        name=description[:80].strip().capitalize(),
-        description=guidance,
-        category=category,
-        source="navigator-created",
-        member_id=member_id,
-        discovered_at=datetime.now(timezone.utc),
-    )
-    store.add_recipe_practice_item(item)
-    audit(member_id, "ai_create", "recipe_practice_item", str(item.id))
-    return {"success": True, "recipe_practice_item": item.model_dump(mode="json")}
+    proposal = store.create_recipe_proposal(member_id, {
+        "name": description[:80].strip().capitalize(),
+        "purpose": f"A short {category.lower()} practice tailored to the need you described.",
+        "trigger": description[:300],
+        "duration_minutes": 3,
+        "steps": [line.strip(" 1234567890.") for line in guidance.splitlines() if line.strip()][:6] or [guidance],
+        "evidence_basis": "Reviewed wellness practice; personal adaptation requires your approval.",
+        "cautions": ["Stop or adapt if this does not feel useful."],
+        "rationale": "Navigator drafted this from your request. Review it before it becomes part of your active Recipes.",
+        "source_kind": "navigator_proposal",
+    })
+    audit(member_id, "ai_propose", "recipe_proposal", proposal["id"])
+    return {"success": True, "recipe_proposal": proposal}
 
 
 @app.get("/v1/audit/{actor_id}")

@@ -177,6 +177,8 @@ class _RecipesScreenState extends State<RecipesScreen> {
   String _current = 'lesson-1';
   bool _loading = true;
   bool _savedPractices = false;
+  Map<String, dynamic>? _journey;
+  List<Map<String, dynamic>> _proposals = [];
 
   @override
   void initState() {
@@ -194,11 +196,36 @@ class _RecipesScreenState extends State<RecipesScreen> {
         );
         _apply(_merge(local ?? _payload(), remote));
         await _persist(sync: true);
+        _journey = await widget.api.getJourney(widget.appState.session!.token);
+        _proposals = await widget.api.getRecipeProposals(widget.appState.session!.token);
       } catch (_) {
         /* Offline is a supported state. */
       }
     }
     if (mounted) setState(() => _loading = false);
+  }
+
+  Future<void> _setJourneyMode(String mode) async {
+    final session = widget.appState.session;
+    if (session == null) return;
+    setState(() => _journey = {...?_journey, 'mode': mode});
+    try {
+      final saved = await widget.api.saveJourney(session.token, {
+        'mode': mode,
+        'active_goal': _journey?['active_goal'],
+        'preferred_duration_minutes': _journey?['preferred_duration_minutes'],
+      });
+      if (mounted) setState(() => _journey = saved);
+    } catch (_) {}
+  }
+
+  Future<void> _decideProposal(String id, bool approved) async {
+    final session = widget.appState.session;
+    if (session == null) return;
+    try {
+      await widget.api.decideRecipeProposal(session.token, id, approved: approved);
+      if (mounted) setState(() => _proposals = _proposals.where((item) => item['id'] != id).toList());
+    } catch (_) {}
   }
 
   Map<String, dynamic> _payload() => {
@@ -278,7 +305,10 @@ class _RecipesScreenState extends State<RecipesScreen> {
             child: Align(
               alignment: Alignment.centerLeft,
               child: TextButton.icon(
-                onPressed: () => setState(() => _savedPractices = false),
+                onPressed: () {
+                  setState(() => _savedPractices = false);
+                  unawaited(_load());
+                },
                 icon: const Icon(Icons.menu_book),
                 label: const Text('Back to journey'),
               ),
@@ -333,6 +363,47 @@ class _RecipesScreenState extends State<RecipesScreen> {
           next: next,
           onContinue: () => _open(next),
         ),
+        const SizedBox(height: 12),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Journey style', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+              const SizedBox(height: 4),
+              const Text('Foundations keeps reviewed lessons at the center. Co-created Journey lets Navigator draft new modules for your approval.'),
+              const SizedBox(height: 12),
+              SegmentedButton<String>(
+                segments: const [
+                  ButtonSegment(value: 'guided_foundations', label: Text('Foundations')),
+                  ButtonSegment(value: 'co_created', label: Text('Co-created')),
+                ],
+                selected: {_journey?['mode']?.toString() ?? 'guided_foundations'},
+                onSelectionChanged: (value) => _setJourneyMode(value.first),
+              ),
+              if ((_journey?['recommendation_reason']?.toString() ?? '').isNotEmpty) Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: Text(_journey!['recommendation_reason'].toString(), style: Theme.of(context).textTheme.bodySmall),
+              ),
+            ]),
+          ),
+        ),
+        if (_proposals.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Text('Navigator proposals', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+          const SizedBox(height: 6),
+          for (final proposal in _proposals) Card(child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(proposal['name']?.toString() ?? 'Personalized Recipe', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+              const SizedBox(height: 4), Text(proposal['rationale']?.toString() ?? ''),
+              const SizedBox(height: 8), Text('Why: ${proposal['evidence_basis'] ?? 'Personalized wellness support'}', style: Theme.of(context).textTheme.bodySmall),
+              const SizedBox(height: 8), Wrap(spacing: 8, children: [
+                FilledButton(onPressed: () => _decideProposal(proposal['id'].toString(), true), child: const Text('Add to my Recipes')),
+                TextButton(onPressed: () => _decideProposal(proposal['id'].toString(), false), child: const Text('Not now')),
+              ]),
+            ]),
+          )),
+        ],
         const SizedBox(height: 12),
         OutlinedButton.icon(
           onPressed: () => setState(() => _savedPractices = true),

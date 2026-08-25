@@ -258,12 +258,22 @@ class MindRecipePageRail extends StatelessWidget {
                             AnimatedScale(
                               duration: duration,
                               scale: selected ? 1.08 : 1,
-                              child: Icon(
-                                icons[itemIndex],
-                                color: selected
-                                    ? scheme.onPrimaryContainer
-                                    : scheme.onSurfaceVariant,
-                              ),
+                              child: labels[itemIndex] == 'Mind Recipe'
+                                  ? ClipRRect(
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: Image.asset(
+                                        'assets/branding/mind-recipe-mark.png',
+                                        width: 27,
+                                        height: 27,
+                                        fit: BoxFit.cover,
+                                      ),
+                                    )
+                                  : Icon(
+                                      icons[itemIndex],
+                                      color: selected
+                                          ? scheme.onPrimaryContainer
+                                          : scheme.onSurfaceVariant,
+                                    ),
                             ),
                             Flexible(
                               child: AnimatedSize(
