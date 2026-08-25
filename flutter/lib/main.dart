@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'dart:io';
 import 'mobile_automation.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -1919,6 +1920,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
         onPressed: widget.onSignOut,
         icon: const Icon(Icons.logout),
         label: const Text('Sign out'),
+      ),
+      const SizedBox(height: 8),
+      Center(
+        child: FutureBuilder<PackageInfo>(
+          future: PackageInfo.fromPlatform(),
+          builder: (context, snap) => Text(
+            'Mind Recipe ${snap.data?.version ?? '1.0.0'} (${snap.data?.buildNumber ?? '—'}) · by Context Field',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context)
+                      .textTheme
+                      .bodySmall
+                      ?.color
+                      ?.withValues(alpha: 0.45),
+                ),
+          ),
+        ),
       ),
     ],
   );
