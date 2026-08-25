@@ -304,18 +304,55 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
         messagesSent: widget.appState.messagesSent,
         aiReflections: widget.appState.aiReflections,
       );
+      // Live streaming: the reply renders as the model generates, so the
+      // member sees words within the first second instead of after the
+      // full completion.
+      final placeholderIndex = widget.messages.length;
+      var lastPaint = DateTime.now();
+      void onToken(String token) {
+        if (!mounted || token.isEmpty) return;
+        final now = DateTime.now();
+        if (now.difference(lastPaint).inMilliseconds < 90) return;
+        lastPaint = now;
+        setState(() {
+          if (placeholderIndex < widget.messages.length &&
+              widget.messages[placeholderIndex].role == ChatRole.assistant) {
+            widget.messages[placeholderIndex] = ChatMessage(
+              role: ChatRole.assistant,
+              text: widget.messages[placeholderIndex].text + token,
+              localGenerated: true,
+            );
+          }
+        });
+        _scrollToEnd();
+      }
+
+      setState(() {
+        widget.messages.add(
+          ChatMessage(role: ChatRole.assistant, text: '', localGenerated: true),
+        );
+        _lastMessageSide = 1.0;
+      });
+      _scrollToEnd();
+
       var reply = await _localInference.infer(
         plan.augment(text),
         history: priorConversation,
+        onToken: onToken,
       );
       // Anti-loop guard: if the reply mostly repeats the previous Navigator
       // turn ("consider the next step…" circles), retry ONCE with an explicit
       // variation instruction so the model moves somewhere new.
       if (reply != null && _isRepetitiveOfLastAssistant(reply)) {
         await _log('REPETITION detected — retrying with variation nudge');
+        if (mounted && placeholderIndex < widget.messages.length) {
+          setState(() => widget.messages[placeholderIndex] =
+              ChatMessage(role: ChatRole.assistant, text: '', localGenerated: true));
+        }
         reply = await _localInference.infer(
           '${plan.augment(text)}\n\nImportant: your previous reply repeated what you already said. Respond with ONE concrete, different suggestion or question you have not used in this conversation. Reference the member\'s latest words specifically.',
           history: priorConversation,
+          onToken: onToken,
         );
       }
       // Fallback ladder: a null reply usually means the full prompt
@@ -329,13 +366,30 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
           history: priorConversation.length > 2
               ? priorConversation.sublist(priorConversation.length - 2)
               : priorConversation,
+          onToken: onToken,
         );
       }
       if (reply == null || reply.trim().isEmpty) {
         await _log('FALLBACK: retrying with bare prompt');
-        reply = await _localInference.infer(text);
+        reply = await _localInference.infer(text, onToken: onToken);
       }
-      final replyToUse = reply;
+      // If the model streamed words but the final clean text came back
+      // empty, the streamed text itself is the reply.
+      var replyToUse = reply;
+      if (replyToUse == null &&
+          placeholderIndex < widget.messages.length &&
+          widget.messages[placeholderIndex].role == ChatRole.assistant &&
+          widget.messages[placeholderIndex].text.trim().length >= 8) {
+        replyToUse = widget.messages[placeholderIndex].text.trim();
+      }
+      void removePlaceholder() {
+        if (mounted &&
+            placeholderIndex < widget.messages.length &&
+            widget.messages[placeholderIndex].role == ChatRole.assistant &&
+            widget.messages[placeholderIndex].text.isEmpty) {
+          widget.messages.removeAt(placeholderIndex);
+        }
+      }
       await _log(
         'REPLY null=${replyToUse == null} len=${replyToUse?.length ?? 0} preview="${replyToUse?.substring(0, replyToUse != null && replyToUse.length > 100 ? 100 : replyToUse?.length ?? 0)}"',
       );
@@ -344,15 +398,25 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
       // Phone-harness intent detection — offer a consent-gated action card
       // whenever the member's message maps to a reminder/appointment/alarm.
       final phoneAction = _phoneActionParser.parse(text);
-      if (replyToUse != null && mounted && localReplyUseful) {
+      final replyFinal = replyToUse;
+      if (replyFinal != null && mounted && localReplyUseful) {
         setState(() {
-          widget.messages.add(
-            ChatMessage(
+          if (placeholderIndex < widget.messages.length &&
+              widget.messages[placeholderIndex].role == ChatRole.assistant) {
+            widget.messages[placeholderIndex] = ChatMessage(
               role: ChatRole.assistant,
-              text: replyToUse,
+              text: replyFinal,
               localGenerated: true,
-            ),
-          );
+            );
+          } else {
+            widget.messages.add(
+              ChatMessage(
+                role: ChatRole.assistant,
+                text: replyFinal,
+                localGenerated: true,
+              ),
+            );
+          }
           _lastMessageSide = 1.0;
           sending = false;
           _pendingPhoneAction = phoneAction;
@@ -361,11 +425,12 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
         widget.onChanged();
         _scrollToEnd();
         if (_voiceConversationEnabled) {
-          await _speakAndResume(replyToUse);
+          await _speakAndResume(replyFinal);
         }
         return;
       }
       if (mounted && !localReplyUseful) {
+        removePlaceholder();
         setState(
           () => widget.messages.add(
             ChatMessage(

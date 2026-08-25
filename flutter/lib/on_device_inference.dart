@@ -57,6 +57,7 @@ abstract class LocalInference {
   Future<String?> infer(
     String userMessage, {
     List<LocalConversationTurn> history = const [],
+    void Function(String token)? onToken,
   });
   Future<void> removeModel();
 }
@@ -583,6 +584,7 @@ class OnDeviceInference implements LocalInference {
   Future<String?> infer(
     String userMessage, {
     List<LocalConversationTurn> history = const [],
+    void Function(String token)? onToken,
   }) async {
     // Use the broadcast snapshot — refreshStatus() here would re-scan the
     // model files on every message and add avoidable first-token latency.
@@ -597,7 +599,14 @@ class OnDeviceInference implements LocalInference {
     try {
       await _engine!.clear();
       final response = StringBuffer();
-      final subscription = _engine!.stream.listen(response.write);
+      final subscription = _engine!.stream.listen(
+        (token) {
+          response.write(token);
+          // Stream to the UI as the model speaks — perceived latency drops
+          // to the first token instead of the full completion.
+          if (onToken != null && token.isNotEmpty) onToken(token);
+        },
+      );
       final prompt = _buildPrompt(userMessage, history: history);
       await _inferLog('infer prompt length=${prompt.length}');
       final promptId = await _engine!.sendPrompt(prompt);
