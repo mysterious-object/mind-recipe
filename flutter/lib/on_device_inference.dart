@@ -793,12 +793,23 @@ class OnDeviceInference implements LocalInference {
   /// absolute file paths) so device-facing errors stay readable.
   String _friendlyError(Object? error) {
     var text = '$error';
+    // Strip Dart/Flutter state prefixes that leak into UI.
+    text = text.replaceFirst('Bad state: ', '');
     while (text.contains('LlamaException:')) {
       text = text.replaceFirst('LlamaException:', '').trim();
     }
     text = text.replaceFirst('Error loading model:', 'could not load —');
+    // Remove noisy absolute file paths from native errors.
     final pathIdx = text.indexOf('/data/user/0/');
-    if (pathIdx > 0) text = text.substring(0, pathIdx);
+    if (pathIdx > 0) text = text.substring(0, pathIdx).trim();
+    // Also strip any remaining "Bad state:" that survived via nesting.
+    text = text.replaceAll('Bad state: ', '');
+    // Collapse the ladder's verbose last-error suffix for the banner.
+    if (text.contains('tried GPU and CPU modes')) {
+      final lastIdx = text.lastIndexOf('Last error:');
+      if (lastIdx > 0) text = text.substring(0, lastIdx).trim();
+      text = text.replaceAll('  ', ' ');
+    }
     return text.isEmpty ? 'unknown engine error' : text;
   }
 

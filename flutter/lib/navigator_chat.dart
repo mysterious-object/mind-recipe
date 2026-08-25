@@ -798,33 +798,35 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
-              child: Row(children: [
-                OutlinedButton.icon(
-                  onPressed: widget.onStartDailyNav,
-                  icon: const Icon(Icons.route_rounded, size: 16),
-                  label: const Text('Daily nav', style: TextStyle(fontSize: 12)),
-                  style: OutlinedButton.styleFrom(visualDensity: VisualDensity.compact),
-                ),
-                const SizedBox(width: 8),
-                OutlinedButton.icon(
-                  onPressed: widget.messages.isEmpty ? null : _saveCurrentThread,
-                  icon: const Icon(Icons.bookmark_add_outlined, size: 16),
-                  label: const Text('Save thread', style: TextStyle(fontSize: 12)),
-                  style: OutlinedButton.styleFrom(visualDensity: VisualDensity.compact),
-                ),
-                const SizedBox(width: 8),
-                OutlinedButton.icon(
-                  onPressed: _showSavedThreads,
-                  icon: const Icon(Icons.bookmarks_outlined, size: 16),
-                  label: Text('Saved (${_savedThreads.length})', style: const TextStyle(fontSize: 12)),
-                  style: OutlinedButton.styleFrom(visualDensity: VisualDensity.compact),
-                ),
-                const Spacer(),
-                // Cloud consent lives here, on the chat page — no Steps detour.
-                SwitchListTile.adaptive(
-                  value: widget.appState.cloudAiEnabled,
-                  onChanged: (v) async {
-                    await widget.appState.setCloudAiEnabled(v);
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(children: [
+                  OutlinedButton.icon(
+                    onPressed: widget.onStartDailyNav,
+                    icon: const Icon(Icons.route_rounded, size: 16),
+                    label: const Text('Daily nav', style: TextStyle(fontSize: 12)),
+                    style: OutlinedButton.styleFrom(visualDensity: VisualDensity.compact),
+                  ),
+                  const SizedBox(width: 8),
+                  OutlinedButton.icon(
+                    onPressed: widget.messages.isEmpty ? null : _saveCurrentThread,
+                    icon: const Icon(Icons.bookmark_add_outlined, size: 16),
+                    label: const Text('Save thread', style: TextStyle(fontSize: 12)),
+                    style: OutlinedButton.styleFrom(visualDensity: VisualDensity.compact),
+                  ),
+                  const SizedBox(width: 8),
+                  OutlinedButton.icon(
+                    onPressed: _showSavedThreads,
+                    icon: const Icon(Icons.bookmarks_outlined, size: 16),
+                    label: Text('Saved (${_savedThreads.length})', style: const TextStyle(fontSize: 12)),
+                    style: OutlinedButton.styleFrom(visualDensity: VisualDensity.compact),
+                  ),
+                  const SizedBox(width: 8),
+                  // Cloud consent lives here, on the chat page — no Steps detour.
+                  SwitchListTile.adaptive(
+                    value: widget.appState.cloudAiEnabled,
+                    onChanged: (v) async {
+                      await widget.appState.setCloudAiEnabled(v);
                     if (mounted) setState(() {});
                   },
                   title: const Text('Cloud AI', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
@@ -840,6 +842,7 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
                   ),
               ]),
             ),
+          ),
             Expanded(
               child: ListView.builder(
                 controller: scrollController,
