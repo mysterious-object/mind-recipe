@@ -405,6 +405,7 @@ class MindRecipePageRail extends StatelessWidget {  const MindRecipePageRail({
     required this.progress,
     required this.scrollController,
     required this.onSelected,
+    this.useCompassIcon = false,
   });
 
   final List<String> labels;
@@ -413,6 +414,7 @@ class MindRecipePageRail extends StatelessWidget {  const MindRecipePageRail({
   final double progress;
   final ScrollController scrollController;
   final ValueChanged<int> onSelected;
+  final bool useCompassIcon;
 
   @override
   Widget build(BuildContext context) {
@@ -501,12 +503,21 @@ class MindRecipePageRail extends StatelessWidget {  const MindRecipePageRail({
                             AnimatedScale(
                               duration: duration,
                               scale: selected ? 1.08 : 1,
-                              child: Icon(
-                                icons[itemIndex],
-                                color: selected
-                                    ? scheme.onPrimaryContainer
-                                    : scheme.onSurfaceVariant,
-                              ),
+                              child: (useCompassIcon && itemIndex == 0)
+                                  ? ImageIcon(
+                                      const AssetImage(
+                                          'assets/branding/navigator-compass.png'),
+                                      size: 24,
+                                      color: selected
+                                          ? scheme.onPrimaryContainer
+                                          : scheme.onSurfaceVariant,
+                                    )
+                                  : Icon(
+                                      icons[itemIndex],
+                                      color: selected
+                                          ? scheme.onPrimaryContainer
+                                          : scheme.onSurfaceVariant,
+                                    ),
                             ),
                             Flexible(
                               child: AnimatedSize(

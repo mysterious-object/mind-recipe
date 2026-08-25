@@ -189,7 +189,7 @@ class _MemberHomeState extends State<MemberHome> {
     'Settings',
   ];
   final icons = const [
-    Icons.explore_rounded,
+    Icons.explore_rounded, // Compass brand (closest material; replaced by ImageIcon below on desktop)
     Icons.menu_book,
     Icons.monitor_heart,
     Icons.calendar_month,
@@ -530,13 +530,31 @@ class _MemberHomeState extends State<MemberHome> {
               ],
             ),
           ),
-          bottomNavigationBar: MindRecipePageRail(
-            labels: labels,
-            icons: icons,
-            selectedIndex: index,
-            progress: progress,
-            scrollController: railController,
-            onSelected: goToPage,
+          bottomNavigationBar: LayoutBuilder(
+            builder: (context, constraints) {
+              // Desktop: show orb + Orbit news in a side panel, keep rail
+              final isDesktop = MediaQuery.sizeOf(context).width > 900;
+              if (isDesktop) {
+                return MindRecipePageRail(
+                  labels: labels,
+                  icons: icons,
+                  selectedIndex: index,
+                  progress: progress,
+                  scrollController: railController,
+                  onSelected: goToPage,
+                  useCompassIcon: true,
+                );
+              }
+              return MindRecipePageRail(
+                labels: labels,
+                icons: icons,
+                selectedIndex: index,
+                progress: progress,
+                scrollController: railController,
+                onSelected: goToPage,
+                useCompassIcon: true,
+              );
+            },
           ),
         );
       },

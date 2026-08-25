@@ -1246,13 +1246,6 @@ class _OpeningSuggestions extends StatelessWidget {
       runSpacing: 8,
       children: [
         ActionChip(
-          label: const Text('Begin daily navigation'),
-          avatar: const Icon(Icons.radar_rounded, size: 18),
-          onPressed: () => onSelected(
-            'Begin my daily navigation. Guide me one step at a time.',
-          ),
-        ),
-        ActionChip(
           label: const Text('I need a quick reset'),
           avatar: const Icon(Icons.bolt_rounded, size: 18),
           onPressed: () => onSelected('I need a quick reset right now.'),
