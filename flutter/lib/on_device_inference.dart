@@ -583,7 +583,9 @@ class OnDeviceInference implements LocalInference {
     String userMessage, {
     List<LocalConversationTurn> history = const [],
   }) async {
-    final status = await refreshStatus();
+    // Use the broadcast snapshot — refreshStatus() here would re-scan the
+    // model files on every message and add avoidable first-token latency.
+    final status = _snapshot;
     await _inferLog(
       'infer called status=${status.status} engine=${_engine != null}',
     );
@@ -707,17 +709,22 @@ class OnDeviceInference implements LocalInference {
     // is used on iPhone and iPad.
     if (Platform.isIOS) Llama.libraryPath = null;
     final model = ModelParams()
-      ..nGpuLayers = 0
-      ..mainGpu = -1;
+      // Offload every layer to the GPU: OpenCL on Adreno/Mali Android,
+      // Metal on iOS. Falls back to CPU silently where no backend exists.
+      ..nGpuLayers = 99
+      ..mainGpu = 0;
     final context = ContextParams()
       ..nCtx = 4096
       ..nBatch = 512
       ..nUbatch = 512
-      ..nThreads = 6
-      ..nThreadsBatch = 6
+      // Performance cores only — little cores add contention and slow
+      // token generation on big.LITTLE phones.
+      ..nThreads = 4
+      ..nThreadsBatch = 4
       ..nPredict = 512
-      ..typeK = LlamaKvCacheType.f16
-      ..typeV = LlamaKvCacheType.f16;
+      ..flashAttention = LlamaFlashAttnType.enabled
+      ..typeK = LlamaKvCacheType.q8_0
+      ..typeV = LlamaKvCacheType.q8_0;
     final sampler = SamplerParams()
       ..temp = 0.75
       ..topK = 30
@@ -798,13 +805,13 @@ Example: If the member says their manager dismissed their work in front of the t
     // Keep context well under nCtx: 6 recent turns, each capped, so the
     // grown system prompt + history never overflow the window (an overflow
     // makes the engine emit nothing and every reply would fail).
-    final recent = history.length > 6
-        ? history.sublist(history.length - 6)
+    final recent = history.length > 4
+        ? history.sublist(history.length - 4)
         : history;
     for (final turn in recent) {
       final role = turn.role == 'assistant' ? 'assistant' : 'user';
       var clean = _cleanPromptText(turn.text);
-      if (clean.length > 400) clean = '${clean.substring(0, 400)}…';
+      if (clean.length > 300) clean = '${clean.substring(0, 300)}…';
       if (clean.isEmpty) continue;
       prompt
         ..writeln('<|im_start|>$role')
