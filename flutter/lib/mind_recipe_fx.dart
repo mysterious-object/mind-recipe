@@ -512,15 +512,6 @@ class MindRecipePageRail extends StatelessWidget {  const MindRecipePageRail({
                                           ? scheme.onPrimaryContainer
                                           : scheme.onSurfaceVariant,
                                     )
-                                  : (useCompassIcon && itemIndex == 1)
-                                      ? ImageIcon(
-                                          const AssetImage(
-                                              'assets/branding/mind-recipe-mark.png'),
-                                          size: 22,
-                                          color: selected
-                                              ? scheme.onPrimaryContainer
-                                              : scheme.onSurfaceVariant,
-                                        )
                                       : Icon(
                                           icons[itemIndex],
                                           color: selected
