@@ -718,23 +718,65 @@ class OnDeviceInference implements LocalInference {
     // path left by another platform/test isolate so DynamicLibrary.process()
     // is used on iPhone and iPad.
     if (Platform.isIOS) Llama.libraryPath = null;
-    // Low-RAM devices: halve the context window — smaller KV cache, faster
-    // prefill, and the trimmed prompt still fits comfortably.
+    // Determine base context size based on device memory
     var nCtx = 4096;
     try {
       final device = await MindRecipeDeviceHarness().capabilities();
-      if ((device.totalMemoryMiB ?? 8192) < 6144) nCtx = 2048;
-    } catch (_) {}
+      final totalMem = device.totalMemoryMiB ?? 8192;
+      if (totalMem < 4096) {
+        nCtx = 1024;  // Very low memory device
+      } else if (totalMem < 6144) {
+        nCtx = 2048;
+      } else if (totalMem < 8192) {
+        nCtx = 3072;
+      }
+    } catch (_) {
+      nCtx = 2048; // Safe default
+    }
 
-    // Load ladder: GPU first, then progressively conservative CPU configs.
-    // The final attempt drops flash attention + q8_0 KV — the most common
-    // cause of init failures on older CPU backends.
-    final attempts = [
-      ('GPU accelerated', 99, nCtx, LlamaFlashAttnType.enabled, LlamaKvCacheType.q8_0),
-      ('CPU', 0, nCtx, LlamaFlashAttnType.enabled, LlamaKvCacheType.q8_0),
-      ('CPU · conservative', 0, nCtx, LlamaFlashAttnType.disabled, LlamaKvCacheType.f16),
-      ('CPU · reduced memory', 0, 1536, LlamaFlashAttnType.disabled, LlamaKvCacheType.f16),
-    ];
+    // Adaptive attempt ladder based on device memory
+    int baseCtx = nCtx;
+    List<(String, int, int, LlamaFlashAttnType, LlamaKvCacheType)> attempts;
+    
+    if (Platform.isIOS) {
+      // iOS: Skip GPU, use Metal-compatible configs
+      attempts = [
+        ('CPU · balanced', 0, nCtx, LlamaFlashAttnType.enabled, LlamaKvCacheType.q8_0),
+        ('CPU · conservative', 0, nCtx, LlamaFlashAttnType.disabled, LlamaKvCacheType.f16),
+        ('CPU · reduced memory', 0, 1536, LlamaFlashAttnType.disabled, LlamaKvCacheType.f16),
+        ('CPU · minimal', 0, 1024, LlamaFlashAttnType.disabled, LlamaKvCacheType.f16),
+      ];
+    } else if (Platform.isAndroid) {
+      // Android: Try GPU first only if enough memory
+      final device = await MindRecipeDeviceHarness().capabilities();
+      final totalMem = device.totalMemoryMiB ?? 8192;
+      if (totalMem >= 8192) {
+        // High memory device: try GPU first
+        attempts = [
+          ('GPU accelerated', 99, nCtx, LlamaFlashAttnType.enabled, LlamaKvCacheType.q8_0),
+          ('CPU · balanced', 0, nCtx, LlamaFlashAttnType.enabled, LlamaKvCacheType.q8_0),
+          ('CPU · conservative', 0, nCtx, LlamaFlashAttnType.disabled, LlamaKvCacheType.f16),
+          ('CPU · reduced memory', 0, 1536, LlamaFlashAttnType.disabled, LlamaKvCacheType.f16),
+          ('CPU · minimal', 0, 1024, LlamaFlashAttnType.disabled, LlamaKvCacheType.f16),
+        ];
+      } else {
+        // Low memory Android: skip GPU
+        attempts = [
+          ('CPU · balanced', 0, nCtx, LlamaFlashAttnType.enabled, LlamaKvCacheType.q8_0),
+          ('CPU · conservative', 0, nCtx, LlamaFlashAttnType.disabled, LlamaKvCacheType.f16),
+          ('CPU · reduced memory', 0, 1536, LlamaFlashAttnType.disabled, LlamaKvCacheType.f16),
+          ('CPU · minimal', 0, 1024, LlamaFlashAttnType.disabled, LlamaKvCacheType.f16),
+        ];
+      }
+    } else {
+      // Desktop/other: conservative
+      attempts = [
+        ('CPU · balanced', 0, nCtx, LlamaFlashAttnType.enabled, LlamaKvCacheType.q8_0),
+        ('CPU · conservative', 0, nCtx, LlamaFlashAttnType.disabled, LlamaKvCacheType.f16),
+        ('CPU · reduced memory', 0, 1536, LlamaFlashAttnType.disabled, LlamaKvCacheType.f16),
+        ('CPU · minimal', 0, 1024, LlamaFlashAttnType.disabled, LlamaKvCacheType.f16),
+      ];
+    }
     Object? lastError;
     for (var i = 0; i < attempts.length; i++) {
       final (label, gpuLayers, ctx, flash, kvType) = attempts[i];
@@ -792,27 +834,37 @@ class OnDeviceInference implements LocalInference {
   }
 
   /// Strips internal exception noise (repeated LlamaException prefixes,
-  /// absolute file paths) so device-facing errors stay readable.
+  /// absolute file paths, Dart state prefixes) so device-facing errors stay readable.
   String _friendlyError(Object? error) {
     var text = '$error';
     // Strip Dart/Flutter state prefixes that leak into UI.
-    text = text.replaceAll(RegExp(r'^(Bad state: |StateError: )'), '');
+    text = text.replaceAll(RegExp(r'(Bad state: |StateError: )'), '');
+    // Remove LlamaException prefixes (can be nested)
     while (text.contains('LlamaException:')) {
       text = text.replaceFirst('LlamaException:', '').trim();
     }
+    // Remove common error prefixes
     text = text.replaceFirst('Error loading model:', 'could not load —');
+    text = text.replaceFirst('Error: ', '');
+    text = text.replaceFirst('Exception: ', '');
     // Remove noisy absolute file paths from native errors.
     final pathIdx = text.indexOf('/data/user/0/');
     if (pathIdx > 0) text = text.substring(0, pathIdx).trim();
     // Also strip any remaining "Bad state:" that survived via nesting.
     text = text.replaceAll('Bad state: ', '');
     // Collapse the ladder's verbose last-error suffix for the banner.
-    if (text.contains('tried GPU and CPU modes')) {
+    if (text.contains('tried GPU and CPU modes') || text.contains('tried GPU and')) {
       final lastIdx = text.lastIndexOf('Last error:');
       if (lastIdx > 0) text = text.substring(0, lastIdx).trim();
       text = text.replaceAll('  ', ' ');
     }
-    return text.isEmpty ? 'unknown engine error' : text;
+    // Remove any remaining "Bad state:" or "StateError:" prefixes
+    text = text.replaceAll(RegExp(r'(Bad state: |StateError: )'), '');
+    text = text.replaceAll(RegExp(r'Exception: '), '');
+    text = text.replaceAll(RegExp(r'Error: '), '');
+    // Clean up multiple spaces
+    text = text.replaceAll(RegExp(r'\s{2,}'), ' ');
+    return text.trim().isEmpty ? 'unknown engine error' : text.trim();
   }
 
   void _disposeEngine() {
