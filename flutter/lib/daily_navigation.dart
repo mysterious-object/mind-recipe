@@ -1,4 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+
+import 'mind_recipe_fx.dart';
 import 'design_tokens.dart';
 
 /// Structured daily navigation — replaces free-form chat with the plan's
@@ -19,8 +23,11 @@ enum NavStep {
 }
 
 class DailyNavigation extends StatefulWidget {
-  const DailyNavigation({super.key, required this.onComplete});
+  const DailyNavigation({super.key, required this.onComplete, required this.onSeePulse});
   final VoidCallback onComplete;
+
+  /// Fires after the completion confirmation — lands the member on Pulse.
+  final VoidCallback onSeePulse;
 
   @override
   State<DailyNavigation> createState() => _DailyNavigationState();
@@ -56,6 +63,11 @@ class _DailyNavigationState extends State<DailyNavigation> {
     }
     if (_current == NavStep.complete) {
       widget.onComplete();
+      // The modal never lingers: brief confirmation, then land on Pulse
+      // where the new pulse point is visible.
+      Timer(const Duration(milliseconds: 2600), () {
+        if (mounted) widget.onSeePulse();
+      });
     }
   }
 
@@ -209,13 +221,20 @@ class _DailyNavigationState extends State<DailyNavigation> {
               child: const Text('Back'),
             ),
           const Spacer(),
-          Semantics(
-            label: _current == NavStep.followUp ? 'Complete navigation' : 'Continue to next step',
-            child: FilledButton(
-              onPressed: canAdvance ? _advance : null,
-              child: Text(_current == NavStep.followUp ? 'Complete' : 'Continue'),
+          if (_current == NavStep.complete)
+            FilledButton.icon(
+              onPressed: widget.onSeePulse,
+              icon: const Icon(Icons.monitor_heart_rounded),
+              label: const Text('View pulse'),
+            )
+          else
+            Semantics(
+              label: _current == NavStep.followUp ? 'Complete navigation' : 'Continue to next step',
+              child: FilledButton(
+                onPressed: canAdvance ? _advance : null,
+                child: Text(_current == NavStep.followUp ? 'Complete' : 'Continue'),
+              ),
             ),
-          ),
         ],
       ),
     );
@@ -529,7 +548,7 @@ class _CompleteStep extends StatelessWidget {
         padding: const EdgeInsets.all(24),
         child: Column(
           children: [
-            Icon(Icons.check_circle, size: 64, color: MindRecipeTokens.success),
+            const MindRecipeOrbBadge(size: 72, active: true),
             const SizedBox(height: 16),
             Text('Navigation complete',
               style: MindRecipeTokens.headlineMedium(context),
@@ -541,7 +560,7 @@ class _CompleteStep extends StatelessWidget {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
-            Text('Your pulse has been updated in the Pulse tab.',
+            Text('Your pulse was just updated — taking you there…',
               style: MindRecipeTokens.bodySmall(context),
               textAlign: TextAlign.center,
             ),

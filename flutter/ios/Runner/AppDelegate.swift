@@ -14,5 +14,6 @@ import UIKit
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
     VoicePlugin.register(with: engineBridge.pluginRegistry.registrar(forPlugin: "VoicePlugin")!)
     MindRecipeDeviceHarnessPlugin.register(with: engineBridge.pluginRegistry.registrar(forPlugin: "MindRecipeDeviceHarnessPlugin")!)
+    MindRecipeMobileAutomationPlugin.register(with: engineBridge.pluginRegistry.registrar(forPlugin: "MindRecipeMobileAutomationPlugin")!)
   }
 }

@@ -8,5 +8,6 @@ class MainActivity : FlutterActivity() {
         super.configureFlutterEngine(flutterEngine)
         flutterEngine.plugins.add(VoicePlugin())
         flutterEngine.plugins.add(MindRecipeDeviceHarnessPlugin())
+        flutterEngine.plugins.add(MindRecipeMobileAutomationPlugin())
     }
 }

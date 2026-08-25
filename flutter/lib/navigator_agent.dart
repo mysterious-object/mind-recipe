@@ -36,6 +36,22 @@ class NavigatorAgent {
     required int aiReflections,
   }) {
     final text = message.toLowerCase();
+    // General AGI assistance (phone features, tasks) is distinct from
+    // therapeutic support — route it practically, not clinically.
+    if (_contains(text, const [
+      'remind', 'reminder', 'appointment', 'alarm', 'wake me',
+      'calendar', 'my calendar', 'set a timer', 'add to my calendar',
+      'book', 'schedule an appointment',
+    ]) && !_contains(text, const [
+      'anxious', 'sad', 'depressed', 'overwhelmed', 'panic', 'grief',
+      'therapy', 'therapist', 'crisis', 'hopeless',
+    ])) {
+      return const NavigatorAgentPlan(
+        tool: 'phone assistance',
+        instruction:
+            'This is a practical phone task, not a therapy moment. Reply in one short sentence confirming what you can do; the app shows an on-device action card for the member to approve. No emotional framing, no questions about feelings.',
+      );
+    }
     if (_contains(text, const [
       'research',
       'evidence',

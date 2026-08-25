@@ -309,6 +309,7 @@ class _MemberHomeState extends State<MemberHome> {
       _KeepAlivePage(
         child: useStructuredNav
             ? DailyNavigation(
+                onSeePulse: () => goToPage(2),
                 onComplete: () {
                   widget.appState.recordAssistantMessage(startsSession: true);
                   widget.appState.recordAiReflection();
