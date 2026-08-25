@@ -793,6 +793,18 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
                   style: OutlinedButton.styleFrom(visualDensity: VisualDensity.compact),
                 ),
                 const Spacer(),
+                // Cloud consent lives here, on the chat page — no Steps detour.
+                SwitchListTile.adaptive(
+                  value: widget.appState.cloudAiEnabled,
+                  onChanged: (v) async {
+                    await widget.appState.setCloudAiEnabled(v);
+                    if (mounted) setState(() {});
+                  },
+                  title: const Text('Cloud AI', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                  subtitle: const Text('Optional · journal excluded', style: TextStyle(fontSize: 11)),
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                ),
                 if (widget.messages.isNotEmpty)
                   IconButton(
                     icon: const Icon(Icons.delete_sweep_outlined, size: 18),

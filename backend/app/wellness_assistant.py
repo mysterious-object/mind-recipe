@@ -210,7 +210,12 @@ async def _call_openrouter(
     async with httpx.AsyncClient(timeout=httpx.Timeout(25.0)) as client:
         response = await client.post(
             "https://openrouter.ai/api/v1/chat/completions",
-            headers={"Authorization": f"Bearer {provider_key}", "Content-Type": "application/json"},
+            headers={
+                "Authorization": f"Bearer {provider_key}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://mindrecipe.app",
+                "X-Title": "Mind Recipe",
+            },
             json=payload,
         )
         response.raise_for_status()
@@ -325,7 +330,7 @@ async def _call_provider(
 
 def _get_model_for_provider(provider: str, requested_model: Optional[str] = None) -> str:
     defaults = {
-        "openrouter": "openrouter/free",
+        "openrouter": "openrouter/stealth/ox-alpha",
         "anthropic": "claude-3-haiku-20240307",
         "google": "gemini-1.5-flash",
     }

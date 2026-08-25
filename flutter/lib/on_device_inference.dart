@@ -575,7 +575,7 @@ class OnDeviceInference implements LocalInference {
         // Keep partial so tab switch / retry can resume via Range.
       }
       _downloadActive = false;
-      _set(LocalInferenceSnapshot(OnDeviceStatus.error, detail: '$error'));
+      _set(LocalInferenceSnapshot(OnDeviceStatus.error, detail: '$error'.replaceFirst('Bad state: ', '')));
       rethrow;
     }
   }
