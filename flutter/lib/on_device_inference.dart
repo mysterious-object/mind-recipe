@@ -128,7 +128,7 @@ final mindRecipePrivateModelChoices = <OnDeviceModelChoice>[
     name: 'Private',
     quality: 'Private on-device guidance',
     bestFor: 'All conversations; stays on this device.',
-    memoryNote: '1.2 GB download · needs 8 GB device memory · keep 2.5 GB free',
+    memoryNote: '1.2 GB download · keep ~2.5 GB free (runs on 3 GB+ devices)',
     recommended: true,
   ),
 ];
@@ -222,7 +222,8 @@ class OnDeviceInference implements LocalInference {
                       _downloadBytesPerSecond)
                   .ceil(),
         );
-  int get _minimumMemoryMiB => 8192;
+  // 1.2 GB Q4_K_M + q8_0 KV fits in ~2.5 GB; 3 GB devices can run it.
+  int get _minimumMemoryMiB => 3072;
 
   Future<File> _modelFile([OnDeviceModelManifest? manifest]) async {
     final target = manifest ?? _activeManifest;
@@ -713,8 +714,15 @@ class OnDeviceInference implements LocalInference {
       // Metal on iOS. Falls back to CPU silently where no backend exists.
       ..nGpuLayers = 99
       ..mainGpu = 0;
+    // Low-RAM devices: halve the context window — smaller KV cache, faster
+    // prefill, and the trimmed prompt still fits comfortably.
+    var nCtx = 4096;
+    try {
+      final device = await MindRecipeDeviceHarness().capabilities();
+      if ((device.totalMemoryMiB ?? 8192) < 6144) nCtx = 2048;
+    } catch (_) {}
     final context = ContextParams()
-      ..nCtx = 4096
+      ..nCtx = nCtx
       ..nBatch = 512
       ..nUbatch = 512
       // Performance cores only — little cores add contention and slow
