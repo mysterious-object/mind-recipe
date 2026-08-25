@@ -1641,11 +1641,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Private on-device AI',
-                    style: TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 8),
                   Builder(builder: (context) {
                     final choice = mindRecipePrivateModelChoices.first;
                     final isActive = choice.manifest.id == OnDeviceInference().activeModel.id && _privateModel.isReady;
@@ -1664,7 +1659,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           Row(children: [
                             const Icon(Icons.shield_rounded, size: 20),
                             const SizedBox(width: 8),
-                            Expanded(child: Text(choice.name, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16))),
+                            Expanded(
+                              child: Text(
+                                choice.name,
+                                maxLines: 1,
+                                softWrap: false,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+                              ),
+                            ),
                             if (isActive) const Chip(avatar: Icon(Icons.check_circle, size: 16), label: Text('Active')),
                             if (isActive) const SizedBox(width: 8),
                             const Chip(label: Text('On-device')),

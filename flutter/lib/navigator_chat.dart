@@ -242,6 +242,20 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
     super.dispose();
   }
 
+  /// Edits an earlier member message: drops that message and everything
+  /// after it, then resends the edited text so the conversation continues
+  /// from that point.
+  void _editMessage(int index, String newText) {
+    if (sending) return;
+    setState(() {
+      if (index < widget.messages.length) {
+        widget.messages.removeRange(index, widget.messages.length);
+      }
+    });
+    composer.text = newText;
+    send();
+  }
+
   Future<void> send([String? suggestion]) async {
     final text = (suggestion ?? composer.text).trim();
     if (text.isEmpty || sending) return;
@@ -732,7 +746,12 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
                     (turn == 0 ? 1 : 0),
                 itemBuilder: (context, index) {
                   if (index < widget.messages.length) {
-                    return _ChatBubble(message: widget.messages[index]);
+                    return _ChatBubble(
+                      message: widget.messages[index],
+                      onEdit: sending
+                          ? null
+                          : (newText) => _editMessage(index, newText),
+                    );
                   }
                   if (sending && index == widget.messages.length) {
                     return const _ThinkingBubble();
@@ -974,14 +993,20 @@ class _PresenceHeader extends StatelessWidget {
 }
 
 class _ChatBubble extends StatelessWidget {
-  const _ChatBubble({required this.message});
+  const _ChatBubble({required this.message, this.onEdit});
   final ChatMessage message;
+
+  /// Member bubbles only — long-press to edit and resend from this point.
+  final void Function(String newText)? onEdit;
 
   @override
   Widget build(BuildContext context) {
     final member = message.role == ChatRole.member;
     final status = message.role == ChatRole.status;
-    return Align(
+    return GestureDetector(
+      onLongPress:
+          member && onEdit != null ? () => _showEditDialog(context) : null,
+      child: Align(
       alignment: member ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
         constraints: BoxConstraints(
@@ -1069,6 +1094,38 @@ class _ChatBubble extends StatelessWidget {
               ),
           ],
         ),
+      ),
+      ),
+    );
+  }
+
+  void _showEditDialog(BuildContext context) {
+    final controller = TextEditingController(text: message.text);
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Edit message'),
+        content: TextField(
+          controller: controller,
+          maxLines: null,
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final text = controller.text.trim();
+              Navigator.pop(ctx);
+              if (text.isNotEmpty && text != message.text) {
+                onEdit?.call(text);
+              }
+            },
+            child: const Text('Resend'),
+          ),
+        ],
       ),
     );
   }
