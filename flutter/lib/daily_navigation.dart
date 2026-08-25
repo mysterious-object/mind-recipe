@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import 'app_services.dart';
+import 'on_device_inference.dart';
 import 'mind_recipe_fx.dart';
 import 'design_tokens.dart';
 
@@ -23,7 +25,8 @@ enum NavStep {
 }
 
 class DailyNavigation extends StatefulWidget {
-  const DailyNavigation({super.key, required this.onComplete, required this.onSeePulse, this.syncSummary = ''});
+  const DailyNavigation({super.key, required this.appState, required this.onComplete, required this.onSeePulse, this.syncSummary = ''});
+  final SecureAppState appState;
   final VoidCallback onComplete;
 
   /// Live activity summary shown on the greeting step (chat ↔ nav sync).
@@ -65,6 +68,18 @@ class _DailyNavigationState extends State<DailyNavigation> {
       setState(() => _current = order[idx + 1]);
     }
     if (_current == NavStep.complete) {
+      // Persist the navigation — Pulse, greeting summaries, and AI grounding
+      // all read this history.
+      unawaited(widget.appState.saveNavigationEntry({
+        'id': DateTime.now().millisecondsSinceEpoch.toString(),
+        't': DateTime.now().toIso8601String(),
+        'emotions': _selectedEmotions.isEmpty
+            ? 'Not recorded'
+            : _selectedEmotions.join(', '),
+        'activation': _activationLevel,
+        'body': _selectedBodyAreas.isEmpty ? '' : _selectedBodyAreas.join(', '),
+        'journal': _journalController.text.trim(),
+      }));
       widget.onComplete();
       // The modal never lingers: brief confirmation, then land on Pulse
       // where the new pulse point is visible.
@@ -199,7 +214,12 @@ class _DailyNavigationState extends State<DailyNavigation> {
           action: _chosenAction,
           zone: _zoneLabel,
         ),
-      NavStep.complete => const _CompleteStep(),
+      NavStep.complete => _CompleteStep(
+            appState: widget.appState,
+            emotions: _selectedEmotions.isEmpty ? 'Not recorded' : _selectedEmotions.join(', '),
+            activation: _activationLevel,
+            journal: _journalController.text.trim(),
+          ),
     };
   }
 
@@ -560,8 +580,74 @@ class _RowItem extends StatelessWidget {
   );
 }
 
-class _CompleteStep extends StatelessWidget {
-  const _CompleteStep();
+class _CompleteStep extends StatefulWidget {
+  const _CompleteStep({
+    required this.appState,
+    required this.emotions,
+    required this.activation,
+    required this.journal,
+  });
+  final SecureAppState appState;
+  final String emotions;
+  final int activation;
+  final String journal;
+
+  @override
+  State<_CompleteStep> createState() => _CompleteStepState();
+}
+
+class _CompleteStepState extends State<_CompleteStep> {
+  bool _wantAi = false;
+  bool _aiBusy = false;
+  bool _navigatorOnline = false;
+  String? _reflection;
+
+  @override
+  void initState() {
+    super.initState();
+    OnDeviceInference.snapshotNotifier.addListener(_updateOnline);
+    _updateOnline();
+  }
+
+  @override
+  void dispose() {
+    OnDeviceInference.snapshotNotifier.removeListener(_updateOnline);
+    super.dispose();
+  }
+
+  void _updateOnline() {
+    if (!mounted) return;
+    final local = OnDeviceInference.snapshotNotifier.value.isReady;
+    final cloud = widget.appState.cloudAiEnabled && widget.appState.aiAvailable;
+    setState(() => _navigatorOnline = local || cloud);
+  }
+
+  Future<void> _reflect() async {
+    setState(() => _aiBusy = true);
+    final prompt =
+        'A member just completed a daily navigation. Emotions: ${widget.emotions}. '
+        'Activation: ${widget.activation}/10. '
+        '${widget.journal.isNotEmpty ? 'Their words: "${widget.journal}". ' : ''}'
+        'Give one grounded observation and one small next step. 35-80 words. '
+        'No diagnosis, no clinical claims.';
+    String? reply;
+    try {
+      reply = await OnDeviceInference().infer(prompt);
+    } catch (_) {}
+    if (mounted) {
+      setState(() {
+        _reflection = reply ?? 'Navigator could not reflect right now — your navigation is saved.';
+        _aiBusy = false;
+      });
+    }
+    final all = await widget.appState.loadNavigationHistory();
+    if (all.isNotEmpty) {
+      final latest = Map<String, dynamic>.from(all.first);
+      latest['ai_reflection'] = _reflection;
+      await widget.appState.saveNavigationEntry(latest);
+    }
+  }
+
   @override
   Widget build(BuildContext context) => Semantics(
     label: 'Navigation complete. Your session has been saved.',
@@ -586,6 +672,39 @@ class _CompleteStep extends StatelessWidget {
               style: MindRecipeTokens.bodySmall(context),
               textAlign: TextAlign.center,
             ),
+            const Divider(height: 28),
+            SwitchListTile.adaptive(
+              contentPadding: EdgeInsets.zero,
+              value: _wantAi && _navigatorOnline,
+              onChanged: _navigatorOnline ? (v) => setState(() => _wantAi = v) : null,
+              title: const Text('AI reflection (optional)'),
+              subtitle: Text(
+                _navigatorOnline
+                    ? 'A brief private reflection on this navigation — saved with it.'
+                    : 'Navigator is offline — install the private model or enable cloud AI.',
+              ),
+            ),
+            if (_wantAi && _navigatorOnline) ...[
+              FilledButton.tonalIcon(
+                onPressed: _aiBusy ? null : _reflect,
+                icon: _aiBusy
+                    ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.auto_awesome_rounded, size: 16),
+                label: Text(_aiBusy ? 'Reflecting…' : 'Reflect on this navigation'),
+              ),
+              if (_reflection != null) ...[
+                const SizedBox(height: 12),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(_reflection!),
+                ),
+              ],
+            ],
           ],
         ),
       ),

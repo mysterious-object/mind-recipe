@@ -302,13 +302,25 @@ class _MemberHomeState extends State<MemberHome> {
     final lastPulseText = lastPulse == null
         ? 'no pulse yet'
         : 'last pulse ${DateTime.now().difference(lastPulse).inHours}h ago';
+    final history = await widget.appState.loadNavigationHistory();
+    var lastNavText = '';
+    if (history.isNotEmpty) {
+      final t = DateTime.tryParse(history.first['t']?.toString() ?? '');
+      if (t != null) {
+        final h = DateTime.now().difference(t).inHours;
+        lastNavText =
+            ' \u00b7 last nav: ${history.first['emotions']} ${history.first['activation']}/10, ${h}h ago';
+      }
+    }
     final summary =
         'Today: ${widget.appState.navigationSessions} navigation(s) · '
-        '${widget.appState.messagesSent} chat messages · $lastPulseText';
+        '${widget.appState.messagesSent} chat messages · $lastPulseText'
+        '$lastNavText';
     if (!mounted) return;
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => DailyNavigation(
+          appState: widget.appState,
           syncSummary: summary,
           onSeePulse: () {
             Navigator.of(context).pop();

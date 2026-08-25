@@ -662,6 +662,50 @@ class SecureAppState extends ChangeNotifier {
 
   static const _moodPulsesKey = 'mind_recipe_mood_pulses';
 
+  static const _navHistoryKey = 'mind_recipe_navigation_history';
+
+  /// Persistent daily-navigation entries (newest first, capped at 100):
+  /// {id, t, emotions, activation, body, journal, ai_reflection}.
+  Future<List<Map<String, dynamic>>> loadNavigationHistory() async {
+    try {
+      final raw = await _storage.read(key: _navHistoryKey);
+      if (raw == null || raw.isEmpty) return [];
+      return (jsonDecode(raw) as List<dynamic>)
+          .map((e) => e as Map<String, dynamic>)
+          .toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  /// Inserts or replaces an entry by id, newest first.
+  Future<void> saveNavigationEntry(Map<String, dynamic> entry) async {
+    try {
+      final all = await loadNavigationHistory();
+      final id = entry['id']?.toString();
+      all.removeWhere((e) => id != null && e['id'] == id);
+      all.insert(0, entry);
+      while (all.length > 100) {
+        all.removeLast();
+      }
+      await _storage.write(key: _navHistoryKey, value: jsonEncode(all));
+    } catch (_) {}
+  }
+
+  /// One-line summary of the most recent navigation, for AI grounding.
+  Future<String> lastNavigationSummary() async {
+    final all = await loadNavigationHistory();
+    if (all.isEmpty) return '';
+    final e = all.first;
+    final t = DateTime.tryParse(e['t']?.toString() ?? '');
+    final ago = t == null
+        ? ''
+        : ' · ${DateTime.now().difference(t).inHours}h ago';
+    return 'Emotions: ${e['emotions']}; activation ${e['activation']}/10'
+        '${(e['journal']?.toString().isNotEmpty ?? false) ? '; noted: ${e['journal']}' : ''}'
+        '$ago';
+  }
+
   /// Real-time mood ring history: [{v: -1..1 valence, a: 0..1 activation,
   /// t: ISO time, src: origin}] — kept to the most recent 300 points.
   Future<List<Map<String, dynamic>>> loadMoodPulses() async {
