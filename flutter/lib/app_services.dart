@@ -517,6 +517,9 @@ class SecureAppState extends ChangeNotifier {
   int _navigationSessions = 0;
   int _messagesSent = 0;
   int _aiReflections = 0;
+  int _lifetimeNavigationSessions = 0;
+  int _lifetimeNavigatorTurns = 0;
+  int _lifetimeAiReflections = 0;
   DateTime? _lastAssistantActivityAt;
 
   bool get hasProviderKey => openRouterKey.trim().isNotEmpty;
@@ -527,6 +530,9 @@ class SecureAppState extends ChangeNotifier {
       _activityDate == _todayKey() ? _navigationSessions : 0;
   int get messagesSent => _activityDate == _todayKey() ? _messagesSent : 0;
   int get aiReflections => _activityDate == _todayKey() ? _aiReflections : 0;
+  int get lifetimeNavigationSessions => _lifetimeNavigationSessions;
+  int get lifetimeNavigatorTurns => _lifetimeNavigatorTurns;
+  int get lifetimeAiReflections => _lifetimeAiReflections;
   DateTime? get lastAssistantActivityAt =>
       _activityDate == _todayKey() ? _lastAssistantActivityAt : null;
 
@@ -565,6 +571,9 @@ class SecureAppState extends ChangeNotifier {
         _navigationSessions = activity['navigation_sessions'] as int? ?? 0;
         _messagesSent = activity['messages_sent'] as int? ?? 0;
         _aiReflections = activity['ai_reflections'] as int? ?? 0;
+        _lifetimeNavigationSessions = activity['lifetime_navigation_sessions'] as int? ?? _navigationSessions;
+        _lifetimeNavigatorTurns = activity['lifetime_navigator_turns'] as int? ?? _messagesSent;
+        _lifetimeAiReflections = activity['lifetime_ai_reflections'] as int? ?? _aiReflections;
         _lastAssistantActivityAt = DateTime.tryParse(
           activity['last_activity_at']?.toString() ?? '',
         );
@@ -613,7 +622,9 @@ class SecureAppState extends ChangeNotifier {
   Future<void> recordAssistantMessage({required bool startsSession}) async {
     _rollActivityDayIfNeeded();
     if (startsSession) _navigationSessions++;
+    if (startsSession) _lifetimeNavigationSessions++;
     _messagesSent++;
+    _lifetimeNavigatorTurns++;
     _lastAssistantActivityAt = DateTime.now();
     notifyListeners();
     await _persistAssistantActivity();
@@ -622,6 +633,7 @@ class SecureAppState extends ChangeNotifier {
   Future<void> recordAiReflection() async {
     _rollActivityDayIfNeeded();
     _aiReflections++;
+    _lifetimeAiReflections++;
     _lastAssistantActivityAt = DateTime.now();
     notifyListeners();
     await _persistAssistantActivity();
@@ -634,6 +646,9 @@ class SecureAppState extends ChangeNotifier {
     _navigationSessions = 0;
     _messagesSent = 0;
     _aiReflections = 0;
+    _lifetimeNavigationSessions = 0;
+    _lifetimeNavigatorTurns = 0;
+    _lifetimeAiReflections = 0;
     _lastAssistantActivityAt = null;
   }
 
@@ -646,6 +661,9 @@ class SecureAppState extends ChangeNotifier {
           'navigation_sessions': _navigationSessions,
           'messages_sent': _messagesSent,
           'ai_reflections': _aiReflections,
+          'lifetime_navigation_sessions': _lifetimeNavigationSessions,
+          'lifetime_navigator_turns': _lifetimeNavigatorTurns,
+          'lifetime_ai_reflections': _lifetimeAiReflections,
           'last_activity_at': _lastAssistantActivityAt?.toIso8601String(),
         }),
       );

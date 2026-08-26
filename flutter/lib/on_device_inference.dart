@@ -907,7 +907,12 @@ class OnDeviceInference implements LocalInference {
       clean = clean.substring(close + '</think>'.length);
     }
     // Strip chat markers that leak as broken code
-    clean = clean.replaceAll('<|im_start|>', '').replaceAll('<|im_end|>', '').replaceAll('/no_think', '').trim();
+    clean = clean
+        .replaceAll('<|im_start|>', '')
+        .replaceAll('<|im_end|>', '')
+        .replaceAll('/no_think', '')
+        .replaceAll('/think', '')
+        .trim();
     // Strip leaked role prefixes like "member:" or "assistant:" at start
     clean = clean.replaceFirst(RegExp(r'^(assistant|member|user)\s*:\s*', caseSensitive: false), '').trim();
     // Strip code fences that appear as broken code
@@ -991,15 +996,27 @@ class OnDeviceInference implements LocalInference {
   String _cleanPromptText(String value) =>
       value.replaceAll('<|', '').replaceAll('|>', '').trim();
 
+  bool _shouldDeliberate(String message) {
+    final text = message.toLowerCase();
+    if (message.length > 180) return true;
+    return const [
+      'plan', 'compare', 'decide', 'why', 'reason', 'remember', 'earlier',
+      'appointment', 'calendar', 'organize', 'goal', 'pattern', 'what should i',
+      'help me figure out', 'i changed my mind', 'that is not what i meant',
+    ].any(text.contains);
+  }
+
   String _buildPrompt(
     String userMessage, {
     List<LocalConversationTurn> history = const [],
   }) {
     final prompt = StringBuffer('''<|im_start|>system
-You are Mind Recipe, a private on-device wellness companion. Understand what the member means in light of the conversation, including short follow-ups such as "yes", "that", or "it". First identify the concrete concern, feeling, event, or request they actually expressed. Then respond directly to that meaning. Ground every reply in a detail the member actually said, without inventing an emotion. Follow the thread forward: when a member answers a question or names a tool such as Google Calendar, explain the next concrete step with that tool instead of repeating the prior suggestion. Do not restart the check-in, repeat a generic greeting, paraphrase every sentence, or force an exercise. Never begin with "You seem to be feeling" or "Thank you for sharing". Never say "It's important to process" or "What would you like to focus on next?" Be warm, specific, and conversational (usually 35 to 100 words). Use at most one genuine question, and make it specific to their words. Never diagnose, prescribe, assess safety, or claim clinical certainty. Treat interpretations as possibilities. If urgent danger is mentioned, encourage contacting local emergency help or 988 in the United States. Never reveal private reasoning or mention internal tools.
+You are Mind Recipe, a private on-device personal assistant and wellness companion. Resolve short follow-ups from the recent conversation. Identify the member's actual intent, the most relevant prior detail or commitment, and the useful outcome before answering. For complex requests, privately compare options, check assumptions, and plan the response; never reveal that private reasoning. Correct yourself immediately when the member says you misunderstood. Move the thread forward instead of restarting, paraphrasing, or repeating a generic exercise. Ground claims in member-owned facts and label uncertainty. Be warm, specific, capable, and concise (usually 35 to 120 words). Use at most one specific question only when information is truly missing. Never diagnose, prescribe, assess safety, or claim clinical certainty. If urgent danger is mentioned, encourage local emergency help or 988 in the United States. Never mention internal tools.
 
 Routing rule:
 - Practical requests (reminders, alarms, calendar, phone features) get brief, concrete assistant help — the app shows an action card to approve. Emotional or reflective messages get therapeutic pacing: presence, one grounded observation, no task-list energy.
+- Treat an unfinished promise, correction, requested action, or named goal in recent turns as active until the member completes, changes, or cancels it.
+- For progress questions, separate observed facts, plausible interpretation, uncertainty, and one optional next action.
 
 Anti-repetition rules (highest priority):
 - Read the earlier assistant turns. Never repeat an idea, phrase, metaphor, or suggestion that already appears there.
@@ -1009,7 +1026,8 @@ Anti-repetition rules (highest priority):
 
 Example: If the member says their manager dismissed their work in front of the team and they froze, stay with the dismissal and the unfinished moment. A useful question might ask what they wish they had been able to say. Do not reduce it to a generic emotion check.<|im_end|>
 ''');
-    // Keep context well under nCtx: 6 recent turns, each capped, so the
+    // Keep context well under the 1K low-memory route while retaining enough
+    // continuity for corrections and unresolved commitments.
     // grown system prompt + history never overflow the window (an overflow
     // makes the engine emit nothing and every reply would fail).
     final recent = history.length > 4
@@ -1018,7 +1036,7 @@ Example: If the member says their manager dismissed their work in front of the t
     for (final turn in recent) {
       final role = turn.role == 'assistant' ? 'assistant' : 'user';
       var clean = _cleanPromptText(turn.text);
-      if (clean.length > 300) clean = '${clean.substring(0, 300)}…';
+      if (clean.length > 220) clean = '${clean.substring(0, 220)}…';
       if (clean.isEmpty) continue;
       prompt
         ..writeln('<|im_start|>$role')
@@ -1028,7 +1046,7 @@ Example: If the member says their manager dismissed their work in front of the t
     prompt
       ..writeln('<|im_start|>user')
       ..writeln(_cleanPromptText(userMessage))
-      ..writeln('<|im_end|>')
+      ..writeln('${_shouldDeliberate(userMessage) ? '/think' : '/no_think'}<|im_end|>')
       ..writeln('<|im_start|>assistant');
     return prompt.toString();
   }
