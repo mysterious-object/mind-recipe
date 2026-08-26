@@ -2,8 +2,11 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+
 import 'dart:io';
+
 import 'mobile_automation.dart';
+
 import 'package:url_launcher/url_launcher.dart';
 
 import 'account_gateway.dart';
@@ -20,6 +23,7 @@ import 'practitioner_sharing.dart';
 import 'pulse_screen.dart';
 import 'recipes_screen.dart';
 import 'voice_interface.dart';
+import 'three_intro_screen.dart';
 
 void main() => runApp(const MindRecipeApp());
 
@@ -35,6 +39,7 @@ class _MindRecipeAppState extends State<MindRecipeApp> {
   bool practitionerMode = false;
   bool onboardingComplete = false;
   bool _initializing = true;
+  bool _introComplete = false;
   late final MindRecipeApiClient api;
   late final SecureAppState appState;
 
@@ -135,7 +140,13 @@ class _MindRecipeAppState extends State<MindRecipeApp> {
         scaffoldBackgroundColor: MindRecipeTokens.voidBlack,
       ),
       themeMode: themeMode,
-      home: !appState.loaded || _initializing
+      home: !_introComplete
+          ? ThreeIntroScreen(
+              variant:
+                  (DateTime.now().millisecondsSinceEpoch ~/ 86400000 ~/ 2) % 6,
+              onComplete: () => setState(() => _introComplete = true),
+            )
+          : !appState.loaded || _initializing
           ? const Scaffold(body: Center(child: CircularProgressIndicator()))
           : appState.session == null
           ? AccountGateway(api: api, appState: appState)
@@ -225,7 +236,10 @@ class _MemberHomeState extends State<MemberHome> {
       final listening = VoiceInterface().isListening;
       String? snippet;
       for (var i = chatMessages.length - 1; i >= 0; i--) {
-        if (chatMessages[i].role == ChatRole.assistant) { snippet = chatMessages[i].text; break; }
+        if (chatMessages[i].role == ChatRole.assistant) {
+          snippet = chatMessages[i].text;
+          break;
+        }
       }
       final isNewSnippet = snippet != _lastSeenAssistantText;
       if (isNewSnippet && snippet != null) {
@@ -234,18 +248,22 @@ class _MemberHomeState extends State<MemberHome> {
         _bubbleDismissedAt = null;
       }
       // If dismissed, keep hidden for 90s or until a new assistant message arrives
-      final dismissedRecently = _bubbleDismissedAt != null &&
+      final dismissedRecently =
+          _bubbleDismissedAt != null &&
           DateTime.now().difference(_bubbleDismissedAt!).inSeconds < 90 &&
           !isNewSnippet;
       String? visibleSnippet = dismissedRecently ? null : snippet;
       // Also keep bubble visible for 12s after last assistant message even when not speaking
       // The snippet is already the visible one - no extra logic needed beyond dismissal
-      if (visibleSnippet != _lastAssistantSnippet || speaking != _voiceIsSpeaking || listening != _voiceIsListening) {
-        if (mounted) setState(() {
-          _voiceIsSpeaking = speaking;
-          _voiceIsListening = listening;
-          _lastAssistantSnippet = visibleSnippet;
-        });
+      if (visibleSnippet != _lastAssistantSnippet ||
+          speaking != _voiceIsSpeaking ||
+          listening != _voiceIsListening) {
+        if (mounted)
+          setState(() {
+            _voiceIsSpeaking = speaking;
+            _voiceIsListening = listening;
+            _lastAssistantSnippet = visibleSnippet;
+          });
       }
     });
   }
@@ -366,26 +384,40 @@ class _MemberHomeState extends State<MemberHome> {
   void _onRecipeAskNavigator(String prompt, String response) {
     setState(() {
       chatMessages.add(ChatMessage(role: ChatRole.member, text: prompt));
-      chatMessages.add(ChatMessage(role: ChatRole.assistant, text: response, localGenerated: true));
+      chatMessages.add(
+        ChatMessage(
+          role: ChatRole.assistant,
+          text: response,
+          localGenerated: true,
+        ),
+      );
     });
     goToPage(1);
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Added to Navigator — continue the conversation there')),
+      const SnackBar(
+        content: Text('Added to Navigator — continue the conversation there'),
+      ),
     );
   }
 
   void _recordNavigationEvent() {
     final now = DateTime.now().toUtc();
-    unawaited(widget.api.ingestMemberEvents(widget.appState.session?.token ?? '', [{
-      'id': 'daily-nav-${now.microsecondsSinceEpoch}',
-      'kind': 'daily_navigation_completed',
-      'occurred_at': now.toIso8601String(),
-      'source': 'daily_navigation',
-      'provenance': 'member',
-      'payload': {'route': '2067_daily_navigation'},
-      'consent_scope': 'device',
-      'schema_version': 'v1',
-    }]).catchError((_) {}));
+    unawaited(
+      widget.api
+          .ingestMemberEvents(widget.appState.session?.token ?? '', [
+            {
+              'id': 'daily-nav-${now.microsecondsSinceEpoch}',
+              'kind': 'daily_navigation_completed',
+              'occurred_at': now.toIso8601String(),
+              'source': 'daily_navigation',
+              'provenance': 'member',
+              'payload': {'route': '2067_daily_navigation'},
+              'consent_scope': 'device',
+              'schema_version': 'v1',
+            },
+          ])
+          .catchError((_) {}),
+    );
   }
 
   @override
@@ -425,14 +457,22 @@ class _MemberHomeState extends State<MemberHome> {
           messages: chatMessages,
         ),
       ),
-      _KeepAlivePage(child: RecipesScreen(api: widget.api, appState: widget.appState, onAskNavigator: _onRecipeAskNavigator)),
+      _KeepAlivePage(
+        child: RecipesScreen(
+          api: widget.api,
+          appState: widget.appState,
+          onAskNavigator: _onRecipeAskNavigator,
+        ),
+      ),
       _KeepAlivePage(
         child: PulseScreen(
           checkIn: checkIn,
           appState: widget.appState,
           onAskNavigator: (message) {
             setState(() {
-              chatMessages.add(ChatMessage(role: ChatRole.member, text: message));
+              chatMessages.add(
+                ChatMessage(role: ChatRole.member, text: message),
+              );
             });
             goToPage(1);
           },
@@ -516,7 +556,14 @@ class _MemberHomeState extends State<MemberHome> {
                         },
                         children: screens,
                       ),
-                      if (((_voiceIsSpeaking || _voiceIsListening) || _lastAssistantSnippet != null) && index != 1 && (_bubbleDismissedAt == null || DateTime.now().difference(_bubbleDismissedAt!).inSeconds >= 90))
+                      if (((_voiceIsSpeaking || _voiceIsListening) ||
+                              _lastAssistantSnippet != null) &&
+                          index != 1 &&
+                          (_bubbleDismissedAt == null ||
+                              DateTime.now()
+                                      .difference(_bubbleDismissedAt!)
+                                      .inSeconds >=
+                                  90))
                         Positioned(
                           left: 12,
                           right: 12,
@@ -524,37 +571,56 @@ class _MemberHomeState extends State<MemberHome> {
                           child: Material(
                             elevation: 8,
                             borderRadius: BorderRadius.circular(18),
-                            color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.96),
+                            color: Theme.of(context)
+                                .colorScheme
+                                .primaryContainer
+                                .withValues(alpha: 0.96),
                             child: InkWell(
                               borderRadius: BorderRadius.circular(18),
                               onTap: () => goToPage(1),
                               child: Padding(
-                                padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
+                                padding: const EdgeInsets.fromLTRB(
+                                  14,
+                                  10,
+                                  10,
+                                  10,
+                                ),
                                 child: Row(
                                   children: [
                                     MindRecipeOrbBadge(
                                       size: 26,
-                                      active: _voiceIsSpeaking || _voiceIsListening,
+                                      active:
+                                          _voiceIsSpeaking || _voiceIsListening,
                                     ),
                                     const SizedBox(width: 10),
                                     Expanded(
                                       child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
                                           Text(
                                             _voiceIsSpeaking
                                                 ? 'Navigator is speaking…'
                                                 : _voiceIsListening
-                                                    ? 'Navigator is listening…'
-                                                    : 'Navigator replied — tap to view',
-                                            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+                                                ? 'Navigator is listening…'
+                                                : 'Navigator replied — tap to view',
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w800,
+                                              fontSize: 13,
+                                            ),
                                           ),
                                           Text(
                                             _lastAssistantSnippet != null
-                                                ? (_lastAssistantSnippet!.length > 92 ? '${_lastAssistantSnippet!.substring(0, 92)}…' : _lastAssistantSnippet!)
+                                                ? (_lastAssistantSnippet!
+                                                              .length >
+                                                          92
+                                                      ? '${_lastAssistantSnippet!.substring(0, 92)}…'
+                                                      : _lastAssistantSnippet!)
                                                 : 'Tap to return to chat — audio continues in background',
-                                            style: const TextStyle(fontSize: 11),
+                                            style: const TextStyle(
+                                              fontSize: 11,
+                                            ),
                                             maxLines: 2,
                                             overflow: TextOverflow.ellipsis,
                                           ),
@@ -562,7 +628,10 @@ class _MemberHomeState extends State<MemberHome> {
                                       ),
                                     ),
                                     IconButton(
-                                      icon: const Icon(Icons.close_rounded, size: 18),
+                                      icon: const Icon(
+                                        Icons.close_rounded,
+                                        size: 18,
+                                      ),
                                       tooltip: 'Close',
                                       onPressed: () async {
                                         await VoiceInterface().stopSpeaking();
@@ -573,7 +642,10 @@ class _MemberHomeState extends State<MemberHome> {
                                         });
                                       },
                                     ),
-                                    const Icon(Icons.chevron_right_rounded, size: 18),
+                                    const Icon(
+                                      Icons.chevron_right_rounded,
+                                      size: 18,
+                                    ),
                                   ],
                                 ),
                               ),
@@ -625,7 +697,8 @@ class _KeepAlivePage extends StatefulWidget {
   State<_KeepAlivePage> createState() => _KeepAlivePageState();
 }
 
-class _KeepAlivePageState extends State<_KeepAlivePage> with AutomaticKeepAliveClientMixin {
+class _KeepAlivePageState extends State<_KeepAlivePage>
+    with AutomaticKeepAliveClientMixin {
   @override
   bool get wantKeepAlive => true;
   @override
@@ -702,7 +775,8 @@ class _PrivateModelDownloadBannerState
     final isDownloading = _snap.status == OnDeviceStatus.downloading;
     final isVerifying = _snap.status == OnDeviceStatus.verifying;
     final isError = _snap.status == OnDeviceStatus.error;
-    if (!isDownloading && !isVerifying && !isError) return const SizedBox.shrink();
+    if (!isDownloading && !isVerifying && !isError)
+      return const SizedBox.shrink();
     if (isError && _errorDismissed) return const SizedBox.shrink();
     if (isError) {
       return Material(
@@ -719,7 +793,10 @@ class _PrivateModelDownloadBannerState
                 Expanded(
                   child: Text(
                     _snap.detail ?? 'Private model setup failed.',
-                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12.5,
+                    ),
                   ),
                 ),
                 TextButton(
@@ -1052,7 +1129,12 @@ class RecipePracticeScreen extends StatelessWidget {
 }
 
 class ProgressScreen extends StatefulWidget {
-  const ProgressScreen({super.key, required this.checkIn, required this.tools, required this.appState});
+  const ProgressScreen({
+    super.key,
+    required this.checkIn,
+    required this.tools,
+    required this.appState,
+  });
   final CheckInState checkIn;
   final Set<String> tools;
   final SecureAppState appState;
@@ -1072,12 +1154,17 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
   Future<void> _load() async {
     final c = await widget.appState.loadCurriculumProgress();
-    if (mounted) setState(() { _curriculum = c; _loading = false; });
+    if (mounted)
+      setState(() {
+        _curriculum = c;
+        _loading = false;
+      });
   }
 
   @override
   Widget build(BuildContext context) {
-    final completed = (_curriculum?['completed_lesson_ids'] as List?)?.length ?? 0;
+    final completed =
+        (_curriculum?['completed_lesson_ids'] as List?)?.length ?? 0;
     const total = 15;
     final pct = total == 0 ? 0.0 : completed / total;
     final streak = _streakDays();
@@ -1085,31 +1172,71 @@ class _ProgressScreenState extends State<ProgressScreen> {
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
-        const Text('Your progress', style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
+        const Text(
+          'Your progress',
+          style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
+        ),
         const SizedBox(height: 4),
-        Text('Recipes, practices, and daily navigation — woven together', style: Theme.of(context).textTheme.bodyMedium),
+        Text(
+          'Recipes, practices, and daily navigation — woven together',
+          style: Theme.of(context).textTheme.bodyMedium,
+        ),
         const SizedBox(height: 16),
         Card(
-          color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.5),
+          color: Theme.of(context).colorScheme.primaryContainer
+              .withValues(alpha: 0.5),
           child: Padding(
             padding: const EdgeInsets.all(16),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(children: [
-                SizedBox(width: 56, height: 56, child: Stack(alignment: Alignment.center, children: [
-                  CircularProgressIndicator(value: pct, strokeWidth: 6),
-                  Text('$completed', style: const TextStyle(fontWeight: FontWeight.w800)),
-                ])),
-                const SizedBox(width: 12),
-                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('$completed of $total recipes complete', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
-                  Text(streak == 0 ? 'Start a streak — one lesson a day keeps the path warm' : '$streak-day streak · keep it gentle', style: Theme.of(context).textTheme.bodySmall),
-                ])),
-              ]),
-              const SizedBox(height: 12),
-              LinearProgressIndicator(value: pct, minHeight: 6, borderRadius: BorderRadius.circular(99)),
-              const SizedBox(height: 8),
-              Text(insight, style: Theme.of(context).textTheme.bodySmall),
-            ]),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    SizedBox(
+                      width: 56,
+                      height: 56,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          CircularProgressIndicator(value: pct, strokeWidth: 6),
+                          Text(
+                            '$completed',
+                            style: const TextStyle(fontWeight: FontWeight.w800),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '$completed of $total recipes complete',
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(fontWeight: FontWeight.w800),
+                          ),
+                          Text(
+                            streak == 0
+                                ? 'Start a streak — one lesson a day keeps the path warm'
+                                : '$streak-day streak · keep it gentle',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                LinearProgressIndicator(
+                  value: pct,
+                  minHeight: 6,
+                  borderRadius: BorderRadius.circular(99),
+                ),
+                const SizedBox(height: 8),
+                Text(insight, style: Theme.of(context).textTheme.bodySmall),
+              ],
+            ),
           ),
         ),
         Card(
@@ -1119,7 +1246,11 @@ class _ProgressScreenState extends State<ProgressScreen> {
             subtitle: Text(
               widget.checkIn.emotions.isEmpty
                   ? 'No emotions selected yet — your next recipe will adapt once you check in.'
-                  : '${widget.checkIn.emotions.join(', ')} · Activation ${widget.checkIn.activation}/10 · ${widget.checkIn.activation >= 7 ? 'Try Grounding (Module 2) today' : widget.checkIn.activation <= 3 ? 'Try Vision & Values (Module 3) today' : 'Try Mindfulness (Module 1) today'}',
+                  : '${widget.checkIn.emotions.join(', ')} · Activation ${widget.checkIn.activation}/10 · ${widget.checkIn.activation >= 7
+                        ? 'Try Grounding (Module 2) today'
+                        : widget.checkIn.activation <= 3
+                        ? 'Try Vision & Values (Module 3) today'
+                        : 'Try Mindfulness (Module 1) today'}',
             ),
           ),
         ),
@@ -1134,26 +1265,46 @@ class _ProgressScreenState extends State<ProgressScreen> {
           child: ListTile(
             leading: const Icon(Icons.spa_rounded),
             title: Text('${widget.tools.length} saved practices'),
-            subtitle: Text(widget.tools.isEmpty ? 'Save a practice from Recipes or Navigator — then we’ll surface what helps most' : 'We track which practices you rate most effective and surface them here'),
+            subtitle: Text(
+              widget.tools.isEmpty
+                  ? 'Save a practice from Recipes or Navigator — then we’ll surface what helps most'
+                  : 'We track which practices you rate most effective and surface them here',
+            ),
           ),
         ),
         const Card(
           child: ListTile(
             leading: Icon(Icons.auto_awesome_rounded),
             title: Text('How this fits together'),
-            subtitle: Text('Daily navigation → Recipes teach the skill → you practice → Progress shows what steadies you. Small steps, noticed over days, build your recipe.'),
+            subtitle: Text(
+              'Daily navigation → Recipes teach the skill → you practice → Progress shows what steadies you. Small steps, noticed over days, build your recipe.',
+            ),
           ),
         ),
-        if (_loading) const Padding(padding: EdgeInsets.all(12), child: LinearProgressIndicator()),
+        if (_loading)
+          const Padding(
+            padding: EdgeInsets.all(12),
+            child: LinearProgressIndicator(),
+          ),
       ],
     );
   }
 
   String _moduleBreakdown() {
-    final ids = (_curriculum?['completed_lesson_ids'] as List?)?.map((e) => e.toString()).toSet() ?? {};
-    int m1 = [1,2,3,4,5].where((n) => ids.contains('lesson-$n')).length;
-    int m2 = [6,7,8,9,10].where((n) => ids.contains('lesson-$n')).length;
-    int m3 = [11,12,13,14,15].where((n) => ids.contains('lesson-$n')).length;
+    final ids =
+        (_curriculum?['completed_lesson_ids'] as List?)
+            ?.map((e) => e.toString())
+            .toSet() ??
+        {};
+    int m1 = [1, 2, 3, 4, 5].where((n) => ids.contains('lesson-$n')).length;
+    int m2 = [6, 7, 8, 9, 10].where((n) => ids.contains('lesson-$n')).length;
+    int m3 = [
+      11,
+      12,
+      13,
+      14,
+      15,
+    ].where((n) => ids.contains('lesson-$n')).length;
     return 'Foundations $m1/5 · Patterns $m2/5 · Direction $m3/5';
   }
 
@@ -1170,10 +1321,14 @@ class _ProgressScreenState extends State<ProgressScreen> {
   }
 
   String _insight(int completed) {
-    if (completed == 0) return 'Start with Foundations — Notice What Is Present. One lesson a day is enough; consistency matters more than speed.';
-    if (completed < 5) return 'Nice start in Foundations. Daily practice helps your nervous system learn what “steady” feels like.';
-    if (completed < 10) return 'You’re building Patterns. Progress shows which practices you return to — that’s your personal recipe emerging.';
-    if (completed < 15) return 'Direction ahead. Your Progress insights will suggest the next small, values-aligned step.';
+    if (completed == 0)
+      return 'Start with Foundations — Notice What Is Present. One lesson a day is enough; consistency matters more than speed.';
+    if (completed < 5)
+      return 'Nice start in Foundations. Daily practice helps your nervous system learn what “steady” feels like.';
+    if (completed < 10)
+      return 'You’re building Patterns. Progress shows which practices you return to — that’s your personal recipe emerging.';
+    if (completed < 15)
+      return 'Direction ahead. Your Progress insights will suggest the next small, values-aligned step.';
     return 'All 15 complete — revisit any lesson. Progress now highlights your most effective practices.';
   }
 }
@@ -1183,10 +1338,34 @@ class BookingScreen extends StatelessWidget {
   static const bookingUrl = String.fromEnvironment('BOOKING_URL');
 
   static const _healthApps = [
-    ('MyChart', 'Health records & visits', 'com.epic.mychart', 'https://apps.apple.com/us/app/mychart/id1040635943', 'https://play.google.com/store/apps/details?id=com.epic.mychart'),
-    ('Down Dog', 'Yoga & movement', 'com.downdogapp', 'https://apps.apple.com/us/app/down-dog-great-yoga-workouts/id1312878494', 'https://play.google.com/store/apps/details?id=com.downdogapp'),
-    ('Insight Timer', 'Meditation & sleep', 'com.spotlightsix.zentimerlite2', 'https://apps.apple.com/us/app/insight-timer-meditation/id337502354', 'https://play.google.com/store/apps/details?id=com.spotlightsix.zentimerlite2'),
-    ('Calm', 'Sleep & calm', 'com.calm.android', 'https://apps.apple.com/us/app/calm/id571800810', 'https://play.google.com/store/apps/details?id=com.calm.android'),
+    (
+      'MyChart',
+      'Health records & visits',
+      'com.epic.mychart',
+      'https://apps.apple.com/us/app/mychart/id1040635943',
+      'https://play.google.com/store/apps/details?id=com.epic.mychart',
+    ),
+    (
+      'Down Dog',
+      'Yoga & movement',
+      'com.downdogapp',
+      'https://apps.apple.com/us/app/down-dog-great-yoga-workouts/id1312878494',
+      'https://play.google.com/store/apps/details?id=com.downdogapp',
+    ),
+    (
+      'Insight Timer',
+      'Meditation & sleep',
+      'com.spotlightsix.zentimerlite2',
+      'https://apps.apple.com/us/app/insight-timer-meditation/id337502354',
+      'https://play.google.com/store/apps/details?id=com.spotlightsix.zentimerlite2',
+    ),
+    (
+      'Calm',
+      'Sleep & calm',
+      'com.calm.android',
+      'https://apps.apple.com/us/app/calm/id571800810',
+      'https://play.google.com/store/apps/details?id=com.calm.android',
+    ),
   ];
 
   Future<void> _openApp(BuildContext context, String name) async {
@@ -1232,7 +1411,10 @@ class BookingScreen extends StatelessWidget {
         if (bookingUrl.isNotEmpty) ...[
           const SizedBox(height: 10),
           OutlinedButton.icon(
-            onPressed: () => launchUrl(Uri.parse(bookingUrl), mode: LaunchMode.externalApplication),
+            onPressed: () => launchUrl(
+              Uri.parse(bookingUrl),
+              mode: LaunchMode.externalApplication,
+            ),
             icon: const Icon(Icons.open_in_new_rounded),
             label: const Text('Open scheduling provider'),
           ),
@@ -1240,7 +1422,11 @@ class BookingScreen extends StatelessWidget {
         const SizedBox(height: 24),
         const Text(
           'CONTINUE IN A HEALTH APP',
-          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, letterSpacing: 1.1),
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 1.1,
+          ),
         ),
         const SizedBox(height: 4),
         const Text(
@@ -1253,7 +1439,10 @@ class BookingScreen extends StatelessWidget {
             margin: const EdgeInsets.only(bottom: 8),
             child: ListTile(
               leading: const Icon(Icons.health_and_safety_rounded),
-              title: Text(app.$1, style: const TextStyle(fontWeight: FontWeight.w700)),
+              title: Text(
+                app.$1,
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
               subtitle: Text(app.$2),
               trailing: const Icon(Icons.chevron_right_rounded),
               onTap: () => _openApp(context, app.$1),
@@ -1269,6 +1458,7 @@ class BookingScreen extends StatelessWidget {
     ),
   );
 }
+
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({
     super.key,
@@ -1660,7 +1850,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   children: [
                     const Text(
                       'BACKGROUND VFX',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, letterSpacing: 1.1),
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.1,
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -1682,9 +1876,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ('void', 'Void Minimal', Icons.nights_stay_rounded),
                           ('prism', 'Prism Burst', Icons.auto_awesome_rounded),
                           ('aurora', 'Aurora Bloom', Icons.wb_twilight_rounded),
-                          ('ember', 'Ember Warm', Icons.local_fire_department_rounded),
+                          (
+                            'ember',
+                            'Ember Warm',
+                            Icons.local_fire_department_rounded,
+                          ),
                           ('ocean', 'Ocean Depth', Icons.waves_rounded),
-                          ('twilight', 'Twilight Veil', Icons.nightlight_rounded),
+                          (
+                            'twilight',
+                            'Twilight Veil',
+                            Icons.nightlight_rounded,
+                          ),
                         ])
                           ChoiceChip(
                             label: Text(v.$2),
@@ -1748,75 +1950,123 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Builder(builder: (context) {
-                    final choice = mindRecipePrivateModelChoices.first;
-                    final isActive = choice.manifest.id == OnDeviceInference().activeModel.id && _privateModel.isReady;
-                    final isDownloaded = _downloadedPrivateModelIds.contains(choice.manifest.id);
-                    return Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Theme.of(context).colorScheme.primary, width: 1.2),
-                        borderRadius: BorderRadius.circular(14),
-                        color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.18),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(children: [
-                            const Icon(Icons.shield_rounded, size: 20),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                choice.name,
-                                maxLines: 1,
-                                softWrap: false,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
-                              ),
-                            ),
-                            if (isActive) const Chip(avatar: Icon(Icons.check_circle, size: 16), label: Text('Active')),
-                            if (isActive) const SizedBox(width: 8),
-                            const Chip(label: Text('On-device')),
-                          ]),
-                          const SizedBox(height: 6),
-                          Text(choice.quality, style: Theme.of(context).textTheme.bodyMedium),
-                          const SizedBox(height: 4),
-                          Text('${choice.bestFor}\n${choice.memoryNote}', style: Theme.of(context).textTheme.bodySmall),
-                          const SizedBox(height: 12),
-                          SizedBox(
-                            width: double.infinity,
-                            child: isActive
-                                ? OutlinedButton.icon(
-                                    onPressed: _modelActionInProgress ? null : () => _removePrivateModel(choice),
-                                    icon: const Icon(Icons.delete_outline_rounded, size: 18),
-                                    label: const Text('Remove Private model'),
-                                  )
-                                : isDownloaded
-                                    ? FilledButton.icon(
-                                        onPressed: _modelActionInProgress ? null : () => _usePrivateModel(choice),
-                                        icon: const Icon(Icons.check_rounded, size: 18),
-                                        label: const Text('Use Private model'),
-                                      )
-                                    : FilledButton.icon(
-                                        onPressed: _modelActionInProgress ? null : _installPrivateModel,
-                                        icon: const Icon(Icons.download_rounded, size: 18),
-                                        label: const Text('Download Private model'),
-                                      ),
+                  Builder(
+                    builder: (context) {
+                      final choice = mindRecipePrivateModelChoices.first;
+                      final isActive =
+                          choice.manifest.id ==
+                              OnDeviceInference().activeModel.id &&
+                          _privateModel.isReady;
+                      final isDownloaded = _downloadedPrivateModelIds.contains(
+                        choice.manifest.id,
+                      );
+                      return Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: Theme.of(context).colorScheme.primary,
+                            width: 1.2,
                           ),
-                          if (isDownloaded && !isActive)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 8),
-                              child: TextButton.icon(
-                                onPressed: _modelActionInProgress ? null : () => _removePrivateModel(choice),
-                                icon: const Icon(Icons.delete_outline_rounded, size: 16),
-                                label: const Text('Remove download'),
-                              ),
+                          borderRadius: BorderRadius.circular(14),
+                          color: Theme.of(context).colorScheme.primaryContainer
+                              .withOpacity(0.18),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.shield_rounded, size: 20),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    choice.name,
+                                    maxLines: 1,
+                                    softWrap: false,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                ),
+                                if (isActive)
+                                  const Chip(
+                                    avatar: Icon(Icons.check_circle, size: 16),
+                                    label: Text('Active'),
+                                  ),
+                                if (isActive) const SizedBox(width: 8),
+                                const Chip(label: Text('On-device')),
+                              ],
                             ),
-                        ],
-                      ),
-                    );
-                  }),
+                            const SizedBox(height: 6),
+                            Text(
+                              choice.quality,
+                              style: Theme.of(context).textTheme.bodyMedium,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${choice.bestFor}\n${choice.memoryNote}',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                            const SizedBox(height: 12),
+                            SizedBox(
+                              width: double.infinity,
+                              child: isActive
+                                  ? OutlinedButton.icon(
+                                      onPressed: _modelActionInProgress
+                                          ? null
+                                          : () => _removePrivateModel(choice),
+                                      icon: const Icon(
+                                        Icons.delete_outline_rounded,
+                                        size: 18,
+                                      ),
+                                      label: const Text('Remove Private model'),
+                                    )
+                                  : isDownloaded
+                                  ? FilledButton.icon(
+                                      onPressed: _modelActionInProgress
+                                          ? null
+                                          : () => _usePrivateModel(choice),
+                                      icon: const Icon(
+                                        Icons.check_rounded,
+                                        size: 18,
+                                      ),
+                                      label: const Text('Use Private model'),
+                                    )
+                                  : FilledButton.icon(
+                                      onPressed: _modelActionInProgress
+                                          ? null
+                                          : _installPrivateModel,
+                                      icon: const Icon(
+                                        Icons.download_rounded,
+                                        size: 18,
+                                      ),
+                                      label: const Text(
+                                        'Download Private model',
+                                      ),
+                                    ),
+                            ),
+                            if (isDownloaded && !isActive)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 8),
+                                child: TextButton.icon(
+                                  onPressed: _modelActionInProgress
+                                      ? null
+                                      : () => _removePrivateModel(choice),
+                                  icon: const Icon(
+                                    Icons.delete_outline_rounded,
+                                    size: 16,
+                                  ),
+                                  label: const Text('Remove download'),
+                                ),
+                              ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
                   const SizedBox(height: 8),
                   Text(
                     'One private model — 1.2 GB, stays on this device, verified before it can run. Download once, use everywhere.',
@@ -1854,9 +2104,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: Text(
                 _privateModel.isReady
                     ? 'Private model ready — stays on this device.'
-                    : _privateModel.status == OnDeviceStatus.downloading || _privateModel.status == OnDeviceStatus.verifying
-                        ? 'Preparing private model — you can keep using the app.'
-                        : 'Tap Download Private model above to enable on-device guidance.',
+                    : _privateModel.status == OnDeviceStatus.downloading ||
+                          _privateModel.status == OnDeviceStatus.verifying
+                    ? 'Preparing private model — you can keep using the app.'
+                    : 'Tap Download Private model above to enable on-device guidance.',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             ),
@@ -1967,12 +2218,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
           builder: (context, snap) => Text(
             'Mind Recipe ${snap.data?.version ?? '1.0.0'} (${snap.data?.buildNumber ?? '—'}) · by Context Field',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context)
-                      .textTheme
-                      .bodySmall
-                      ?.color
-                      ?.withValues(alpha: 0.45),
-                ),
+              color: Theme.of(context).textTheme.bodySmall?.color
+                  ?.withValues(alpha: 0.45),
+            ),
           ),
         ),
       ),

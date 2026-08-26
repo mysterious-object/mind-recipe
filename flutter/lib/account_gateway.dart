@@ -12,7 +12,8 @@ class AccountGateway extends StatefulWidget {
   State<AccountGateway> createState() => _AccountGatewayState();
 }
 
-class _AccountGatewayState extends State<AccountGateway> {
+class _AccountGatewayState extends State<AccountGateway>
+    with SingleTickerProviderStateMixin {
   final name = TextEditingController();
   final email = TextEditingController();
   final password = TextEditingController();
@@ -26,6 +27,16 @@ class _AccountGatewayState extends State<AccountGateway> {
   bool acceptedTerms = false;
   String? error;
   String? info;
+  late final AnimationController _logoController;
+
+  @override
+  void initState() {
+    super.initState();
+    _logoController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 5),
+    )..repeat(reverse: true);
+  }
 
   String? _validationError() {
     final normalizedEmail = email.text.trim();
@@ -65,6 +76,7 @@ class _AccountGatewayState extends State<AccountGateway> {
 
   @override
   void dispose() {
+    _logoController.dispose();
     name.dispose();
     email.dispose();
     password.dispose();
@@ -177,10 +189,20 @@ class _AccountGatewayState extends State<AccountGateway> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         Center(
-                          child: Image.asset(
-                            'assets/branding/mind-recipe-mark.png',
-                            height: 92,
-                            fit: BoxFit.contain,
+                          child: AnimatedBuilder(
+                            animation: _logoController,
+                            builder: (context, child) => Transform.rotate(
+                              angle: (_logoController.value - .5) * .035,
+                              child: Transform.scale(
+                                scale: .96 + _logoController.value * .08,
+                                child: child,
+                              ),
+                            ),
+                            child: Image.asset(
+                              'assets/branding/mind-recipe-mark.png',
+                              height: 92,
+                              fit: BoxFit.contain,
+                            ),
                           ),
                         ),
                         const SizedBox(height: 18),
@@ -202,7 +224,9 @@ class _AccountGatewayState extends State<AccountGateway> {
                         const SizedBox(height: 8),
                         Text(
                           resetting
-                              ? (resetTokenStage ? 'Choose a new password' : 'Reset your password')
+                              ? (resetTokenStage
+                                    ? 'Choose a new password'
+                                    : 'Reset your password')
                               : creating
                               ? 'Create your private space'
                               : 'Welcome back, navigator',
@@ -241,20 +265,26 @@ class _AccountGatewayState extends State<AccountGateway> {
                             autocorrect: false,
                             decoration: const InputDecoration(
                               labelText: 'Reset code',
-                              helperText: 'From the reset link or support message',
+                              helperText:
+                                  'From the reset link or support message',
                               prefixIcon: Icon(Icons.vpn_key_outlined),
                               border: OutlineInputBorder(),
                             ),
                           ),
-                        if (resetting && resetTokenStage) const SizedBox(height: 12),
+                        if (resetting && resetTokenStage)
+                          const SizedBox(height: 12),
                         if (!resetting || resetTokenStage)
                           TextField(
                             controller: password,
                             obscureText: obscure,
                             onSubmitted: (_) => busy ? null : submit(),
                             decoration: InputDecoration(
-                              labelText: resetting ? 'New password' : 'Password',
-                              helperText: (!resetting && creating) || (resetting && resetTokenStage)
+                              labelText: resetting
+                                  ? 'New password'
+                                  : 'Password',
+                              helperText:
+                                  (!resetting && creating) ||
+                                      (resetting && resetTokenStage)
                                   ? '10 characters minimum'
                                   : null,
                               prefixIcon: const Icon(Icons.lock_outline),
@@ -270,7 +300,8 @@ class _AccountGatewayState extends State<AccountGateway> {
                               ),
                             ),
                           ),
-                        if (creating || (resetting && resetTokenStage)) const SizedBox(height: 12),
+                        if (creating || (resetting && resetTokenStage))
+                          const SizedBox(height: 12),
                         if (creating || (resetting && resetTokenStage))
                           TextField(
                             controller: confirmPassword,
@@ -326,7 +357,9 @@ class _AccountGatewayState extends State<AccountGateway> {
                             busy
                                 ? 'Connecting…'
                                 : resetting
-                                ? (resetTokenStage ? 'Set new password' : 'Send reset code')
+                                ? (resetTokenStage
+                                      ? 'Set new password'
+                                      : 'Send reset code')
                                 : creating
                                 ? 'Create account'
                                 : 'Sign in',

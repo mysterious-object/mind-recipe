@@ -15,6 +15,7 @@ pipeline {
   environment {
     MIND_RECIPE_STAGING_API_URL = 'https://staging-api.mindrecipe.142.93.201.156.sslip.io'
     FLUTTER_DIR = 'flutter'
+    MIND_RECIPE_DRIVE_FOLDER = '14JW3fnMrR9-e4akDTgfgFYiS73r3Kvd'
   }
 
   options {
@@ -79,6 +80,24 @@ pipeline {
           '''
         }
         stash(name: 'ipa', includes: 'flutter/build/ios/ipa/mind-recipe-ios-unsigned.ipa')
+      }
+    }
+
+    stage('Deliver builds to Google Drive') {
+      when { expression { return currentBuild.currentResult == 'SUCCESS' } }
+      steps {
+        withCredentials([file(credentialsId: 'mind-recipe-google-drive-service-account', variable: 'GOOGLE_APPLICATION_CREDENTIALS')]) {
+          sh '''
+            chmod +x ci/upload_drive.sh
+            ci/upload_drive.sh flutter/build/app/outputs/flutter-apk/app-release.apk \
+              Mind-Recipe-1.0.0-2074-Android.apk "$MIND_RECIPE_DRIVE_FOLDER"
+            if [ -f flutter/build/ios/ipa/mind-recipe-ios-unsigned.ipa ]; then
+              ci/upload_drive.sh flutter/build/ios/ipa/mind-recipe-ios-unsigned.ipa \
+                Mind-Recipe-1.0.0-2074-iOS-unsigned.ipa "$MIND_RECIPE_DRIVE_FOLDER" \
+                victoria@contextfield.co
+            fi
+          '''
+        }
       }
     }
   }

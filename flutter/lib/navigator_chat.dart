@@ -146,16 +146,30 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
 
   Future<void> _saveCurrentThread() async {
     if (widget.messages.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No conversation to save yet.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No conversation to save yet.')),
+      );
       return;
     }
-    final title = widget.messages.firstWhere((m) => m.role == ChatRole.member, orElse: () => widget.messages.first).text;
+    final title = widget.messages
+        .firstWhere(
+          (m) => m.role == ChatRole.member,
+          orElse: () => widget.messages.first,
+        )
+        .text;
     final shortTitle = title.length > 48 ? '${title.substring(0, 48)}…' : title;
-    final msgs = widget.messages.map((m) => {'role': m.role.name, 'text': m.text}).toList();
+    final msgs = widget.messages
+        .map((m) => {'role': m.role.name, 'text': m.text})
+        .toList();
     await widget.appState.saveThread(shortTitle, msgs);
     final threads = await widget.appState.loadSavedThreads();
     if (mounted) setState(() => _savedThreads = threads);
-    if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Thread saved — find it in Saved threads')));
+    if (mounted)
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Thread saved — find it in Saved threads'),
+        ),
+      );
   }
 
   Future<void> _showSavedThreads() async {
@@ -168,52 +182,77 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
       isScrollControlled: true,
       builder: (ctx) => FractionallySizedBox(
         heightFactor: 0.85,
-        child: Column(children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-            child: Row(children: [
-              const Icon(Icons.bookmark_rounded),
-              const SizedBox(width: 8),
-              const Text('Saved threads', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
-              const Spacer(),
-              Text('${threads.length} saved'),
-            ]),
-          ),
-          const Divider(height: 1),
-          Expanded(
-            child: threads.isEmpty
-                ? const Center(child: Text('No saved threads yet — tap Save thread in chat to keep one.'))
-                : ListView.separated(
-                    padding: const EdgeInsets.all(12),
-                    itemCount: threads.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 8),
-                    itemBuilder: (ctx, i) {
-                      final t = threads[i];
-                      final msgs = (t['messages'] as List).length;
-                      return Card(
-                        child: ListTile(
-                          title: Text(t['title']?.toString() ?? 'Untitled', maxLines: 2, overflow: TextOverflow.ellipsis),
-                          subtitle: Text('$msgs messages · ${t['saved_at']?.toString().substring(0, 10) ?? ''}'),
-                          trailing: const Icon(Icons.chevron_right_rounded),
-                          onTap: () {
-                            Navigator.pop(ctx);
-                            // Restore thread: replace current messages
-                            setState(() {
-                              widget.messages
-                                ..clear()
-                                ..addAll((t['messages'] as List).map((m) => ChatMessage(
-                                      role: m['role'] == 'assistant' ? ChatRole.assistant : m['role'] == 'member' ? ChatRole.member : ChatRole.status,
-                                      text: m['text']?.toString() ?? '',
-                                    )));
-                            });
-                            widget.onChanged();
-                          },
-                        ),
-                      );
-                    },
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+              child: Row(
+                children: [
+                  const Icon(Icons.bookmark_rounded),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Saved threads',
+                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
                   ),
-          ),
-        ]),
+                  const Spacer(),
+                  Text('${threads.length} saved'),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            Expanded(
+              child: threads.isEmpty
+                  ? const Center(
+                      child: Text(
+                        'No saved threads yet — tap Save thread in chat to keep one.',
+                      ),
+                    )
+                  : ListView.separated(
+                      padding: const EdgeInsets.all(12),
+                      itemCount: threads.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 8),
+                      itemBuilder: (ctx, i) {
+                        final t = threads[i];
+                        final msgs = (t['messages'] as List).length;
+                        return Card(
+                          child: ListTile(
+                            title: Text(
+                              t['title']?.toString() ?? 'Untitled',
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            subtitle: Text(
+                              '$msgs messages · ${t['saved_at']?.toString().substring(0, 10) ?? ''}',
+                            ),
+                            trailing: const Icon(Icons.chevron_right_rounded),
+                            onTap: () {
+                              Navigator.pop(ctx);
+                              // Restore thread: replace current messages
+                              setState(() {
+                                widget.messages
+                                  ..clear()
+                                  ..addAll(
+                                    (t['messages'] as List).map(
+                                      (m) => ChatMessage(
+                                        role: m['role'] == 'assistant'
+                                            ? ChatRole.assistant
+                                            : m['role'] == 'member'
+                                            ? ChatRole.member
+                                            : ChatRole.status,
+                                        text: m['text']?.toString() ?? '',
+                                      ),
+                                    ),
+                                  );
+                              });
+                              widget.onChanged();
+                            },
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -366,8 +405,13 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
       if (reply != null && _isRepetitiveOfLastAssistant(reply)) {
         await _log('REPETITION detected — retrying with variation nudge');
         if (mounted && placeholderIndex < widget.messages.length) {
-          setState(() => widget.messages[placeholderIndex] =
-              ChatMessage(role: ChatRole.assistant, text: '', localGenerated: true));
+          setState(
+            () => widget.messages[placeholderIndex] = ChatMessage(
+              role: ChatRole.assistant,
+              text: '',
+              localGenerated: true,
+            ),
+          );
         }
         reply = await _localInference.infer(
           '${plan.augment(text)}\n\nImportant: your previous reply repeated what you already said. Respond with ONE concrete, different suggestion or question you have not used in this conversation. Reference the member\'s latest words specifically.',
@@ -410,6 +454,7 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
           widget.messages.removeAt(placeholderIndex);
         }
       }
+
       await _log(
         'REPLY null=${replyToUse == null} len=${replyToUse?.length ?? 0} preview="${replyToUse?.substring(0, replyToUse != null && replyToUse.length > 100 ? 100 : replyToUse?.length ?? 0)}"',
       );
@@ -605,7 +650,8 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
     final a = words(reply);
     final b = words(lastAssistant);
     if (a.isEmpty || b.isEmpty) return false;
-    final overlap = a.intersection(b).length / (a.length < b.length ? a.length : b.length);
+    final overlap =
+        a.intersection(b).length / (a.length < b.length ? a.length : b.length);
     return overlap > 0.6;
   }
 
@@ -795,11 +841,6 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
               localReady: _localSnapshot.isReady,
               thinking: sending,
               turn: turn,
-              cloudAiEnabled: widget.appState.cloudAiEnabled,
-              onToggleCloudAi: (v) async {
-                await widget.appState.setCloudAiEnabled(v);
-                if (mounted) setState(() {});
-              },
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
@@ -809,24 +850,37 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   OutlinedButton.icon(
-                    onPressed: widget.messages.isEmpty ? null : _saveCurrentThread,
+                    onPressed: widget.messages.isEmpty
+                        ? null
+                        : _saveCurrentThread,
                     icon: const Icon(Icons.bookmark_add_outlined, size: 16),
-                    label: const Text('Save thread', style: TextStyle(fontSize: 12)),
-                    style: OutlinedButton.styleFrom(visualDensity: VisualDensity.compact),
+                    label: const Text(
+                      'Save thread',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                    ),
                   ),
                   OutlinedButton.icon(
                     onPressed: _showSavedThreads,
                     icon: const Icon(Icons.bookmarks_outlined, size: 16),
-                    label: Text('Saved (${_savedThreads.length})', style: const TextStyle(fontSize: 12)),
-                    style: OutlinedButton.styleFrom(visualDensity: VisualDensity.compact),
+                    label: Text(
+                      'Saved (${_savedThreads.length})',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                    ),
                   ),
-                if (widget.messages.isNotEmpty)
-                  IconButton(
-                    icon: const Icon(Icons.delete_sweep_outlined, size: 18),
-                    tooltip: 'Clear chat',
-                    onPressed: () => setState(() => widget.messages.clear()),
-                  ),
-              ]),
+                  if (widget.messages.isNotEmpty)
+                    IconButton(
+                      icon: const Icon(Icons.delete_sweep_outlined, size: 18),
+                      tooltip: 'Clear chat',
+                      onPressed: () => setState(() => widget.messages.clear()),
+                    ),
+                ],
+              ),
             ),
             Expanded(
               child: ListView.builder(
@@ -859,6 +913,17 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
                 onAllow: () => _executePhoneAction(_pendingPhoneAction!),
                 onDismiss: () => setState(() => _pendingPhoneAction = null),
               ),
+            _ModelRouteSelector(
+              useCloud: widget.appState.cloudAiEnabled,
+              localReady: _localSnapshot.isReady,
+              cloudReady: cloudAvailable,
+              onChanged: sending
+                  ? null
+                  : (useCloud) async {
+                      await widget.appState.setCloudAiEnabled(useCloud);
+                      if (mounted) setState(() {});
+                    },
+            ),
             _Composer(
               controller: composer,
               canSend: canSend,
@@ -910,7 +975,8 @@ class _PhoneActionCard extends StatelessWidget {
               children: [
                 Icon(
                   switch (action.type) {
-                    PhoneActionType.reminder => Icons.notifications_active_outlined,
+                    PhoneActionType.reminder =>
+                      Icons.notifications_active_outlined,
                     PhoneActionType.appointment => Icons.event_outlined,
                     PhoneActionType.alarm => Icons.alarm_outlined,
                   },
@@ -921,7 +987,10 @@ class _PhoneActionCard extends StatelessWidget {
                 Expanded(
                   child: Text(
                     action.summary,
-                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 13.5,
+                    ),
                   ),
                 ),
                 IconButton(
@@ -990,16 +1059,12 @@ class _PresenceHeader extends StatelessWidget {
     required this.localReady,
     required this.thinking,
     required this.turn,
-    required this.cloudAiEnabled,
-    required this.onToggleCloudAi,
   });
   final Animation<double> animation;
   final bool cloudAvailable;
   final bool localReady;
   final bool thinking;
   final int turn;
-  final bool cloudAiEnabled;
-  final ValueChanged<bool> onToggleCloudAi;
 
   @override
   Widget build(BuildContext context) {
@@ -1007,7 +1072,11 @@ class _PresenceHeader extends StatelessWidget {
     final statusColor = online
         ? MindRecipeFxPalette.livingGreen
         : Colors.orange;
-    final statusLabel = localReady ? 'PRIVATE' : cloudAvailable ? 'CLOUD' : 'OFFLINE';
+    final statusLabel = localReady
+        ? 'PRIVATE'
+        : cloudAvailable
+        ? 'CLOUD'
+        : 'OFFLINE';
 
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
@@ -1015,44 +1084,40 @@ class _PresenceHeader extends StatelessWidget {
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.82),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: statusColor.withValues(alpha: 0.30),
-        ),
+        border: Border.all(color: statusColor.withValues(alpha: 0.30)),
       ),
       child: Row(
         children: [
-          // Breathing orb — the only visual, no image
+          // The brand compass is the connection signal: it breathes while
+          // connected and rotates while Navigator is producing a response.
           AnimatedBuilder(
             animation: animation,
-            builder: (context, _) => Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    statusColor.withValues(alpha: 0.85),
-                    statusColor.withValues(alpha: 0.25),
-                  ],
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: statusColor.withValues(
-                        alpha: 0.30 + math.sin(animation.value * math.pi * 2) * 0.10),
-                    blurRadius: 16,
+            builder: (context, _) => Transform.rotate(
+              angle: thinking ? animation.value * math.pi * 2 : 0,
+              child: Transform.scale(
+                scale: online
+                    ? .96 + math.sin(animation.value * math.pi * 2) * .04
+                    : .92,
+                child: Container(
+                  width: 48,
+                  height: 48,
+                  padding: const EdgeInsets.all(5),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: statusColor.withValues(
+                          alpha: online ? .30 : .08,
+                        ),
+                        blurRadius: 16,
+                      ),
+                    ],
                   ),
-                ],
-              ),
-              child: Icon(
-                thinking
-                    ? Icons.hourglass_empty_rounded
-                    : localReady
-                        ? Icons.shield_rounded
-                        : cloudAvailable
-                            ? Icons.cloud_rounded
-                            : Icons.cloud_off_rounded,
-                size: 22,
-                color: Colors.white,
+                  child: ColorFiltered(
+                    colorFilter: ColorFilter.mode(statusColor, BlendMode.srcIn),
+                    child: Image.asset('assets/branding/navigator-compass.png'),
+                  ),
+                ),
               ),
             ),
           ),
@@ -1066,8 +1131,8 @@ class _PresenceHeader extends StatelessWidget {
                   thinking
                       ? 'Thinking…'
                       : online
-                          ? 'Navigator online'
-                          : 'Navigator offline',
+                      ? 'Navigator online'
+                      : 'Navigator offline',
                   style: const TextStyle(
                     fontWeight: FontWeight.w700,
                     fontSize: 14,
@@ -1077,9 +1142,10 @@ class _PresenceHeader extends StatelessWidget {
                   localReady
                       ? 'Private · on device'
                       : cloudAvailable
-                          ? 'Cloud · connected'
-                          : 'Tap Cloud AI to connect',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 11.5),
+                      ? 'Cloud · connected'
+                      : 'Choose a model below to connect',
+                  style: Theme.of(context).textTheme.bodySmall
+                      ?.copyWith(fontSize: 11.5),
                 ),
               ],
             ),
@@ -1101,19 +1167,63 @@ class _PresenceHeader extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(width: 8),
-          // Compact cloud toggle
-          Transform.scale(
-            scale: 0.65,
-            child: Switch.adaptive(
-              value: cloudAiEnabled,
-              onChanged: onToggleCloudAi,
-            ),
-          ),
         ],
       ),
     );
   }
+}
+
+class _ModelRouteSelector extends StatelessWidget {
+  const _ModelRouteSelector({
+    required this.useCloud,
+    required this.localReady,
+    required this.cloudReady,
+    required this.onChanged,
+  });
+  final bool useCloud;
+  final bool localReady;
+  final bool cloudReady;
+  final ValueChanged<bool>? onChanged;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(16, 3, 16, 6),
+    child: Row(
+      children: [
+        const Icon(Icons.psychology_alt_rounded, size: 18),
+        const SizedBox(width: 8),
+        Expanded(
+          child: DropdownButtonFormField<bool>(
+            initialValue: useCloud,
+            isDense: true,
+            decoration: const InputDecoration(
+              labelText: 'Navigator model',
+              border: OutlineInputBorder(),
+            ),
+            items: [
+              DropdownMenuItem(
+                value: false,
+                child: Text(
+                  'Private · Qwen3 1.7B${localReady ? ' · ready' : ' · unavailable'}',
+                ),
+              ),
+              DropdownMenuItem(
+                value: true,
+                child: Text(
+                  'API model${cloudReady ? ' · connected' : ' · unavailable'}',
+                ),
+              ),
+            ],
+            onChanged: onChanged == null
+                ? null
+                : (value) {
+                    if (value != null) onChanged!(value);
+                  },
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 class _ChatBubble extends StatelessWidget {
@@ -1128,97 +1238,98 @@ class _ChatBubble extends StatelessWidget {
     final member = message.role == ChatRole.member;
     final status = message.role == ChatRole.status;
     return GestureDetector(
-      onLongPress:
-          member && onEdit != null ? () => _showEditDialog(context) : null,
+      onLongPress: member && onEdit != null
+          ? () => _showEditDialog(context)
+          : null,
       child: Align(
-      alignment: member ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        constraints: BoxConstraints(
-          maxWidth: MediaQuery.sizeOf(context).width * 0.82,
-        ),
-        margin: const EdgeInsets.only(top: 10),
-        padding: const EdgeInsets.all(15),
-        decoration: BoxDecoration(
-          gradient: member
-              ? const LinearGradient(
-                  colors: [Color(0xff006b60), Color(0xff2f6cfa)],
-                )
-              : status
-              ? null
-              : LinearGradient(
-                  colors: [
-                    Theme.of(context).colorScheme.surface
-                        .withValues(alpha: 0.96),
-                    MindRecipeFxPalette.secondary.withValues(alpha: 0.10),
-                  ],
-                ),
-          color: status
-              ? Theme.of(context).colorScheme.surfaceContainerHighest
-                    .withValues(alpha: 0.9)
-              : null,
-          borderRadius: BorderRadius.only(
-            topLeft: const Radius.circular(22),
-            topRight: const Radius.circular(22),
-            bottomLeft: Radius.circular(member ? 22 : 5),
-            bottomRight: Radius.circular(member ? 5 : 22),
+        alignment: member ? Alignment.centerRight : Alignment.centerLeft,
+        child: Container(
+          constraints: BoxConstraints(
+            maxWidth: MediaQuery.sizeOf(context).width * 0.82,
           ),
-          border: Border.all(
+          margin: const EdgeInsets.only(top: 10),
+          padding: const EdgeInsets.all(15),
+          decoration: BoxDecoration(
+            gradient: member
+                ? const LinearGradient(
+                    colors: [Color(0xff006b60), Color(0xff2f6cfa)],
+                  )
+                : status
+                ? null
+                : LinearGradient(
+                    colors: [
+                      Theme.of(context).colorScheme.surface
+                          .withValues(alpha: 0.96),
+                      MindRecipeFxPalette.secondary.withValues(alpha: 0.10),
+                    ],
+                  ),
             color: status
-                ? Theme.of(context).colorScheme.outlineVariant
-                : MindRecipeFxPalette.primary.withValues(alpha: 0.20),
+                ? Theme.of(context).colorScheme.surfaceContainerHighest
+                      .withValues(alpha: 0.9)
+                : null,
+            borderRadius: BorderRadius.only(
+              topLeft: const Radius.circular(22),
+              topRight: const Radius.circular(22),
+              bottomLeft: Radius.circular(member ? 22 : 5),
+              bottomRight: Radius.circular(member ? 5 : 22),
+            ),
+            border: Border.all(
+              color: status
+                  ? Theme.of(context).colorScheme.outlineVariant
+                  : MindRecipeFxPalette.primary.withValues(alpha: 0.20),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color:
+                    (member
+                            ? MindRecipeFxPalette.secondary
+                            : MindRecipeFxPalette.primary)
+                        .withValues(alpha: 0.11),
+                blurRadius: 20,
+                offset: const Offset(0, 7),
+              ),
+            ],
           ),
-          boxShadow: [
-            BoxShadow(
-              color:
-                  (member
-                          ? MindRecipeFxPalette.secondary
-                          : MindRecipeFxPalette.primary)
-                      .withValues(alpha: 0.11),
-              blurRadius: 20,
-              offset: const Offset(0, 7),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              status
-                  ? 'SYSTEM'
-                  : member
-                  ? 'YOU'
-                  : 'NAVIGATOR',
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 1.3,
-                color: member
-                    ? Colors.white70
-                    : Theme.of(context).colorScheme.primary,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              message.text,
-              style: TextStyle(
-                fontSize: 16,
-                height: 1.35,
-                color: member ? Colors.white : null,
-              ),
-            ),
-            if (message.localGenerated || message.cloudGenerated)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Text(
-                  message.localGenerated
-                      ? 'On-device AI · private · suggestion, not fact'
-                      : 'Cloud AI · journal excluded · suggestion, not fact',
-                  style: Theme.of(context).textTheme.labelSmall,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                status
+                    ? 'SYSTEM'
+                    : member
+                    ? 'YOU'
+                    : 'NAVIGATOR',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1.3,
+                  color: member
+                      ? Colors.white70
+                      : Theme.of(context).colorScheme.primary,
                 ),
               ),
-          ],
+              const SizedBox(height: 6),
+              Text(
+                message.text,
+                style: TextStyle(
+                  fontSize: 16,
+                  height: 1.35,
+                  color: member ? Colors.white : null,
+                ),
+              ),
+              if (message.localGenerated || message.cloudGenerated)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    message.localGenerated
+                        ? 'On-device AI · private · suggestion, not fact'
+                        : 'Cloud AI · journal excluded · suggestion, not fact',
+                    style: Theme.of(context).textTheme.labelSmall,
+                  ),
+                ),
+            ],
+          ),
         ),
-      ),
       ),
     );
   }

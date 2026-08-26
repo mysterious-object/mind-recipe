@@ -107,6 +107,7 @@ class _PulseScreenState extends State<PulseScreen> with WidgetsBindingObserver {
   bool _webReady = false;
   bool _useFallback = false;
   bool _loading = true;
+  Timer? _rendererDeadline;
   late _FamiliarState _familiar;
 
   @override
@@ -122,6 +123,7 @@ class _PulseScreenState extends State<PulseScreen> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    _rendererDeadline?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _controller?.runJavaScript('window.setFamiliarPaused(true)');
     super.dispose();
@@ -134,14 +136,17 @@ class _PulseScreenState extends State<PulseScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _load() async {
-    final results = await Future.wait<dynamic>([
-      widget.appState.loadMoodPulses(),
-      widget.appState.loadCurriculumProgress(),
-    ]);
-    _pulses = (results[0] as List).cast<Map<String, dynamic>>();
-    _curriculum = results[1] as Map<String, dynamic>?;
-    _familiar = _deriveFamiliar();
-    if (mounted) setState(() => _loading = false);
+    try {
+      final results = await Future.wait<dynamic>([
+        widget.appState.loadMoodPulses(),
+        widget.appState.loadCurriculumProgress(),
+      ]);
+      _pulses = (results[0] as List).cast<Map<String, dynamic>>();
+      _curriculum = results[1] as Map<String, dynamic>?;
+      _familiar = _deriveFamiliar();
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
     await _sendState();
   }
 
@@ -152,7 +157,19 @@ class _PulseScreenState extends State<PulseScreen> with WidgetsBindingObserver {
         ..setBackgroundColor(Colors.transparent)
         ..setNavigationDelegate(
           NavigationDelegate(
-            onNavigationRequest: (_) => NavigationDecision.prevent,
+            // The renderer is bundled with the app. Allow only Flutter's
+            // local asset origins and reject all outbound navigation.
+            onNavigationRequest: (request) {
+              final uri = Uri.tryParse(request.url);
+              final local =
+                  uri != null &&
+                  (uri.scheme == 'file' ||
+                      uri.scheme == 'data' ||
+                      uri.host == 'appassets.androidplatform.net');
+              return local
+                  ? NavigationDecision.navigate
+                  : NavigationDecision.prevent;
+            },
             onWebResourceError: (error) {
               if (error.isForMainFrame == true && mounted) {
                 setState(() => _useFallback = true);
@@ -165,6 +182,7 @@ class _PulseScreenState extends State<PulseScreen> with WidgetsBindingObserver {
           onMessageReceived: (message) {
             if (!mounted) return;
             if (message.message == 'ready') {
+              _rendererDeadline?.cancel();
               setState(() => _webReady = true);
               unawaited(_sendState());
             } else if (message.message == 'webgl_error' ||
@@ -175,6 +193,9 @@ class _PulseScreenState extends State<PulseScreen> with WidgetsBindingObserver {
         )
         ..loadFlutterAsset('assets/familiar/index.html');
       _controller = controller;
+      _rendererDeadline = Timer(const Duration(seconds: 6), () {
+        if (mounted && !_webReady) setState(() => _useFallback = true);
+      });
     } catch (_) {
       _useFallback = true;
     }

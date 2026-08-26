@@ -325,7 +325,8 @@ class OnDeviceInference implements LocalInference {
       return _set(
         LocalInferenceSnapshot(
           OnDeviceStatus.error,
-          detail: 'Private model is unavailable on this device: ${_friendlyError(error)}',
+          detail:
+              'Private model is unavailable on this device: ${_friendlyError(error)}',
         ),
       );
     } finally {
@@ -417,7 +418,9 @@ class OnDeviceInference implements LocalInference {
               break;
             }
             // Server disagrees with our partial – start clean.
-            await _inferLog('range not satisfiable with short file – restarting');
+            await _inferLog(
+              'range not satisfiable with short file – restarting',
+            );
             if (await temporary.exists()) await temporary.delete();
             received = 0;
             _downloadProgress = 0;
@@ -464,8 +467,7 @@ class OnDeviceInference implements LocalInference {
                 final elapsedMs = now.difference(lastSampleAt).inMilliseconds;
                 if (elapsedMs >= 750) {
                   _downloadBytesPerSecond =
-                      ((received - lastSampleBytes) * 1000 / elapsedMs)
-                          .round();
+                      ((received - lastSampleBytes) * 1000 / elapsedMs).round();
                   lastSampleBytes = received;
                   lastSampleAt = now;
                 }
@@ -565,17 +567,26 @@ class OnDeviceInference implements LocalInference {
           error is FileSystemException &&
           error.message.contains('signed manifest');
       if (isIntegrityError && await temporary.exists()) {
-        await _inferLog('integrity failure – deleting corrupted $temporary: $error');
+        await _inferLog(
+          'integrity failure – deleting corrupted $temporary: $error',
+        );
         try {
           await temporary.delete();
         } catch (_) {}
       } else if (await temporary.exists()) {
         final len = await temporary.length();
-        await _inferLog('install failed kept partial $len bytes for resume: $error');
+        await _inferLog(
+          'install failed kept partial $len bytes for resume: $error',
+        );
         // Keep partial so tab switch / retry can resume via Range.
       }
       _downloadActive = false;
-      _set(LocalInferenceSnapshot(OnDeviceStatus.error, detail: _friendlyError(error).replaceFirst('Bad state: ', '')));
+      _set(
+        LocalInferenceSnapshot(
+          OnDeviceStatus.error,
+          detail: _friendlyError(error).replaceFirst('Bad state: ', ''),
+        ),
+      );
       rethrow;
     }
   }
@@ -597,7 +608,9 @@ class OnDeviceInference implements LocalInference {
       return null;
     }
     if (_engine == null) {
-      await _inferLog('infer fallback mock for "$userMessage" history=${history.length}');
+      await _inferLog(
+        'infer fallback mock for "$userMessage" history=${history.length}',
+      );
       // Simulate thoughtful pause — reasoning should not feel instant and dumb
       await Future.delayed(const Duration(milliseconds: 800));
       final mock = _fallbackResponse(userMessage, history);
@@ -612,14 +625,12 @@ class OnDeviceInference implements LocalInference {
     try {
       await _engine!.clear();
       final response = StringBuffer();
-      final subscription = _engine!.stream.listen(
-        (token) {
-          response.write(token);
-          // Stream to the UI as the model speaks — perceived latency drops
-          // to the first token instead of the full completion.
-          if (onToken != null && token.isNotEmpty) onToken(token);
-        },
-      );
+      final subscription = _engine!.stream.listen((token) {
+        response.write(token);
+        // Stream to the UI as the model speaks — perceived latency drops
+        // to the first token instead of the full completion.
+        if (onToken != null && token.isNotEmpty) onToken(token);
+      });
       final prompt = _buildPrompt(userMessage, history: history);
       await _inferLog('infer prompt length=${prompt.length}');
       final promptId = await _engine!.sendPrompt(prompt);
@@ -737,7 +748,7 @@ class OnDeviceInference implements LocalInference {
       final device = await MindRecipeDeviceHarness().capabilities();
       final totalMem = device.totalMemoryMiB ?? 8192;
       if (totalMem < 4096) {
-        nCtx = 1024;  // Very low memory device
+        nCtx = 1024; // Very low memory device
       } else if (totalMem < 6144) {
         nCtx = 2048;
       } else if (totalMem < 8192) {
@@ -748,14 +759,44 @@ class OnDeviceInference implements LocalInference {
     }
 
     // Adaptive attempt ladder based on device memory
-    List<(String, int, int, int, int, int, LlamaFlashAttnType, LlamaKvCacheType)> attempts;
-    
+    List<
+      (String, int, int, int, int, int, LlamaFlashAttnType, LlamaKvCacheType)
+    >
+    attempts;
+
     if (Platform.isIOS) {
       // iOS: Skip GPU, use Metal-compatible configs
       attempts = [
-        ('CPU · balanced', 0, nCtx, 128, 3, 384, LlamaFlashAttnType.enabled, LlamaKvCacheType.q8_0),
-        ('CPU · conservative', 0, 1536, 64, 2, 352, LlamaFlashAttnType.disabled, LlamaKvCacheType.q8_0),
-        ('CPU · minimal', 0, 1024, 32, 2, 320, LlamaFlashAttnType.disabled, LlamaKvCacheType.q8_0),
+        (
+          'CPU · balanced',
+          0,
+          nCtx,
+          128,
+          3,
+          384,
+          LlamaFlashAttnType.enabled,
+          LlamaKvCacheType.q8_0,
+        ),
+        (
+          'CPU · conservative',
+          0,
+          1536,
+          64,
+          2,
+          352,
+          LlamaFlashAttnType.disabled,
+          LlamaKvCacheType.q8_0,
+        ),
+        (
+          'CPU · minimal',
+          0,
+          1024,
+          32,
+          2,
+          320,
+          LlamaFlashAttnType.disabled,
+          LlamaKvCacheType.q8_0,
+        ),
       ];
     } else if (Platform.isAndroid) {
       // Android: Try GPU first on most devices — 6GB+ is enough for Q4_K_M, fixes false offline error.
@@ -764,30 +805,121 @@ class OnDeviceInference implements LocalInference {
       if (totalMem >= 8192) {
         // High memory device: try GPU first
         attempts = [
-          ('GPU accelerated', 99, nCtx, 256, 4, 448, LlamaFlashAttnType.enabled, LlamaKvCacheType.q8_0),
-          ('CPU · balanced', 0, nCtx, 128, 4, 384, LlamaFlashAttnType.enabled, LlamaKvCacheType.q8_0),
-          ('CPU · conservative', 0, 1536, 64, 2, 352, LlamaFlashAttnType.disabled, LlamaKvCacheType.q8_0),
-          ('CPU · minimal', 0, 1024, 32, 2, 320, LlamaFlashAttnType.disabled, LlamaKvCacheType.q8_0),
+          (
+            'GPU accelerated',
+            99,
+            nCtx,
+            256,
+            4,
+            448,
+            LlamaFlashAttnType.enabled,
+            LlamaKvCacheType.q8_0,
+          ),
+          (
+            'CPU · balanced',
+            0,
+            nCtx,
+            128,
+            4,
+            384,
+            LlamaFlashAttnType.enabled,
+            LlamaKvCacheType.q8_0,
+          ),
+          (
+            'CPU · conservative',
+            0,
+            1536,
+            64,
+            2,
+            352,
+            LlamaFlashAttnType.disabled,
+            LlamaKvCacheType.q8_0,
+          ),
+          (
+            'CPU · minimal',
+            0,
+            1024,
+            32,
+            2,
+            320,
+            LlamaFlashAttnType.disabled,
+            LlamaKvCacheType.q8_0,
+          ),
         ];
       } else {
         // Low memory Android: skip GPU
         attempts = [
-          ('CPU · low memory', 0, nCtx, 128, 3, 384, LlamaFlashAttnType.enabled, LlamaKvCacheType.q8_0),
-          ('CPU · conservative', 0, 1024, 64, 2, 352, LlamaFlashAttnType.disabled, LlamaKvCacheType.q8_0),
-          ('CPU · minimal', 0, 1024, 32, 2, 320, LlamaFlashAttnType.disabled, LlamaKvCacheType.q8_0),
+          (
+            'CPU · low memory',
+            0,
+            nCtx,
+            128,
+            3,
+            384,
+            LlamaFlashAttnType.enabled,
+            LlamaKvCacheType.q8_0,
+          ),
+          (
+            'CPU · conservative',
+            0,
+            1024,
+            64,
+            2,
+            352,
+            LlamaFlashAttnType.disabled,
+            LlamaKvCacheType.q8_0,
+          ),
+          (
+            'CPU · minimal',
+            0,
+            1024,
+            32,
+            2,
+            320,
+            LlamaFlashAttnType.disabled,
+            LlamaKvCacheType.q8_0,
+          ),
         ];
       }
     } else {
       // Desktop/other: conservative
       attempts = [
-        ('CPU · balanced', 0, nCtx, 128, 3, 384, LlamaFlashAttnType.enabled, LlamaKvCacheType.q8_0),
-        ('CPU · conservative', 0, 1536, 64, 2, 352, LlamaFlashAttnType.disabled, LlamaKvCacheType.q8_0),
-        ('CPU · minimal', 0, 1024, 32, 2, 320, LlamaFlashAttnType.disabled, LlamaKvCacheType.q8_0),
+        (
+          'CPU · balanced',
+          0,
+          nCtx,
+          128,
+          3,
+          384,
+          LlamaFlashAttnType.enabled,
+          LlamaKvCacheType.q8_0,
+        ),
+        (
+          'CPU · conservative',
+          0,
+          1536,
+          64,
+          2,
+          352,
+          LlamaFlashAttnType.disabled,
+          LlamaKvCacheType.q8_0,
+        ),
+        (
+          'CPU · minimal',
+          0,
+          1024,
+          32,
+          2,
+          320,
+          LlamaFlashAttnType.disabled,
+          LlamaKvCacheType.q8_0,
+        ),
       ];
     }
     Object? lastError;
     for (var i = 0; i < attempts.length; i++) {
-      final (label, gpuLayers, ctx, batch, threads, predict, flash, kvType) = attempts[i];
+      final (label, gpuLayers, ctx, batch, threads, predict, flash, kvType) =
+          attempts[i];
       try {
         final model = ModelParams()
           ..nGpuLayers = gpuLayers
@@ -821,8 +953,7 @@ class OnDeviceInference implements LocalInference {
             modelParams: model,
             contextParams: context,
             samplingParams: sampler,
-            verbose:
-                const bool.fromEnvironment('MIND_RECIPE_LOCAL_VERBOSE'),
+            verbose: const bool.fromEnvironment('MIND_RECIPE_LOCAL_VERBOSE'),
           ),
         );
         await _inferLog(
@@ -838,7 +969,9 @@ class OnDeviceInference implements LocalInference {
         _disposeEngine();
       }
     }
-    await _inferLog('all native attempts failed lastError=$lastError — using lightweight fallback so offline works');
+    await _inferLog(
+      'all native attempts failed lastError=$lastError — using lightweight fallback so offline works',
+    );
     // Lightweight fallback: do not throw the GPU/CPU ladder error that blocked Navigator.
     // refreshStatus will still mark ready, and infer() will serve a Dart fallback response.
     return;
@@ -864,7 +997,8 @@ class OnDeviceInference implements LocalInference {
     // Also strip any remaining "Bad state:" that survived via nesting.
     text = text.replaceAll('Bad state: ', '');
     // Collapse the ladder's verbose last-error suffix for the banner.
-    if (text.contains('tried GPU and CPU modes') || text.contains('tried GPU and')) {
+    if (text.contains('tried GPU and CPU modes') ||
+        text.contains('tried GPU and')) {
       final lastIdx = text.lastIndexOf('Last error:');
       if (lastIdx > 0) text = text.substring(0, lastIdx).trim();
       text = text.replaceAll('  ', ' ');
@@ -914,7 +1048,12 @@ class OnDeviceInference implements LocalInference {
         .replaceAll('/think', '')
         .trim();
     // Strip leaked role prefixes like "member:" or "assistant:" at start
-    clean = clean.replaceFirst(RegExp(r'^(assistant|member|user)\s*:\s*', caseSensitive: false), '').trim();
+    clean = clean
+        .replaceFirst(
+          RegExp(r'^(assistant|member|user)\s*:\s*', caseSensitive: false),
+          '',
+        )
+        .trim();
     // Strip code fences that appear as broken code
     if (clean.startsWith('```') && clean.contains('```')) {
       final lines = clean.split('\n');
@@ -954,7 +1093,9 @@ class OnDeviceInference implements LocalInference {
       if (importantIdx != -1) clean = clean.substring(0, importantIdx);
       clean = clean.trim();
     } else {
-      clean = clean.replaceFirst(RegExp(r'^(member|user):\s*', caseSensitive: false), '').trim();
+      clean = clean
+          .replaceFirst(RegExp(r'^(member|user):\s*', caseSensitive: false), '')
+          .trim();
       // Strip bare retry instruction
       final importantIdx = clean.indexOf('Important:');
       if (importantIdx != -1) clean = clean.substring(0, importantIdx).trim();
@@ -964,33 +1105,49 @@ class OnDeviceInference implements LocalInference {
     clean = clean.replaceAll(RegExp(r'\s+'), ' ').trim();
     final lower = clean.toLowerCase();
 
-    // Use history to avoid repetition and make fallback more dynamic/reasoned.
-    // If last assistant turn already asked about "calm vs empty", don't repeat it.
+    // Use history to avoid repetition and move the conversation forward.
     final lastAssistant = history.isNotEmpty
-        ? history.lastWhere((t) => t.role == 'assistant', orElse: () => history.last).text.toLowerCase()
+        ? history
+              .lastWhere(
+                (t) => t.role == 'assistant',
+                orElse: () => history.last,
+              )
+              .text
+              .toLowerCase()
         : '';
-    final hasAskedCalm = lastAssistant.contains('calm rather than empty') || lastAssistant.contains('sitting with you');
+    final hasAskedCalm =
+        lastAssistant.contains('calm rather than empty') ||
+        lastAssistant.contains('sitting with you');
 
     // Slower illusion: the fallback is fast (native failed), but reasoning should
     // feel thoughtful, not instant. Caller streams with 28ms delay + 800ms pause.
     if (lower.contains('quick reset') || lower.contains('reset')) {
-      return 'Let’s take that quick reset together — breathe in for 4, out for 6, feel your feet on the floor, and name one thing you can see that feels steady. What feels a fraction calmer now, even 2 out of 10?';
+      return 'Let’s make the next minute simpler. Put both feet down, loosen your jaw, and let one exhale run slightly longer than the inhale. No need to force calm—just reduce the demand on your attention for three breaths. Then choose: continue here, or handle the one thing that matters next.';
     }
-    if (lower.length < 14 || ['yes', 'that', 'it', 'ok', 'okay', 'idk', 'alone'].contains(lower)) {
+    if (lower.length < 14 ||
+        ['yes', 'that', 'it', 'ok', 'okay', 'idk', 'alone'].contains(lower)) {
       // Short follow-ups like "that I'm alone and it's calm" — don't repeat "member"
       // Make it dynamic: if we already asked about calm, shift to grounding.
       if (hasAskedCalm) {
         return 'That calm aloneness — is it more in your chest, shoulders, or breath right now? Notice one small physical detail and tell me what you find.';
       }
-      final shortSnippet = clean.length > 80 ? '${clean.substring(0, 80).trim()}…' : clean;
-      return 'Thanks for naming that — “$shortSnippet.” When that quiet aloneness is there, what’s one small detail that tells you it’s calm rather than empty?';
+      return hasAskedCalm
+          ? 'I’m with you. We don’t need to turn this into another exercise. Do you want me to stay with the feeling, help make sense of it, or help with something practical?'
+          : 'I’m following. Before I steer this somewhere generic: do you want presence, perspective, or practical help right now?';
     }
     // Reflect with specificity, no internal labels, one grounded question — vary if last turn was similar
-    final snippet = clean.length > 92 ? '${clean.substring(0, 92).trim()}…' : clean;
     if (hasAskedCalm && lower.contains('alone')) {
-      return 'You named “$snippet” — that aloneness with calm is worth staying with. If that calm had a color or a texture, what would it be, and what helps it linger a minute longer?';
+      return 'That distinction matters. Being alone can be restorative when it feels chosen and spacious, and painful when it feels imposed. We can leave the calm intact instead of analyzing it—unless there is something underneath it you want help understanding.';
     }
-    return 'I hear you — “$snippet.” That sounds important and very personal. What part of that is most present for you right now, and what’s one gentle next step that fits the next hour?';
+    if (lower.contains('appointment') ||
+        lower.contains('remind') ||
+        lower.contains('calendar')) {
+      return 'I can help turn that into a clear action. Tell me the date, time, and title if any are missing; Mind Recipe will show the complete proposal for you to review before your phone confirms it.';
+    }
+    if (lower.contains('help me decide') || lower.contains('should i')) {
+      return 'Let’s make the decision concrete. I’ll compare what each option gives you, what it costs, and which choice is easiest to reverse. What are the two options—and is your priority relief now, progress later, or protecting a relationship?';
+    }
+    return 'I’m paying attention to the situation, not just the emotion around it. I can help you understand the pattern, decide what to do next, or simply stay with it without turning it into homework. Which would actually help?';
   }
 
   String _cleanPromptText(String value) =>
@@ -1000,9 +1157,22 @@ class OnDeviceInference implements LocalInference {
     final text = message.toLowerCase();
     if (message.length > 180) return true;
     return const [
-      'plan', 'compare', 'decide', 'why', 'reason', 'remember', 'earlier',
-      'appointment', 'calendar', 'organize', 'goal', 'pattern', 'what should i',
-      'help me figure out', 'i changed my mind', 'that is not what i meant',
+      'plan',
+      'compare',
+      'decide',
+      'why',
+      'reason',
+      'remember',
+      'earlier',
+      'appointment',
+      'calendar',
+      'organize',
+      'goal',
+      'pattern',
+      'what should i',
+      'help me figure out',
+      'i changed my mind',
+      'that is not what i meant',
     ].any(text.contains);
   }
 
@@ -1046,7 +1216,9 @@ Example: If the member says their manager dismissed their work in front of the t
     prompt
       ..writeln('<|im_start|>user')
       ..writeln(_cleanPromptText(userMessage))
-      ..writeln('${_shouldDeliberate(userMessage) ? '/think' : '/no_think'}<|im_end|>')
+      ..writeln(
+        '${_shouldDeliberate(userMessage) ? '/think' : '/no_think'}<|im_end|>',
+      )
       ..writeln('<|im_start|>assistant');
     return prompt.toString();
   }
