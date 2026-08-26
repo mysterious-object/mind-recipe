@@ -150,6 +150,75 @@ class RecipePracticePracticeInput(BaseModel):
     notes: Optional[str] = Field(default=None, max_length=500)
 
 
+class JourneyMode(str, Enum):
+    guided_foundations = "guided_foundations"
+    co_created = "co_created"
+
+
+class JourneySettingsInput(BaseModel):
+    mode: JourneyMode = JourneyMode.guided_foundations
+    active_goal: Optional[str] = Field(default=None, max_length=500)
+    preferred_duration_minutes: Optional[int] = Field(default=None, ge=1, le=60)
+
+
+class JourneySettings(JourneySettingsInput):
+    member_id: str
+    current_module_id: str = "lesson-1"
+    recommended_module_id: Optional[str] = None
+    recommendation_reason: str = "Start with the foundations at your own pace."
+    updated_at: datetime
+
+
+class RecipeProposalInput(BaseModel):
+    name: str = Field(min_length=1, max_length=160)
+    purpose: str = Field(min_length=1, max_length=600)
+    trigger: Optional[str] = Field(default=None, max_length=300)
+    duration_minutes: int = Field(default=3, ge=1, le=60)
+    steps: List[str] = Field(min_length=1, max_length=8)
+    evidence_basis: str = Field(default="User-guided wellness practice", max_length=800)
+    cautions: List[str] = Field(default_factory=list, max_length=8)
+    rationale: str = Field(min_length=1, max_length=1000)
+    source_kind: str = Field(default="navigator_proposal", max_length=80)
+
+
+class RecipeProposal(RecipeProposalInput):
+    id: str
+    member_id: str
+    status: str = "proposed"
+    version: int = 1
+    created_at: datetime
+    updated_at: datetime
+
+
+class RecipeProposalDecision(BaseModel):
+    approved: bool
+    edits: Optional[RecipeProposalInput] = None
+
+
+class MemoryCardInput(BaseModel):
+    kind: str = Field(min_length=1, max_length=80)
+    content: str = Field(min_length=1, max_length=1000)
+    pinned: bool = False
+
+
+class MemoryCard(MemoryCardInput):
+    id: str
+    member_id: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class MemberEventInput(BaseModel):
+    id: str = Field(min_length=8, max_length=120)
+    kind: str = Field(min_length=1, max_length=80)
+    occurred_at: datetime
+    source: str = Field(min_length=1, max_length=80)
+    provenance: str = Field(default="member", max_length=80)
+    payload: Dict[str, Any] = Field(default_factory=dict)
+    consent_scope: str = Field(default="device", max_length=80)
+    schema_version: str = Field(default="v1", max_length=20)
+
+
 class CurriculumProgressInput(BaseModel):
     curriculum_version: str = Field(min_length=1, max_length=40)
     completed_lesson_ids: List[str] = Field(default_factory=list, max_length=30)

@@ -18,7 +18,7 @@ client = TestClient(app)
 
 def reset_store():
     with store._connect() as conn:
-        for table in ("checkins", "consents", "audit_events", "trend_cache", "pattern_alerts", "conversation_memory", "recipe_practice_items"):
+        for table in ("checkins", "consents", "audit_events", "trend_cache", "pattern_alerts", "conversation_memory", "recipe_practice_items", "journey_settings", "recipe_proposals", "memory_cards", "member_events"):
             conn.execute(f"DELETE FROM {table}")
     auth_store.clear()
 
@@ -186,6 +186,36 @@ def test_authenticated_recipe_practice_crud_and_practice_persist():
     assert practice.json()["effectiveness_ratings"] == [4]
     assert client.delete(f"/v1/recipes/practices/{item_id}", headers=headers).status_code == 204
     assert client.get("/v1/recipes/practices", headers=headers).json() == []
+
+
+def test_adaptive_journey_recipe_approval_memory_and_pulse_event():
+    reset_store()
+    registered = client.post("/v1/auth/register", json={
+        "email": "journey@example.com", "display_name": "Journey", "password": "very-secure-passphrase"})
+    headers = {"authorization": f"Bearer {registered.json()['access_token']}"}
+    journey = client.put("/v1/journey", headers=headers, json={
+        "mode": "co_created", "active_goal": "sleep more steadily", "preferred_duration_minutes": 3,
+    })
+    assert journey.status_code == 200
+    assert journey.json()["mode"] == "co_created"
+    assert journey.json()["recommended_module_id"] == "lesson-4"
+    proposal = client.post("/v1/recipes/proposals", headers=headers, json={
+        "name": "Evening pause", "purpose": "Wind down", "duration_minutes": 3,
+        "steps": ["Pause", "Breathe"], "rationale": "A short option before bed.",
+    })
+    assert proposal.status_code == 201
+    approved = client.post(f"/v1/recipes/proposals/{proposal.json()['id']}/decision", headers=headers, json={"approved": True})
+    assert approved.json()["status"] == "approved"
+    assert client.get("/v1/recipes/practices", headers=headers).json()[0]["source"] == "navigator-approved"
+    memory = client.post("/v1/memory", headers=headers, json={"kind": "preference", "content": "Keep practices short."})
+    assert memory.status_code == 201
+    assert client.get("/v1/memory", headers=headers).json()[0]["content"] == "Keep practices short."
+    event = client.post("/v1/member-events", headers=headers, json=[{
+        "id": "navigation-event-001", "kind": "daily_navigation_completed", "recorded_at": None,
+        "occurred_at": datetime.now(timezone.utc).isoformat(), "source": "mobile",
+    }])
+    assert event.status_code == 200
+    assert client.get("/v1/pulse/today", headers=headers).json()["recent_events"][0]["kind"] == "daily_navigation_completed"
 
 
 def test_agent_requires_explicit_approval_for_external_research_and_skill_activation():

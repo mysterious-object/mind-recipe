@@ -417,6 +417,51 @@ class MindRecipeApiClient {
     }
     return decoded;
   }
+
+  Future<Map<String, dynamic>> getJourney(String token) async => _getMember('/v1/journey', token);
+
+  Future<Map<String, dynamic>> saveJourney(String token, Map<String, dynamic> value) =>
+      _sendMember('PUT', '/v1/journey', token, value);
+
+  Future<List<Map<String, dynamic>>> getRecipeProposals(String token) async {
+    final response = await _client.get(Uri.parse('$mindRecipeApiBase/v1/recipes/proposals'), headers: _memberHeaders(token)).timeout(const Duration(seconds: 8));
+    if (response.statusCode != 200) throw const ApiException('Could not load Recipe proposals.');
+    return (jsonDecode(response.body) as List).cast<Map<String, dynamic>>();
+  }
+
+  Future<Map<String, dynamic>> decideRecipeProposal(String token, String id, {required bool approved}) =>
+      _sendMember('POST', '/v1/recipes/proposals/$id/decision', token, {'approved': approved});
+
+  Future<List<Map<String, dynamic>>> getMemory(String token) async {
+    final response = await _client.get(Uri.parse('$mindRecipeApiBase/v1/memory'), headers: _memberHeaders(token)).timeout(const Duration(seconds: 8));
+    if (response.statusCode != 200) throw const ApiException('Could not load Navigator memory.');
+    return (jsonDecode(response.body) as List).cast<Map<String, dynamic>>();
+  }
+
+  Future<Map<String, dynamic>> createMemory(String token, Map<String, dynamic> value) =>
+      _sendMember('POST', '/v1/memory', token, value);
+
+  Future<void> ingestMemberEvents(String token, List<Map<String, dynamic>> events) async {
+    await _sendMember('POST', '/v1/member-events', token, events);
+  }
+
+  Future<Map<String, dynamic>> getPulse(String token) => _getMember('/v1/pulse/today', token);
+
+  Future<Map<String, dynamic>> _getMember(String path, String token) async {
+    final response = await _client.get(Uri.parse('$mindRecipeApiBase$path'), headers: _memberHeaders(token)).timeout(const Duration(seconds: 8));
+    if (response.statusCode < 200 || response.statusCode >= 300) throw const ApiException('Navigator is temporarily unavailable.');
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> _sendMember(String method, String path, String token, Object body) async {
+    final request = http.Request(method, Uri.parse('$mindRecipeApiBase$path'))
+      ..headers.addAll(_memberHeaders(token, json: true))
+      ..body = jsonEncode(body);
+    final streamed = await _client.send(request).timeout(const Duration(seconds: 10));
+    final response = await http.Response.fromStream(streamed);
+    if (response.statusCode < 200 || response.statusCode >= 300) throw const ApiException('Navigator could not save that change.');
+    return response.body.isEmpty ? <String, dynamic>{} : jsonDecode(response.body) as Map<String, dynamic>;
+  }
 }
 
 class AiReply {

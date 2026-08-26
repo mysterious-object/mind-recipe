@@ -203,6 +203,8 @@ class _RecipesScreenState extends State<RecipesScreen> {
   List<RecipeLesson> _generated = [];
   bool _generating = false;
   String? _generateError;
+  String _journeyMode = 'guided_foundations';
+  List<Map<String, dynamic>> _proposals = const [];
   late final LessonGenerator _generator = LessonGenerator(widget.appState);
 
   @override
@@ -218,8 +220,15 @@ class _RecipesScreenState extends State<RecipesScreen> {
     if (local != null) _apply(local);
     if (widget.appState.session != null) {
       try {
+        final token = widget.appState.session!.token;
+        final journey = await widget.api.getJourney(token);
+        final proposals = await widget.api.getRecipeProposals(token);
+        if (mounted) setState(() {
+          _journeyMode = journey['mode']?.toString() ?? 'guided_foundations';
+          _proposals = proposals;
+        });
         final remote = await widget.api.getCurriculumProgress(
-          token: widget.appState.session!.token,
+          token: token,
         );
         _apply(_merge(local ?? _payload(), remote));
         await _persist(sync: true);
@@ -329,6 +338,20 @@ class _RecipesScreenState extends State<RecipesScreen> {
     await _persist(sync: true);
   }
 
+  Future<void> _reviewProposal(Map<String, dynamic> proposal) async {
+    final approved = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+      title: Text(proposal['name']?.toString() ?? 'Custom Recipe'),
+      content: Text('${proposal['purpose'] ?? 'Suggested from your journey.'}\n\nNothing is added until you approve it.'),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Defer')),
+        FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Approve')),
+      ],
+    ));
+    if (approved == null || widget.appState.session == null) return;
+    await widget.api.decideRecipeProposal(widget.appState.session!.token, proposal['id'].toString(), approved: approved);
+    if (mounted) setState(() => _proposals = _proposals.where((item) => item['id'] != proposal['id']).toList());
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_savedPractices)
@@ -390,6 +413,39 @@ class _RecipesScreenState extends State<RecipesScreen> {
           ],
         ),
         const SizedBox(height: 18),
+        Card(child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Text('Journey mode', style: TextStyle(fontWeight: FontWeight.w800)),
+            const SizedBox(height: 8),
+            SegmentedButton<String>(
+              segments: const [
+                ButtonSegment(value: 'guided_foundations', label: Text('Guided')),
+                ButtonSegment(value: 'co_created', label: Text('Co-created')),
+              ],
+              selected: {_journeyMode},
+              onSelectionChanged: (value) async {
+                final mode = value.first;
+                setState(() => _journeyMode = mode);
+                final token = widget.appState.session?.token;
+                if (token != null) await widget.api.saveJourney(token, {'mode': mode});
+              },
+            ),
+            const SizedBox(height: 8),
+            Text(_journeyMode == 'co_created'
+                ? 'Navigator may draft custom modules and Recipes. You approve every change.'
+                : 'Reviewed foundations stay canonical while Navigator adapts the path.'),
+          ]),
+        )),
+        if (_proposals.any((item) => item['status'] == 'proposed')) ...[
+          const SizedBox(height: 12),
+          Text('Navigator proposals', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+          ..._proposals.where((item) => item['status'] == 'proposed').map((proposal) => Card(child: ListTile(
+            title: Text(proposal['name']?.toString() ?? 'Custom Recipe'),
+            subtitle: Text(proposal['purpose']?.toString() ?? 'Suggested from your journey.'),
+            trailing: FilledButton(onPressed: () => _reviewProposal(proposal), child: const Text('Review')),
+          ))),
+        ],
         _JourneyCard(
           completed: _completed.length,
           next: next,

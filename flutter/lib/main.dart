@@ -341,6 +341,7 @@ class _MemberHomeState extends State<MemberHome> {
             goToPage(2);
           },
           onComplete: () {
+            _recordNavigationEvent();
             widget.appState.recordAssistantMessage(startsSession: true);
             widget.appState.recordAiReflection();
             final mood = MoodState.fromCheckIn(checkIn);
@@ -373,6 +374,20 @@ class _MemberHomeState extends State<MemberHome> {
     );
   }
 
+  void _recordNavigationEvent() {
+    final now = DateTime.now().toUtc();
+    unawaited(widget.api.ingestMemberEvents(widget.appState.session?.token ?? '', [{
+      'id': 'daily-nav-${now.microsecondsSinceEpoch}',
+      'kind': 'daily_navigation_completed',
+      'occurred_at': now.toIso8601String(),
+      'source': 'daily_navigation',
+      'provenance': 'member',
+      'payload': {'route': '2067_daily_navigation'},
+      'consent_scope': 'device',
+      'schema_version': 'v1',
+    }]).catchError((_) {}));
+  }
+
   @override
   Widget build(BuildContext context) {
     final screens = [
@@ -382,6 +397,7 @@ class _MemberHomeState extends State<MemberHome> {
           syncSummary: '',
           onSeePulse: () => goToPage(3),
           onComplete: () {
+            _recordNavigationEvent();
             widget.appState.recordAssistantMessage(startsSession: true);
             widget.appState.recordAiReflection();
             final mood = MoodState.fromCheckIn(checkIn);

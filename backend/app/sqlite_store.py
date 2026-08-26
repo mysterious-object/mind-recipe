@@ -129,6 +129,56 @@ class SqliteStore:
                     current_lesson_id TEXT,
                     updated_at TEXT NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS journey_settings (
+                    member_id TEXT PRIMARY KEY,
+                    mode TEXT NOT NULL DEFAULT 'guided_foundations',
+                    active_goal TEXT,
+                    preferred_duration_minutes INTEGER,
+                    current_module_id TEXT NOT NULL DEFAULT 'lesson-1',
+                    recommended_module_id TEXT,
+                    recommendation_reason TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS recipe_proposals (
+                    id TEXT PRIMARY KEY,
+                    member_id TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    version INTEGER NOT NULL DEFAULT 1,
+                    name TEXT NOT NULL,
+                    purpose TEXT NOT NULL,
+                    trigger_text TEXT,
+                    duration_minutes INTEGER NOT NULL,
+                    steps TEXT NOT NULL,
+                    evidence_basis TEXT NOT NULL,
+                    cautions TEXT NOT NULL DEFAULT '[]',
+                    rationale TEXT NOT NULL,
+                    source_kind TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_recipe_proposals_member ON recipe_proposals(member_id, status, updated_at);
+                CREATE TABLE IF NOT EXISTS memory_cards (
+                    id TEXT PRIMARY KEY,
+                    member_id TEXT NOT NULL,
+                    kind TEXT NOT NULL,
+                    content TEXT NOT NULL,
+                    pinned INTEGER NOT NULL DEFAULT 0,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_memory_cards_member ON memory_cards(member_id, pinned, updated_at);
+                CREATE TABLE IF NOT EXISTS member_events (
+                    id TEXT PRIMARY KEY,
+                    member_id TEXT NOT NULL,
+                    kind TEXT NOT NULL,
+                    occurred_at TEXT NOT NULL,
+                    source TEXT NOT NULL,
+                    provenance TEXT NOT NULL,
+                    payload TEXT NOT NULL DEFAULT '{}',
+                    consent_scope TEXT NOT NULL,
+                    schema_version TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_member_events_member ON member_events(member_id, occurred_at);
             """)
             # One-time preservation migration from the retired practice table.
             legacy_table = "tool" + "box_items"
@@ -140,6 +190,125 @@ class SqliteStore:
                 conn.execute(
                     f"INSERT OR IGNORE INTO recipe_practice_items SELECT * FROM {legacy_table}"
                 )
+
+    # ── Adaptive Journey ───────────────────────────────────────────
+
+    def get_journey_settings(self, member_id: str) -> Dict[str, Any]:
+        with self._connect() as conn:
+            row = conn.execute("SELECT * FROM journey_settings WHERE member_id=?", (member_id,)).fetchone()
+        if row:
+            return dict(row)
+        return {
+            "member_id": member_id, "mode": "guided_foundations", "active_goal": None,
+            "preferred_duration_minutes": None, "current_module_id": "lesson-1",
+            "recommended_module_id": "lesson-1",
+            "recommendation_reason": "Start with the foundations at your own pace.",
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+    def save_journey_settings(self, member_id: str, values: Dict[str, Any]) -> Dict[str, Any]:
+        existing = self.get_journey_settings(member_id)
+        result = {**existing, **values, "member_id": member_id, "updated_at": datetime.now(timezone.utc).isoformat()}
+        goal = (result.get("active_goal") or "").lower()
+        completed = self.get_curriculum_progress(member_id) or {"completed_lesson_ids": []}
+        if goal and "sleep" in goal:
+            result["recommended_module_id"] = "lesson-4"
+            result["recommendation_reason"] = "You named sleep as a current goal, so a baseline-focused module may help you notice what supports recovery."
+        elif len(completed.get("completed_lesson_ids", [])):
+            result["recommended_module_id"] = "lesson-6"
+            result["recommendation_reason"] = "You have completed foundations; a grounding module is a gentle next option."
+        with self._connect() as conn:
+            conn.execute("""INSERT INTO journey_settings
+                (member_id,mode,active_goal,preferred_duration_minutes,current_module_id,recommended_module_id,recommendation_reason,updated_at)
+                VALUES (?,?,?,?,?,?,?,?)
+                ON CONFLICT(member_id) DO UPDATE SET mode=excluded.mode,active_goal=excluded.active_goal,
+                preferred_duration_minutes=excluded.preferred_duration_minutes,current_module_id=excluded.current_module_id,
+                recommended_module_id=excluded.recommended_module_id,recommendation_reason=excluded.recommendation_reason,updated_at=excluded.updated_at""",
+                (result["member_id"], result["mode"], result.get("active_goal"), result.get("preferred_duration_minutes"),
+                 result["current_module_id"], result.get("recommended_module_id"), result["recommendation_reason"], result["updated_at"]))
+        return result
+
+    def create_recipe_proposal(self, member_id: str, values: Dict[str, Any]) -> Dict[str, Any]:
+        now = datetime.now(timezone.utc).isoformat()
+        result = {**values, "id": str(uuid4()), "member_id": member_id, "status": "proposed", "version": 1, "created_at": now, "updated_at": now}
+        with self._connect() as conn:
+            conn.execute("""INSERT INTO recipe_proposals
+            (id,member_id,status,version,name,purpose,trigger_text,duration_minutes,steps,evidence_basis,cautions,rationale,source_kind,created_at,updated_at)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (result["id"], member_id, result["status"], 1, result["name"], result["purpose"], result.get("trigger"),
+             result["duration_minutes"], json.dumps(result["steps"]), result["evidence_basis"], json.dumps(result.get("cautions", [])),
+             result["rationale"], result["source_kind"], now, now))
+        return result
+
+    def get_recipe_proposals(self, member_id: str) -> List[Dict[str, Any]]:
+        with self._connect() as conn:
+            rows = conn.execute("SELECT * FROM recipe_proposals WHERE member_id=? ORDER BY updated_at DESC", (member_id,)).fetchall()
+        return [self._decode_recipe_proposal(row) for row in rows]
+
+    def decide_recipe_proposal(self, member_id: str, proposal_id: str, approved: bool, edits: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
+        with self._connect() as conn:
+            row = conn.execute("SELECT * FROM recipe_proposals WHERE id=? AND member_id=?", (proposal_id, member_id)).fetchone()
+            if not row or row["status"] != "proposed":
+                return None
+            result = self._decode_recipe_proposal(row)
+            if edits:
+                result.update(edits)
+            result["status"] = "approved" if approved else "archived"
+            result["updated_at"] = datetime.now(timezone.utc).isoformat()
+            conn.execute("""UPDATE recipe_proposals SET status=?,version=?,name=?,purpose=?,trigger_text=?,duration_minutes=?,steps=?,evidence_basis=?,cautions=?,rationale=?,source_kind=?,updated_at=? WHERE id=?""",
+                (result["status"], int(row["version"]) + (1 if edits else 0), result["name"], result["purpose"], result.get("trigger"), result["duration_minutes"], json.dumps(result["steps"]), result["evidence_basis"], json.dumps(result.get("cautions", [])), result["rationale"], result["source_kind"], result["updated_at"], proposal_id))
+        return self.get_recipe_proposal(member_id, proposal_id)
+
+    def get_recipe_proposal(self, member_id: str, proposal_id: str) -> Optional[Dict[str, Any]]:
+        with self._connect() as conn:
+            row = conn.execute("SELECT * FROM recipe_proposals WHERE id=? AND member_id=?", (proposal_id, member_id)).fetchone()
+        return self._decode_recipe_proposal(row) if row else None
+
+    @staticmethod
+    def _decode_recipe_proposal(row: sqlite3.Row) -> Dict[str, Any]:
+        value = dict(row)
+        value["trigger"] = value.pop("trigger_text")
+        value["steps"] = json.loads(value["steps"])
+        value["cautions"] = json.loads(value["cautions"])
+        return value
+
+    def list_memory_cards(self, member_id: str) -> List[Dict[str, Any]]:
+        with self._connect() as conn:
+            rows = conn.execute("SELECT * FROM memory_cards WHERE member_id=? ORDER BY pinned DESC, updated_at DESC", (member_id,)).fetchall()
+        return [{**dict(row), "pinned": bool(row["pinned"])} for row in rows]
+
+    def save_memory_card(self, member_id: str, values: Dict[str, Any], card_id: Optional[str] = None) -> Dict[str, Any]:
+        now = datetime.now(timezone.utc).isoformat()
+        identifier = card_id or str(uuid4())
+        with self._connect() as conn:
+            if card_id:
+                conn.execute("UPDATE memory_cards SET kind=?,content=?,pinned=?,updated_at=? WHERE id=? AND member_id=?", (values["kind"], values["content"], int(values.get("pinned", False)), now, identifier, member_id))
+            else:
+                conn.execute("INSERT INTO memory_cards (id,member_id,kind,content,pinned,created_at,updated_at) VALUES (?,?,?,?,?,?,?)", (identifier, member_id, values["kind"], values["content"], int(values.get("pinned", False)), now, now))
+            row = conn.execute("SELECT * FROM memory_cards WHERE id=? AND member_id=?", (identifier, member_id)).fetchone()
+        return {**dict(row), "pinned": bool(row["pinned"])} if row else None
+
+    def delete_memory_card(self, member_id: str, card_id: str) -> bool:
+        with self._connect() as conn:
+            return conn.execute("DELETE FROM memory_cards WHERE id=? AND member_id=?", (card_id, member_id)).rowcount > 0
+
+    def add_member_events(self, member_id: str, events: List[Dict[str, Any]]) -> int:
+        with self._connect() as conn:
+            for event in events:
+                conn.execute("INSERT OR IGNORE INTO member_events (id,member_id,kind,occurred_at,source,provenance,payload,consent_scope,schema_version) VALUES (?,?,?,?,?,?,?,?,?)", (event["id"], member_id, event["kind"], event["occurred_at"], event["source"], event["provenance"], json.dumps(event.get("payload", {})), event["consent_scope"], event["schema_version"]))
+            return conn.total_changes
+
+    def pulse_summary(self, member_id: str) -> Dict[str, Any]:
+        events = []
+        with self._connect() as conn:
+            rows = conn.execute("SELECT kind,payload,occurred_at,source FROM member_events WHERE member_id=? ORDER BY occurred_at DESC LIMIT 50", (member_id,)).fetchall()
+        for row in rows:
+            events.append({**dict(row), "payload": json.loads(row["payload"])})
+        practices = self.get_recipe_practice_items(member_id)
+        ratings = [rating for item in practices for rating in item.get("effectiveness_ratings", [])]
+        return {"recent_events": events[:8], "recipe_effectiveness": round(sum(ratings) / len(ratings), 1) if ratings else None,
+                "practice_count": sum(int(item.get("practice_count", 0)) for item in practices), "data_sources": sorted({event["source"] for event in events}),
+                "uncertainty": "Pulse reflects only the information you chose to share; it is not a diagnosis."}
 
     # ── RecipePractice ───────────────────────────────────────────────
 
