@@ -10,7 +10,7 @@
 // For IPA: macOS agent with full Xcode (xcode-select -s /Applications/Xcode.app).
 
 pipeline {
-  agent { label 'flutter' }
+  agent none
 
   environment {
     MIND_RECIPE_STAGING_API_URL = 'https://staging-api.mindrecipe.142.93.201.156.sslip.io'
@@ -25,30 +25,15 @@ pipeline {
   }
 
   stages {
-    stage('Checkout') {
+    stage('Build and analyze on macOS') {
+      agent { label 'mac-builder' }
       steps {
+        deleteDir()
         checkout scm
-      }
-    }
-
-    stage('Pub get') {
-      steps {
         dir("${FLUTTER_DIR}") {
           sh 'flutter pub get'
-        }
-      }
-    }
-
-    stage('Analyze') {
-      steps {
-        dir("${FLUTTER_DIR}") {
           sh 'flutter analyze --no-fatal-infos --no-fatal-warnings || true'
         }
-      }
-    }
-
-    stage('Build APK (arm64, unsigned staging)') {
-      steps {
         dir("${FLUTTER_DIR}") {
           sh '''
             flutter build apk --release --target-platform android-arm64 \
@@ -56,66 +41,39 @@ pipeline {
           '''
         }
         stash(name: 'apk', includes: 'flutter/build/app/outputs/flutter-apk/app-release.apk')
-      }
-    }
-
-    stage('Build IPA (unsigned — same as Actions)') {
-      when {
-        expression {
-          return sh(
-            returnStdout: true,
-            script: 'xcodebuild -version >/dev/null 2>&1 && echo yes || echo no',
-          ).trim() == 'yes'
-        }
-      }
-      steps {
-        dir("${FLUTTER_DIR}") {
-          sh '''
-            flutter build ios --release --no-codesign \
-              --dart-define=MIND_RECIPE_API_BASE=${MIND_RECIPE_STAGING_API_URL}
-            # Package unsigned IPA exactly like .github/workflows/ios-ipa.yml
-            mkdir -p build/ios/ipa/Payload
-            cp -R build/ios/iphoneos/Runner.app build/ios/ipa/Payload/
-            cd build/ios/ipa && zip -qry mind-recipe-ios-unsigned.ipa Payload
-          '''
-        }
+        sh 'chmod +x ci/build_ios_in_tart.sh && ci/build_ios_in_tart.sh'
         stash(name: 'ipa', includes: 'flutter/build/ios/ipa/mind-recipe-ios-unsigned.ipa')
       }
     }
 
     stage('Deliver builds to Google Drive') {
-      when { expression { return currentBuild.currentResult == 'SUCCESS' } }
+      agent { label 'built-in' }
       steps {
+        deleteDir()
+        checkout scm
+        unstash 'apk'
+        unstash 'ipa'
         withCredentials([file(credentialsId: 'mind-recipe-google-drive-service-account', variable: 'GOOGLE_APPLICATION_CREDENTIALS')]) {
           sh '''
             chmod +x ci/upload_drive.sh
             ci/upload_drive.sh flutter/build/app/outputs/flutter-apk/app-release.apk \
               Mind-Recipe-1.0.0-2074-Android.apk "$MIND_RECIPE_DRIVE_FOLDER"
-            if [ -f flutter/build/ios/ipa/mind-recipe-ios-unsigned.ipa ]; then
-              ci/upload_drive.sh flutter/build/ios/ipa/mind-recipe-ios-unsigned.ipa \
-                Mind-Recipe-1.0.0-2074-iOS-unsigned.ipa "$MIND_RECIPE_DRIVE_FOLDER" \
-                victoria@contextfield.co
-            fi
+            ci/upload_drive.sh flutter/build/ios/ipa/mind-recipe-ios-unsigned.ipa \
+              Mind-Recipe-1.0.0-2074-iOS-unsigned.ipa "$MIND_RECIPE_DRIVE_FOLDER" \
+              victoria@contextfield.co
           '''
         }
+        archiveArtifacts(
+          artifacts: 'flutter/build/app/outputs/flutter-apk/app-release.apk,flutter/build/ios/ipa/mind-recipe-ios-unsigned.ipa',
+          fingerprint: true,
+        )
       }
     }
   }
 
   post {
     always {
-      unstash('apk')
-      archiveArtifacts(
-        artifacts: 'flutter/build/app/outputs/flutter-apk/app-release.apk',
-        fingerprint: true,
-        allowEmptyArchive: true,
-      )
-      archiveArtifacts(
-        artifacts: 'flutter/build/ios/ipa/mind-recipe-ios-unsigned.ipa',
-        fingerprint: true,
-        allowEmptyArchive: true,
-      )
-      sh 'rm -rf flutter/build/ios/ipa/Payload || true'
+      echo 'Jenkins build finished; artifacts are archived only after both platform builds succeed.'
     }
     success {
       echo "Mind Recipe build #${env.BUILD_NUMBER} — artifacts archived in Jenkins."
