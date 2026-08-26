@@ -15,7 +15,7 @@ pipeline {
   environment {
     MIND_RECIPE_STAGING_API_URL = 'https://staging-api.mindrecipe.142.93.201.156.sslip.io'
     FLUTTER_DIR = 'flutter'
-    MIND_RECIPE_DRIVE_FOLDER = '14JW3fnMrR9-e4akDTgfgFYiS73r3Kvd'
+    MIND_RECIPE_DRIVE_FOLDER = '14JIW3fnMrR9-e4akDTgfgFYiS73r3Kvd'
   }
 
   options {
