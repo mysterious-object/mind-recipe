@@ -181,26 +181,35 @@ class _PulseScreenState extends State<PulseScreen>
                   const SizedBox(height: 6),
                   Text(mood.guidance),
                   const SizedBox(height: 12),
-                  Row(children: [
-                    Expanded(
-                      child: FilledButton.icon(
-                        onPressed: () => setState(() {
-                          _inBreathWork = true;
-                          _breathCycle = 0;
-                        }),
-                        icon: const Icon(Icons.air_rounded),
-                        label: const Text('Breathe with me'),
+                  // Dynamic, aligned buttons — wrap on narrow screens so words never clip
+                  LayoutBuilder(builder: (context, c) {
+                    final narrow = c.maxWidth < 360;
+                    final breathe = FilledButton.icon(
+                      onPressed: () => setState(() {
+                        _inBreathWork = true;
+                        _breathCycle = 0;
+                      }),
+                      icon: const Icon(Icons.air_rounded, size: 18),
+                      label: const Text('Breathe with me', textAlign: TextAlign.center),
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: _navigatorOnline ? _askNavigator : null,
-                        icon: const Icon(Icons.chat_bubble_outline_rounded),
-                        label: Text(_navigatorOnline ? 'Ask Navigator' : 'Navigator offline'),
+                    );
+                    final ask = OutlinedButton.icon(
+                      onPressed: _navigatorOnline ? _askNavigator : null,
+                      icon: const Icon(Icons.chat_bubble_outline_rounded, size: 18),
+                      label: Text(_navigatorOnline ? 'Ask Navigator' : 'Navigator offline', textAlign: TextAlign.center),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
                       ),
-                    ),
-                  ]),
+                    );
+                    if (narrow) {
+                      return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [breathe, const SizedBox(height: 8), ask]);
+                    }
+                    return Row(children: [Expanded(child: breathe), const SizedBox(width: 8), Expanded(child: ask)]);
+                  }),
                 ],
               ),
             ),
@@ -208,28 +217,54 @@ class _PulseScreenState extends State<PulseScreen>
         const SizedBox(height: 16),
         Text('How does it feel right now?', style: Theme.of(context).textTheme.titleSmall),
         const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          children: [
-            for (final chip in const [
-              ('Activated', 1.0, -0.4),
-              ('Steady', 0.5, 0.2),
-              ('Low', -0.5, 0.2),
-              ('Heavy', -0.8, -0.3),
-              ('Bright', 0.8, 0.6),
-            ])
-              ActionChip(
-                label: Text(chip.$1),
-                onPressed: _logging
-                    ? null
-                    : () => _logQuick(
-                          chip.$1.toLowerCase(),
-                          chip.$3,
-                          chip.$2,
-                        ),
-              ),
-          ],
-        ),
+        // Dynamic, aligned quick-log options — wrap cleanly and surface current check-in
+        Builder(builder: (context) {
+          // Build dynamic chip set from current check-in + defaults, deduped
+          final seen = <String>{};
+          final dynamicChips = <(String, double, double)>[];
+          for (final e in widget.checkIn.emotions.take(3)) {
+            final label = e.trim();
+            if (label.isEmpty || seen.contains(label.toLowerCase())) continue;
+            seen.add(label.toLowerCase());
+            // Map check-in emotion to a gentle pulse estimate
+            dynamicChips.add((label[0].toUpperCase() + label.substring(1), 0.5, 0.0));
+          }
+          for (final chip in const [
+            ('Activated', 1.0, -0.4),
+            ('Steady', 0.5, 0.2),
+            ('Low', -0.5, 0.2),
+            ('Heavy', -0.8, -0.3),
+            ('Bright', 0.8, 0.6),
+            ('Calm', 0.3, 0.5),
+            ('Tense', 0.9, -0.5),
+          ]) {
+            if (seen.contains(chip.$1.toLowerCase())) continue;
+            seen.add(chip.$1.toLowerCase());
+            dynamicChips.add(chip);
+          }
+          return Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            alignment: WrapAlignment.start,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              for (final chip in dynamicChips.take(7))
+                ActionChip(
+                  label: Text(chip.$1, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  labelPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  visualDensity: VisualDensity.compact,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  onPressed: _logging
+                      ? null
+                      : () => _logQuick(
+                            chip.$1.toLowerCase(),
+                            chip.$3,
+                            chip.$2,
+                          ),
+                ),
+            ],
+          );
+        }),
         const SizedBox(height: 20),
         if (_pulses.isNotEmpty) ...[
           Text('Recent pulses', style: Theme.of(context).textTheme.titleSmall),

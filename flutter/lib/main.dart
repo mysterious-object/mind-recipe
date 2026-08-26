@@ -205,6 +205,8 @@ class _MemberHomeState extends State<MemberHome> {
   bool _voiceIsSpeaking = false;
   bool _voiceIsListening = false;
   String? _lastAssistantSnippet;
+  DateTime? _bubbleDismissedAt;
+  String? _lastSeenAssistantText;
 
   @override
   void initState() {
@@ -225,16 +227,25 @@ class _MemberHomeState extends State<MemberHome> {
       for (var i = chatMessages.length - 1; i >= 0; i--) {
         if (chatMessages[i].role == ChatRole.assistant) { snippet = chatMessages[i].text; break; }
       }
-      if (snippet != _lastAssistantSnippet || speaking != _voiceIsSpeaking || listening != _voiceIsListening) {
+      final isNewSnippet = snippet != _lastSeenAssistantText;
+      if (isNewSnippet && snippet != null) {
+        _lastSeenAssistantText = snippet;
+        // New assistant message clears dismissal so bubble can reappear
+        _bubbleDismissedAt = null;
+      }
+      // If dismissed, keep hidden for 90s or until a new assistant message arrives
+      final dismissedRecently = _bubbleDismissedAt != null &&
+          DateTime.now().difference(_bubbleDismissedAt!).inSeconds < 90 &&
+          !isNewSnippet;
+      String? visibleSnippet = dismissedRecently ? null : snippet;
+      // Also keep bubble visible for 12s after last assistant message even when not speaking
+      // The snippet is already the visible one - no extra logic needed beyond dismissal
+      if (visibleSnippet != _lastAssistantSnippet || speaking != _voiceIsSpeaking || listening != _voiceIsListening) {
         if (mounted) setState(() {
           _voiceIsSpeaking = speaking;
           _voiceIsListening = listening;
-          _lastAssistantSnippet = snippet;
+          _lastAssistantSnippet = visibleSnippet;
         });
-      }
-      // Also keep bubble visible for 12s after last assistant message even when not speaking
-      if (snippet != null && snippet != _lastAssistantSnippet) {
-        if (mounted) setState(() => _lastAssistantSnippet = snippet);
       }
     });
   }
@@ -489,7 +500,7 @@ class _MemberHomeState extends State<MemberHome> {
                         },
                         children: screens,
                       ),
-                      if (((_voiceIsSpeaking || _voiceIsListening) || _lastAssistantSnippet != null) && index != 0)
+                      if (((_voiceIsSpeaking || _voiceIsListening) || _lastAssistantSnippet != null) && index != 1 && (_bubbleDismissedAt == null || DateTime.now().difference(_bubbleDismissedAt!).inSeconds >= 90))
                         Positioned(
                           left: 12,
                           right: 12,
@@ -500,7 +511,7 @@ class _MemberHomeState extends State<MemberHome> {
                             color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.96),
                             child: InkWell(
                               borderRadius: BorderRadius.circular(18),
-                              onTap: () => goToPage(0),
+                              onTap: () => goToPage(1),
                               child: Padding(
                                 padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
                                 child: Row(
@@ -536,11 +547,14 @@ class _MemberHomeState extends State<MemberHome> {
                                     ),
                                     IconButton(
                                       icon: const Icon(Icons.close_rounded, size: 18),
-                                      tooltip: 'Stop',
+                                      tooltip: 'Close',
                                       onPressed: () async {
                                         await VoiceInterface().stopSpeaking();
                                         await VoiceInterface().stopListening();
-                                        setState(() => _lastAssistantSnippet = null);
+                                        setState(() {
+                                          _lastAssistantSnippet = null;
+                                          _bubbleDismissedAt = DateTime.now();
+                                        });
                                       },
                                     ),
                                     const Icon(Icons.chevron_right_rounded, size: 18),

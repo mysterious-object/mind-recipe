@@ -597,12 +597,14 @@ class OnDeviceInference implements LocalInference {
       return null;
     }
     if (_engine == null) {
-      await _inferLog('infer fallback mock for "$userMessage"');
-      final mock = _fallbackResponse(userMessage);
+      await _inferLog('infer fallback mock for "$userMessage" history=${history.length}');
+      // Simulate thoughtful pause — reasoning should not feel instant and dumb
+      await Future.delayed(const Duration(milliseconds: 800));
+      final mock = _fallbackResponse(userMessage, history);
       if (onToken != null) {
         for (final part in mock.split(' ')) {
           onToken('$part ');
-          await Future.delayed(const Duration(milliseconds: 12));
+          await Future.delayed(const Duration(milliseconds: 28));
         }
       }
       return mock;
@@ -894,16 +896,31 @@ class OnDeviceInference implements LocalInference {
   }
 
   String _stripPrivateReasoning(String response) {
-    final close = response.lastIndexOf('</think>');
-    if (close >= 0) return response.substring(close + '</think>'.length);
-    if (response.contains('<think>')) {
-      final open = response.indexOf('<think>');
-      final afterOpen = open + '<think>'.length;
-      if (afterOpen < response.length)
-        return response.substring(afterOpen).trim();
-      return '';
+    var clean = response;
+    // Strip Qwen3 <think> blocks fully
+    while (clean.contains('<think>') && clean.contains('</think>')) {
+      final start = clean.indexOf('<think>');
+      final end = clean.indexOf('</think>') + '</think>'.length;
+      clean = clean.substring(0, start) + clean.substring(end);
     }
-    return response;
+    if (clean.contains('<think>')) {
+      final open = clean.indexOf('<think>');
+      clean = clean.substring(0, open);
+    }
+    if (clean.contains('</think>')) {
+      final close = clean.lastIndexOf('</think>');
+      clean = clean.substring(close + '</think>'.length);
+    }
+    // Strip chat markers that leak as broken code
+    clean = clean.replaceAll('<|im_start|>', '').replaceAll('<|im_end|>', '').replaceAll('/no_think', '').trim();
+    // Strip leaked role prefixes like "member:" or "assistant:" at start
+    clean = clean.replaceFirst(RegExp(r'^(assistant|member|user)\s*:\s*', caseSensitive: false), '').trim();
+    // Strip code fences that appear as broken code
+    if (clean.startsWith('```') && clean.contains('```')) {
+      final lines = clean.split('\n');
+      clean = lines.where((l) => !l.trim().startsWith('```')).join('\n').trim();
+    }
+    return clean;
   }
 
   String _enforceWellnessBoundaries(String response) => response
@@ -916,16 +933,64 @@ class OnDeviceInference implements LocalInference {
         'notice what feels steady around you',
       );
 
-  String _fallbackResponse(String userMessage) {
-    final lower = userMessage.toLowerCase().trim();
+  String _fallbackResponse(String raw, List<LocalConversationTurn> history) {
+    // Extract real member utterance when NavigatorAgent wraps it — otherwise the
+    // fallback echoes "Member message: ... Selected Mind Recipe support: ..." which
+    // looks like broken code. The member only typed the part after "Member message:".
+    var clean = raw;
+    final memberIdx = clean.indexOf('Member message:');
+    if (memberIdx != -1) {
+      clean = clean.substring(memberIdx + 'Member message:'.length);
+      final supportIdx = clean.indexOf('Selected Mind Recipe support:');
+      if (supportIdx != -1) clean = clean.substring(0, supportIdx);
+      final guidanceIdx = clean.indexOf('Tool guidance:');
+      if (guidanceIdx != -1) clean = clean.substring(0, guidanceIdx);
+      final instructionIdx = clean.indexOf('Respond to the member directly');
+      if (instructionIdx != -1) clean = clean.substring(0, instructionIdx);
+      // Navigation context suffix
+      final navIdx = clean.indexOf('(I already completed');
+      if (navIdx != -1) clean = clean.substring(0, navIdx);
+      final importantIdx = clean.indexOf('Important: your previous reply');
+      if (importantIdx != -1) clean = clean.substring(0, importantIdx);
+      clean = clean.trim();
+    } else {
+      clean = clean.replaceFirst(RegExp(r'^(member|user):\s*', caseSensitive: false), '').trim();
+      // Strip bare retry instruction
+      final importantIdx = clean.indexOf('Important:');
+      if (importantIdx != -1) clean = clean.substring(0, importantIdx).trim();
+    }
+    if (clean.isEmpty) clean = raw.trim();
+    // Final safety: collapse newlines and trim
+    clean = clean.replaceAll(RegExp(r'\s+'), ' ').trim();
+    final lower = clean.toLowerCase();
+
+    // Use history to avoid repetition and make fallback more dynamic/reasoned.
+    // If last assistant turn already asked about "calm vs empty", don't repeat it.
+    final lastAssistant = history.isNotEmpty
+        ? history.lastWhere((t) => t.role == 'assistant', orElse: () => history.last).text.toLowerCase()
+        : '';
+    final hasAskedCalm = lastAssistant.contains('calm rather than empty') || lastAssistant.contains('sitting with you');
+
+    // Slower illusion: the fallback is fast (native failed), but reasoning should
+    // feel thoughtful, not instant. Caller streams with 28ms delay + 800ms pause.
     if (lower.contains('quick reset') || lower.contains('reset')) {
-      return 'Let\'s take a quick reset together — notice one steady breath and one thing you can see nearby. What feels most present right now?';
+      return 'Let’s take that quick reset together — breathe in for 4, out for 6, feel your feet on the floor, and name one thing you can see that feels steady. What feels a fraction calmer now, even 2 out of 10?';
     }
-    if (lower.length < 12 || lower == 'yes' || lower == 'that' || lower == 'it') {
-      return 'Thanks for sharing that. What stands out most about that for you right now?';
+    if (lower.length < 14 || ['yes', 'that', 'it', 'ok', 'okay', 'idk', 'alone'].contains(lower)) {
+      // Short follow-ups like "that I'm alone and it's calm" — don't repeat "member"
+      // Make it dynamic: if we already asked about calm, shift to grounding.
+      if (hasAskedCalm) {
+        return 'That calm aloneness — is it more in your chest, shoulders, or breath right now? Notice one small physical detail and tell me what you find.';
+      }
+      final shortSnippet = clean.length > 80 ? '${clean.substring(0, 80).trim()}…' : clean;
+      return 'Thanks for naming that — “$shortSnippet.” When that quiet aloneness is there, what’s one small detail that tells you it’s calm rather than empty?';
     }
-    final snippet = userMessage.length > 80 ? '${userMessage.substring(0, 80)}…' : userMessage;
-    return 'I hear you — "$snippet" feels important. What part of that is sitting with you most right now?';
+    // Reflect with specificity, no internal labels, one grounded question — vary if last turn was similar
+    final snippet = clean.length > 92 ? '${clean.substring(0, 92).trim()}…' : clean;
+    if (hasAskedCalm && lower.contains('alone')) {
+      return 'You named “$snippet” — that aloneness with calm is worth staying with. If that calm had a color or a texture, what would it be, and what helps it linger a minute longer?';
+    }
+    return 'I hear you — “$snippet.” That sounds important and very personal. What part of that is most present for you right now, and what’s one gentle next step that fits the next hour?';
   }
 
   String _cleanPromptText(String value) =>
@@ -968,7 +1033,7 @@ Example: If the member says their manager dismissed their work in front of the t
     prompt
       ..writeln('<|im_start|>user')
       ..writeln(_cleanPromptText(userMessage))
-      ..writeln('/no_think<|im_end|>')
+      ..writeln('<|im_end|>')
       ..writeln('<|im_start|>assistant');
     return prompt.toString();
   }

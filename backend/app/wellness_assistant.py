@@ -203,9 +203,13 @@ async def _call_openrouter(
         "temperature": temperature,
         "max_tokens": max_tokens,
     }
-    # The free router can select models with different reasoning contracts.
-    # Do not require an optional reasoning parameter that could exclude them.
-    if model != "openrouter/free":
+    # Reasoning: keep it enabled for Navigator — disabling it made replies fast but shallow.
+    # Only the generic router skips it; specific models like qwen3-32b benefit from medium effort.
+    if model == "openrouter/free":
+        pass
+    elif "qwen" in model:
+        payload["reasoning"] = {"effort": "medium"}
+    else:
         payload["reasoning"] = {"effort": "none", "exclude": True}
     async with httpx.AsyncClient(timeout=httpx.Timeout(25.0)) as client:
         response = await client.post(
@@ -329,8 +333,10 @@ async def _call_provider(
 
 
 def _get_model_for_provider(provider: str, requested_model: Optional[str] = None) -> str:
+    # Smarter free-tier default — openrouter/free routes to a tiny fast model (dumb),
+    # while qwen3-32b keeps reasoning quality for Navigator. Keep anthropic/google pinned.
     defaults = {
-        "openrouter": "openrouter/free",
+        "openrouter": "qwen/qwen3-32b:free",
         "anthropic": "claude-3-haiku-20240307",
         "google": "gemini-1.5-flash",
     }
