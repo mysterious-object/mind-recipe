@@ -651,6 +651,7 @@ class _PrivateModelDownloadBannerState
     OnDeviceStatus.checking,
   );
   Timer? _timer;
+  bool _errorDismissed = false;
 
   @override
   void initState() {
@@ -666,7 +667,10 @@ class _PrivateModelDownloadBannerState
                   (_snap.status == OnDeviceStatus.downloading
                       ? OnDeviceInference().downloadProgress
                       : -1))) {
-        setState(() => _snap = cur);
+        setState(() {
+          _snap = cur;
+          if (cur.status != OnDeviceStatus.error) _errorDismissed = false;
+        });
       } else if (cur.status == OnDeviceStatus.downloading ||
           cur.status == OnDeviceStatus.verifying) {
         // Still need to tick for progress bar animation
@@ -699,6 +703,7 @@ class _PrivateModelDownloadBannerState
     final isVerifying = _snap.status == OnDeviceStatus.verifying;
     final isError = _snap.status == OnDeviceStatus.error;
     if (!isDownloading && !isVerifying && !isError) return const SizedBox.shrink();
+    if (isError && _errorDismissed) return const SizedBox.shrink();
     if (isError) {
       return Material(
         elevation: 6,
@@ -725,6 +730,11 @@ class _PrivateModelDownloadBannerState
                     } catch (_) {}
                   },
                   child: const Text('Retry'),
+                ),
+                IconButton(
+                  tooltip: 'Dismiss',
+                  onPressed: () => setState(() => _errorDismissed = true),
+                  icon: const Icon(Icons.close_rounded, size: 18),
                 ),
               ],
             ),
@@ -1499,7 +1509,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           children: [
             const ListTile(
               leading: Icon(Icons.auto_awesome_rounded),
-              title: Text('Chimera FX appearance'),
+              title: Text('Visual appearance'),
               subtitle: Text(
                 'Choose the app theme and control the animated visual atmosphere.',
               ),
@@ -1595,7 +1605,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             const Divider(height: 1),
             SwitchListTile(
-              title: const Text('Chimera FX motion'),
+              title: const Text('Living background motion'),
               subtitle: const Text(
                 'Show animated fields and reactive background effects.',
               ),

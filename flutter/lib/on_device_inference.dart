@@ -748,69 +748,64 @@ class OnDeviceInference implements LocalInference {
     }
 
     // Adaptive attempt ladder based on device memory
-    int baseCtx = nCtx;
-    List<(String, int, int, LlamaFlashAttnType, LlamaKvCacheType)> attempts;
+    List<(String, int, int, int, int, int, LlamaFlashAttnType, LlamaKvCacheType)> attempts;
     
     if (Platform.isIOS) {
       // iOS: Skip GPU, use Metal-compatible configs
       attempts = [
-        ('CPU · balanced', 0, nCtx, LlamaFlashAttnType.enabled, LlamaKvCacheType.q8_0),
-        ('CPU · conservative', 0, nCtx, LlamaFlashAttnType.disabled, LlamaKvCacheType.f16),
-        ('CPU · reduced memory', 0, 1536, LlamaFlashAttnType.disabled, LlamaKvCacheType.f16),
-        ('CPU · minimal', 0, 1024, LlamaFlashAttnType.disabled, LlamaKvCacheType.f16),
-        ('CPU · ultra-low', 0, 512, LlamaFlashAttnType.disabled, LlamaKvCacheType.f16),
+        ('CPU · balanced', 0, nCtx, 128, 3, 384, LlamaFlashAttnType.enabled, LlamaKvCacheType.q8_0),
+        ('CPU · conservative', 0, 1536, 64, 2, 352, LlamaFlashAttnType.disabled, LlamaKvCacheType.q8_0),
+        ('CPU · minimal', 0, 1024, 32, 2, 320, LlamaFlashAttnType.disabled, LlamaKvCacheType.q8_0),
       ];
     } else if (Platform.isAndroid) {
       // Android: Try GPU first on most devices — 6GB+ is enough for Q4_K_M, fixes false offline error.
       final device = await MindRecipeDeviceHarness().capabilities();
       final totalMem = device.totalMemoryMiB ?? 8192;
-      if (totalMem >= 4096) {
+      if (totalMem >= 8192) {
         // High memory device: try GPU first
         attempts = [
-          ('GPU accelerated', 99, nCtx, LlamaFlashAttnType.enabled, LlamaKvCacheType.q8_0),
-          ('CPU · balanced', 0, nCtx, LlamaFlashAttnType.enabled, LlamaKvCacheType.q8_0),
-          ('CPU · conservative', 0, nCtx, LlamaFlashAttnType.disabled, LlamaKvCacheType.f16),
-          ('CPU · reduced memory', 0, 1536, LlamaFlashAttnType.disabled, LlamaKvCacheType.f16),
-          ('CPU · minimal', 0, 1024, LlamaFlashAttnType.disabled, LlamaKvCacheType.f16),
-          ('CPU · ultra-low', 0, 512, LlamaFlashAttnType.disabled, LlamaKvCacheType.f16),
+          ('GPU accelerated', 99, nCtx, 256, 4, 448, LlamaFlashAttnType.enabled, LlamaKvCacheType.q8_0),
+          ('CPU · balanced', 0, nCtx, 128, 4, 384, LlamaFlashAttnType.enabled, LlamaKvCacheType.q8_0),
+          ('CPU · conservative', 0, 1536, 64, 2, 352, LlamaFlashAttnType.disabled, LlamaKvCacheType.q8_0),
+          ('CPU · minimal', 0, 1024, 32, 2, 320, LlamaFlashAttnType.disabled, LlamaKvCacheType.q8_0),
         ];
       } else {
         // Low memory Android: skip GPU
         attempts = [
-          ('CPU · balanced', 0, nCtx, LlamaFlashAttnType.enabled, LlamaKvCacheType.q8_0),
-          ('CPU · conservative', 0, nCtx, LlamaFlashAttnType.disabled, LlamaKvCacheType.f16),
-          ('CPU · reduced memory', 0, 1536, LlamaFlashAttnType.disabled, LlamaKvCacheType.f16),
-          ('CPU · minimal', 0, 1024, LlamaFlashAttnType.disabled, LlamaKvCacheType.f16),
-          ('CPU · ultra-low', 0, 512, LlamaFlashAttnType.disabled, LlamaKvCacheType.f16),
+          ('CPU · low memory', 0, nCtx, 128, 3, 384, LlamaFlashAttnType.enabled, LlamaKvCacheType.q8_0),
+          ('CPU · conservative', 0, 1024, 64, 2, 352, LlamaFlashAttnType.disabled, LlamaKvCacheType.q8_0),
+          ('CPU · minimal', 0, 1024, 32, 2, 320, LlamaFlashAttnType.disabled, LlamaKvCacheType.q8_0),
         ];
       }
     } else {
       // Desktop/other: conservative
       attempts = [
-        ('CPU · balanced', 0, nCtx, LlamaFlashAttnType.enabled, LlamaKvCacheType.q8_0),
-        ('CPU · conservative', 0, nCtx, LlamaFlashAttnType.disabled, LlamaKvCacheType.f16),
-        ('CPU · reduced memory', 0, 1536, LlamaFlashAttnType.disabled, LlamaKvCacheType.f16),
-        ('CPU · minimal', 0, 1024, LlamaFlashAttnType.disabled, LlamaKvCacheType.f16),
-        ('CPU · ultra-low', 0, 512, LlamaFlashAttnType.disabled, LlamaKvCacheType.f16),
+        ('CPU · balanced', 0, nCtx, 128, 3, 384, LlamaFlashAttnType.enabled, LlamaKvCacheType.q8_0),
+        ('CPU · conservative', 0, 1536, 64, 2, 352, LlamaFlashAttnType.disabled, LlamaKvCacheType.q8_0),
+        ('CPU · minimal', 0, 1024, 32, 2, 320, LlamaFlashAttnType.disabled, LlamaKvCacheType.q8_0),
       ];
     }
     Object? lastError;
     for (var i = 0; i < attempts.length; i++) {
-      final (label, gpuLayers, ctx, flash, kvType) = attempts[i];
+      final (label, gpuLayers, ctx, batch, threads, predict, flash, kvType) = attempts[i];
       try {
         final model = ModelParams()
           ..nGpuLayers = gpuLayers
-          ..mainGpu = 0;
+          ..mainGpu = 0
+          ..useMemorymap = true
+          ..useMemoryLock = false;
         final context = ContextParams()
           ..nCtx = ctx
-          ..nBatch = 512
-          ..nUbatch = 512
+          ..nBatch = batch
+          ..nUbatch = batch
           // Performance cores only — little cores add contention and slow
           // token generation on big.LITTLE phones.
-          ..nThreads = 4
-          ..nThreadsBatch = 4
-          ..nPredict = 512
+          ..nThreads = threads
+          ..nThreadsBatch = threads
+          ..nPredict = predict
           ..flashAttention = flash
+          ..offloadKqv = gpuLayers > 0
+          ..opOffload = gpuLayers > 0
           ..typeK = kvType
           ..typeV = kvType;
         final sampler = SamplerParams()

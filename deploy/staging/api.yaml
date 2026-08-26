@@ -54,6 +54,10 @@ spec:
               value: /data/mind-recipe-staging.sqlite3
             - name: PYTHONPATH
               value: /tmp/site:/app
+          envFrom:
+            - secretRef:
+                name: mind-recipe-runtime
+                optional: true
           volumeMounts:
             - name: source
               mountPath: /app/app
