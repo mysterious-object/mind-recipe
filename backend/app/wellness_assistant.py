@@ -330,7 +330,7 @@ async def _call_provider(
 
 def _get_model_for_provider(provider: str, requested_model: Optional[str] = None) -> str:
     defaults = {
-        "openrouter": "openrouter/stealth/ox-alpha",
+        "openrouter": "openrouter/free",
         "anthropic": "claude-3-haiku-20240307",
         "google": "gemini-1.5-flash",
     }
