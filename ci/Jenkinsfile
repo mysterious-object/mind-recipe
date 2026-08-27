@@ -34,6 +34,8 @@ pipeline {
           sh 'flutter pub get'
           sh 'flutter analyze --no-fatal-infos --no-fatal-warnings || true'
         }
+        // The macOS node remains the current Flutter/Android reference runner.
+        // IPA provisioning is isolated in Tart below and requires no Apple ID.
         dir("${FLUTTER_DIR}") {
           sh '''
             flutter build apk --release --target-platform android-arm64 \
