@@ -104,6 +104,7 @@ class _PulseScreenState extends State<PulseScreen> with WidgetsBindingObserver {
   WebViewController? _controller;
   List<Map<String, dynamic>> _pulses = const [];
   Map<String, dynamic>? _curriculum;
+  Map<String, dynamic> _pulseSummary = const {};
   bool _webReady = false;
   bool _useFallback = false;
   bool _loading = true;
@@ -140,9 +141,13 @@ class _PulseScreenState extends State<PulseScreen> with WidgetsBindingObserver {
       final results = await Future.wait<dynamic>([
         widget.appState.loadMoodPulses(),
         widget.appState.loadCurriculumProgress(),
+        MindRecipeApiClient()
+            .getPulse(widget.appState.session?.token ?? '')
+            .catchError((_) => <String, dynamic>{}),
       ]);
       _pulses = (results[0] as List).cast<Map<String, dynamic>>();
       _curriculum = results[1] as Map<String, dynamic>?;
+      _pulseSummary = results[2] as Map<String, dynamic>;
       _familiar = _deriveFamiliar();
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -387,7 +392,11 @@ class _PulseScreenState extends State<PulseScreen> with WidgetsBindingObserver {
           ),
         ),
         const SizedBox(height: 12),
-        _ProgressSignals(familiar: _familiar, pulses: _pulses),
+        _ProgressSignals(
+          familiar: _familiar,
+          pulses: _pulses,
+          summary: _pulseSummary,
+        ),
       ],
     );
   }
@@ -444,9 +453,14 @@ class _FamiliarState {
 }
 
 class _ProgressSignals extends StatelessWidget {
-  const _ProgressSignals({required this.familiar, required this.pulses});
+  const _ProgressSignals({
+    required this.familiar,
+    required this.pulses,
+    required this.summary,
+  });
   final _FamiliarState familiar;
   final List<Map<String, dynamic>> pulses;
+  final Map<String, dynamic> summary;
 
   @override
   Widget build(BuildContext context) {
@@ -463,6 +477,8 @@ class _ProgressSignals extends StatelessWidget {
             const SizedBox(height: 12),
             _Signal(label: 'Module integration', value: familiar.growth),
             _Signal(label: 'Navigator continuity', value: familiar.continuity),
+            const Divider(height: 24),
+            _SignalSources(summary: summary),
             if (pulses.length > 1) ...[
               const SizedBox(height: 12),
               SizedBox(
@@ -481,6 +497,60 @@ class _ProgressSignals extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _SignalSources extends StatelessWidget {
+  const _SignalSources({required this.summary});
+  final Map<String, dynamic> summary;
+
+  @override
+  Widget build(BuildContext context) {
+    final events = (summary['recent_events'] as List?)
+            ?.whereType<Map>()
+            .map((event) => event.cast<String, dynamic>())
+            .toList() ??
+        const <Map<String, dynamic>>[];
+    final sources = (summary['data_sources'] as List?)
+            ?.map((source) => source.toString())
+            .toList() ??
+        const <String>[];
+    final healthEvents = events.where((event) {
+      final kind = event['kind']?.toString().toLowerCase() ?? '';
+      return kind.contains('sleep') ||
+          kind.contains('step') ||
+          kind.contains('workout') ||
+          kind.contains('heart') ||
+          kind.contains('hrv');
+    }).toList();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Context and provenance',
+          style: TextStyle(fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 7),
+        Text(
+          healthEvents.isEmpty
+              ? 'No consented sleep, activity, or vital summaries are available yet. Pulse will not guess from missing wearable data.'
+              : '${healthEvents.length} recent health or activity summaries are contributing. Raw wearable samples remain on your device.',
+        ),
+        const SizedBox(height: 8),
+        Text(
+          sources.isEmpty
+              ? 'Current source: your on-device Mind Recipe activity'
+              : 'Sources: ${sources.join(', ')}',
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+        const SizedBox(height: 5),
+        Text(
+          summary['uncertainty']?.toString() ??
+              'Pulse is context, not a diagnosis or a judgment about a good or bad day.',
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+      ],
     );
   }
 }

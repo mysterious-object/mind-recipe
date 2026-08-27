@@ -155,6 +155,7 @@ class MindRecipeApiClient {
     required String text,
     required Map<String, dynamic> context,
     bool externalResearchOptIn = false,
+    String? model,
   }) async {
     final response = await _client
         .post(
@@ -171,6 +172,7 @@ class MindRecipeApiClient {
             'privacy_mode': 'cloud_byok',
             'cloud_opt_in': true,
             'external_research_opt_in': externalResearchOptIn,
+            if (model != null && model.isNotEmpty) 'model': model,
             'context': context,
           }),
         )
@@ -501,6 +503,7 @@ class SecureAppState extends ChangeNotifier {
   static const _chimeraFxIntensityKey = 'mind_recipe_chimera_fx_intensity';
   static const _chimeraFxVariantKey = 'mind_recipe_chimera_fx_variant';
   static const _curriculumProgressKey = 'mind_recipe_curriculum_progress';
+  static const _cloudModelKey = 'mind_recipe_cloud_model';
 
   AccountSession? session;
   String openRouterKey = '';
@@ -508,6 +511,7 @@ class SecureAppState extends ChangeNotifier {
   bool managedAiAvailable = false;
   bool cloudAiEnabled = true;
   bool publicResearchEnabled = false;
+  String selectedCloudModel = 'anthropic/claude-sonnet-5';
   String appearanceMode = 'system';
   String chimeraTheme = 'verdant';
   bool chimeraFxEnabled = true;
@@ -556,6 +560,7 @@ class SecureAppState extends ChangeNotifier {
         _storage.read(key: _chimeraFxEnabledKey),
         _storage.read(key: _chimeraFxIntensityKey),
         _storage.read(key: _chimeraFxVariantKey),
+        _storage.read(key: _cloudModelKey),
       ]);
       if ((values[0] ?? '').isNotEmpty) {
         session = AccountSession(
@@ -612,6 +617,9 @@ class SecureAppState extends ChangeNotifier {
       }.contains(values[11])
           ? values[11]!
           : 'field';
+      selectedCloudModel = (values[12] ?? '').trim().isEmpty
+          ? 'anthropic/claude-sonnet-5'
+          : values[12]!.trim();
     } catch (_) {
       // Secure storage can be unavailable in some test harnesses. The app stays fail-closed.
     }
@@ -887,6 +895,14 @@ class SecureAppState extends ChangeNotifier {
     cloudAiEnabled = value;
     notifyListeners();
     await _storage.write(key: _cloudAiEnabledKey, value: '$value');
+  }
+
+  Future<void> setSelectedCloudModel(String value) async {
+    final model = value.trim();
+    if (model.isEmpty || model.length > 120) return;
+    selectedCloudModel = model;
+    notifyListeners();
+    await _storage.write(key: _cloudModelKey, value: model);
   }
 
   Future<void> setPublicResearchEnabled(bool value) async {

@@ -16,8 +16,11 @@ command -v sshpass >/dev/null || {
 
 if ! tart list --format json 2>/dev/null | grep -q "\"name\"[[:space:]]*:[[:space:]]*\"$TART_VM\""; then
   available_kb=$(df -Pk "$HOME" | awk 'NR==2 {print $4}')
-  if (( available_kb < 35 * 1024 * 1024 )); then
-    echo "JENKINS_MAC_STORAGE_LOW: at least 35 GiB free is required to provision the pinned Xcode VM; found $((available_kb / 1024 / 1024)) GiB." >&2
+  # The pinned Xcode image is roughly 65 GiB compressed and needs working
+  # headroom while Tart materializes its APFS disk. Fail before a partial pull
+  # fills the Jenkins host.
+  if (( available_kb < 85 * 1024 * 1024 )); then
+    echo "JENKINS_MAC_STORAGE_LOW: at least 85 GiB free is required to provision the pinned Xcode VM; found $((available_kb / 1024 / 1024)) GiB." >&2
     exit 22
   fi
   tart clone "$TART_IMAGE" "$TART_VM"

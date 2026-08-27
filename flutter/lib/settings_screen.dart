@@ -14,7 +14,7 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  String _selectedModel = 'openrouter/free';
+  late String _selectedModel;
   ThemeMode _themeMode = ThemeMode.system;
   bool _visualMotionEnabled = true;
   double _fxIntensity = 0.7;
@@ -26,6 +26,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   void initState() {
     super.initState();
+    _selectedModel = widget.appState.selectedCloudModel;
     _refreshPrivateModel();
   }
 
@@ -51,28 +52,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   static const _models = [
     {
+      'id': 'anthropic/claude-sonnet-5',
+      'name': 'Claude Sonnet 5',
+      'provider': 'openrouter',
+    },
+    {
+      'id': 'anthropic/claude-opus-5',
+      'name': 'Claude Opus 5',
+      'provider': 'openrouter',
+    },
+    {
+      'id': 'openai/gpt-5.6-sol',
+      'name': 'GPT-5.6 Sol',
+      'provider': 'openrouter',
+    },
+    {
+      'id': 'google/gemini-3.1-pro-preview',
+      'name': 'Gemini 3.1 Pro',
+      'provider': 'openrouter',
+    },
+    {
       'id': 'openrouter/free',
       'name': 'OpenRouter Free Router',
-      'provider': 'openrouter',
-    },
-    {
-      'id': 'claude-sonnet-4-20250514',
-      'name': 'Claude Sonnet 4',
-      'provider': 'anthropic',
-    },
-    {
-      'id': 'gemini-2.0-flash',
-      'name': 'Gemini 2.0 Flash',
-      'provider': 'google',
-    },
-    {
-      'id': 'meta-llama/llama-3.2-3b-instruct:free',
-      'name': 'Llama 3.2 3B (Free)',
-      'provider': 'openrouter',
-    },
-    {
-      'id': 'google/gemma-4-26b-a4b-it:free',
-      'name': 'Gemma 4 26B (Free)',
       'provider': 'openrouter',
     },
     {
@@ -257,7 +258,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
               subtitle: Text(m['provider']!.toUpperCase()),
               value: m['id']!,
               groupValue: _selectedModel,
-              onChanged: (v) => setState(() => _selectedModel = v!),
+              onChanged: (v) async {
+                if (v == null) return;
+                setState(() => _selectedModel = v);
+                await widget.appState.setSelectedCloudModel(v);
+              },
               activeColor: MindRecipeTokens.primary,
             ),
           )

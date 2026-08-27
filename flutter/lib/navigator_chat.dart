@@ -552,6 +552,7 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
     }
 
     try {
+      final curriculum = await widget.appState.loadCurriculumProgress();
       final recent = widget.messages
           .where((message) => message.role != ChatRole.status)
           .toList()
@@ -566,6 +567,7 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
         providerKey: widget.appState.openRouterKey,
         text: text,
         externalResearchOptIn: widget.appState.publicResearchEnabled,
+        model: widget.appState.selectedCloudModel,
         context: {
           'member_id': widget.appState.session?.email ?? '',
           'display_name': widget.appState.session?.displayName ?? '',
@@ -575,6 +577,19 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
           'body_areas': widget.state.bodyAreas.toList(),
           'context_tags': widget.state.contextTags.toList(),
           'zone_label': widget.state.greenZone,
+          if (curriculum != null) 'curriculum_progress': curriculum,
+          'screen_context': {
+            'destination': 'Navigator',
+            'mode': 'conversation',
+          },
+          'device_capabilities': {
+            'confirmed_actions': const [
+              'calendar',
+              'reminder',
+              'alarm',
+            ],
+            'requires_native_confirmation': true,
+          },
         },
       );
       if (!mounted) return;
