@@ -89,12 +89,10 @@ class PulseScreen extends StatefulWidget {
     super.key,
     required this.checkIn,
     required this.appState,
-    required this.onAskNavigator,
   });
 
   final CheckInState checkIn;
   final SecureAppState appState;
-  final void Function(String message) onAskNavigator;
 
   @override
   State<PulseScreen> createState() => _PulseScreenState();
@@ -286,15 +284,6 @@ class _PulseScreenState extends State<PulseScreen> with WidgetsBindingObserver {
     return 'This form reflects ${parts.join(', ')}. Mood changes its temporary energy; only sustained progress changes its lasting form.';
   }
 
-  void _askNavigator() {
-    widget.onAskNavigator(
-      'Review my Pulse familiar. It is in the $_stageName stage with '
-      '${_familiar.completed} modules complete. Explain the most meaningful '
-      'pattern you can support from my approved history, what remains uncertain, '
-      'and one optional next step. Do not diagnose or repeat Daily Nav.',
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return ListView(
@@ -378,15 +367,6 @@ class _PulseScreenState extends State<PulseScreen> with WidgetsBindingObserver {
                 ),
                 const SizedBox(height: 6),
                 Text(_whyChanged),
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    onPressed: _askNavigator,
-                    icon: const Icon(Icons.explore_rounded),
-                    label: const Text('Ask Navigator about my progress'),
-                  ),
-                ),
               ],
             ),
           ),

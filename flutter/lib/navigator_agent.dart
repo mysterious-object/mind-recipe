@@ -104,8 +104,9 @@ class NavigatorAgent {
       );
     }
     return const NavigatorAgentPlan(
-      tool: 'daily check-in',
-      instruction: 'Continue a voluntary reflection with one grounded observation, one useful next step, or one genuine question.',
+      tool: 'open conversation',
+      instruction:
+          'Listen for what the member wants before choosing a mode. Answer, plan, reflect, or help practically based on their request. Never start Daily Nav or a wellness exercise unless they explicitly choose it.',
     );
   }
 

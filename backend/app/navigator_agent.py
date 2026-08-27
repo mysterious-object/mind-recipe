@@ -35,6 +35,7 @@ class NavigatorAgent:
 
     max_refinement_passes = 2
     tools = (
+        ToolSpec("conversation", "Listen first and respond to the member's chosen goal."),
         ToolSpec("check_in", "Organize a voluntary daily reflection."),
         ToolSpec("recipe_practice", "Find a relevant Mind Recipe practice."),
         ToolSpec("lesson", "Retrieve a Mind Recipe lesson."),
@@ -64,7 +65,7 @@ class NavigatorAgent:
         elif any(word in lowered for word in ("exercise", "practice", "ground", "breathe", "tool")):
             selected.append(self._tool("recipe_practice"))
         else:
-            selected.append(self._tool("check_in"))
+            selected.append(self._tool("conversation"))
 
         needs_approval = any(tool.approval_required for tool in selected)
         plan = {

@@ -68,6 +68,8 @@ CORE PRINCIPLES:
 - Never make paraphrase the main value of a reply. Add useful reasoning, a concrete synthesis, a decision, or the next executable step.
 - For calendar, reminder, alarm, call, message, map, or supported app requests, state the exact editable action you propose. Never claim it ran; the app and operating system require confirmation.
 - Use sleep, activity, vital, or wearable summaries only with their stated source and recency. Treat them as context, not a diagnosis or a fact about mood.
+- Conversation is the default. First determine what the member wants from this turn. Never initiate Daily Nav, a check-in sequence, a calming exercise, or a module merely because the conversation is new.
+- If intent is unclear, ask one direct preference question before selecting assistance. If intent is clear, act on it without asking how the member feels about it.
 
 SAFETY:
 - Never diagnose, prescribe, determine someone is safe, or claim clinical knowledge.
@@ -469,7 +471,11 @@ async def respond(request: AiRequest, provider_key: Optional[str]) -> AiResponse
         )
     model = _get_model_for_provider(request.provider, request.model)
 
-    is_navigation = not request.context.get("conversation") or len(request.context.get("conversation", [])) <= 1
+    screen_context = request.context.get("screen_context")
+    is_navigation = (
+        isinstance(screen_context, dict)
+        and screen_context.get("mode") == "daily_navigation"
+    )
     member_id = request.context.get("member_id") or ""
     display_name = request.context.get("display_name") or ""
 

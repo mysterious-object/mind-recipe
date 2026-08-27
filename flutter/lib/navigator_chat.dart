@@ -1392,15 +1392,32 @@ class _OpeningSuggestions extends StatelessWidget {
       runSpacing: 8,
       children: [
         ActionChip(
-          label: const Text('I need a quick reset'),
-          avatar: const Icon(Icons.bolt_rounded, size: 18),
-          onPressed: () => onSelected('I need a quick reset right now.'),
+          label: const Text('Plan my next step'),
+          avatar: const Icon(Icons.route_rounded, size: 18),
+          onPressed: () => onSelected(
+            'Help me decide and plan the most useful next step. Listen to what I want before recommending anything.',
+          ),
         ),
         ActionChip(
-          label: const Text('Talk freely'),
-          avatar: const Icon(Icons.chat_bubble_outline, size: 18),
-          onPressed: () =>
-              onSelected('I want to talk freely before the check-in.'),
+          label: const Text('Create a reminder'),
+          avatar: const Icon(Icons.notifications_active_outlined, size: 18),
+          onPressed: () => onSelected(
+            'Help me create a reminder. Ask only for the missing details, then show me the editable phone action before anything opens.',
+          ),
+        ),
+        ActionChip(
+          label: const Text('Find my next module'),
+          avatar: const Icon(Icons.auto_stories_outlined, size: 18),
+          onPressed: () => onSelected(
+            'Use my approved goals and progress to suggest a next module, explain why, and give me alternatives.',
+          ),
+        ),
+        ActionChip(
+          label: const Text('60-second reset'),
+          avatar: const Icon(Icons.bolt_rounded, size: 18),
+          onPressed: () => onSelected(
+            'Give me a 60-second reset fitted to what I tell you. Do not start a full daily navigation unless I ask.',
+          ),
         ),
       ],
     ),

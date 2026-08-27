@@ -24,6 +24,7 @@ import 'pulse_screen.dart';
 import 'recipes_screen.dart';
 import 'voice_interface.dart';
 import 'three_intro_screen.dart';
+import 'three_background.dart';
 
 void main() => runApp(const MindRecipeApp());
 
@@ -420,6 +421,58 @@ class _MemberHomeState extends State<MemberHome> {
     );
   }
 
+  Future<void> _showContextNavigator() async {
+    final destination = labels[index];
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      builder: (sheetContext) => FractionallySizedBox(
+        heightFactor: .88,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 10, 8, 4),
+              child: Row(
+                children: [
+                  Image.asset(
+                    'assets/branding/navigator-compass.png',
+                    width: 30,
+                    height: 30,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Navigator · $destination',
+                      style: Theme.of(context).textTheme.titleMedium
+                          ?.copyWith(fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(sheetContext),
+                    icon: const Icon(Icons.keyboard_arrow_down_rounded),
+                    tooltip: 'Minimize Navigator',
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: NavigatorChatExperience(
+                state: checkIn,
+                onChanged: () => setState(() {}),
+                api: widget.api,
+                appState: widget.appState,
+                messages: chatMessages,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (mounted) setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
     final screens = [
@@ -468,14 +521,6 @@ class _MemberHomeState extends State<MemberHome> {
         child: PulseScreen(
           checkIn: checkIn,
           appState: widget.appState,
-          onAskNavigator: (message) {
-            setState(() {
-              chatMessages.add(
-                ChatMessage(role: ChatRole.member, text: message),
-              );
-            });
-            goToPage(1);
-          },
         ),
       ),
       const _KeepAlivePage(child: BookingScreen()),
@@ -524,22 +569,10 @@ class _MemberHomeState extends State<MemberHome> {
                     children: [
                       if (widget.appState.chimeraFxEnabled)
                         Positioned.fill(
-                          child: Opacity(
-                            opacity: widget.appState.chimeraFxIntensity,
-                            child: MindRecipeGpuField(
-                              progress: progress,
-                              variant: widget.appState.chimeraFxVariant,
-                            ),
-                          ),
-                        ),
-                      if (widget.appState.chimeraFxEnabled)
-                        Positioned.fill(
-                          child: Opacity(
-                            opacity: widget.appState.chimeraFxIntensity,
-                            child: MindRecipeFxBackdrop(
-                              progress: progress,
-                              variant: widget.appState.chimeraFxVariant,
-                            ),
+                          child: ThreeBackground(
+                            progress: progress,
+                            variant: widget.appState.chimeraFxVariant,
+                            intensity: widget.appState.chimeraFxIntensity,
                           ),
                         ),
                       PageView(
@@ -556,14 +589,7 @@ class _MemberHomeState extends State<MemberHome> {
                         },
                         children: screens,
                       ),
-                      if (((_voiceIsSpeaking || _voiceIsListening) ||
-                              _lastAssistantSnippet != null) &&
-                          index != 1 &&
-                          (_bubbleDismissedAt == null ||
-                              DateTime.now()
-                                      .difference(_bubbleDismissedAt!)
-                                      .inSeconds >=
-                                  90))
+                      if (index != 1)
                         Positioned(
                           left: 12,
                           right: 12,
@@ -577,7 +603,7 @@ class _MemberHomeState extends State<MemberHome> {
                                 .withValues(alpha: 0.96),
                             child: InkWell(
                               borderRadius: BorderRadius.circular(18),
-                              onTap: () => goToPage(1),
+                              onTap: _showContextNavigator,
                               child: Padding(
                                 padding: const EdgeInsets.fromLTRB(
                                   14,
@@ -604,7 +630,7 @@ class _MemberHomeState extends State<MemberHome> {
                                                 ? 'Navigator is speaking…'
                                                 : _voiceIsListening
                                                 ? 'Navigator is listening…'
-                                                : 'Navigator replied — tap to view',
+                                                : 'Navigator · ${labels[index]}',
                                             style: const TextStyle(
                                               fontWeight: FontWeight.w800,
                                               fontSize: 13,
@@ -617,7 +643,7 @@ class _MemberHomeState extends State<MemberHome> {
                                                           92
                                                       ? '${_lastAssistantSnippet!.substring(0, 92)}…'
                                                       : _lastAssistantSnippet!)
-                                                : 'Tap to return to chat — audio continues in background',
+                                                : 'Talk freely or ask for help here without leaving this tab',
                                             style: const TextStyle(
                                               fontSize: 11,
                                             ),
@@ -627,23 +653,8 @@ class _MemberHomeState extends State<MemberHome> {
                                         ],
                                       ),
                                     ),
-                                    IconButton(
-                                      icon: const Icon(
-                                        Icons.close_rounded,
-                                        size: 18,
-                                      ),
-                                      tooltip: 'Close',
-                                      onPressed: () async {
-                                        await VoiceInterface().stopSpeaking();
-                                        await VoiceInterface().stopListening();
-                                        setState(() {
-                                          _lastAssistantSnippet = null;
-                                          _bubbleDismissedAt = DateTime.now();
-                                        });
-                                      },
-                                    ),
                                     const Icon(
-                                      Icons.chevron_right_rounded,
+                                      Icons.expand_less_rounded,
                                       size: 18,
                                     ),
                                   ],
