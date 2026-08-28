@@ -293,7 +293,7 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
     String navigationContext = '';
     if (startsSession) {
       try {
-        final lastNav = await widget.appState.lastNavigationSummary();
+        final lastNav = await widget.appState.lastNavigationSummary().timeout(const Duration(milliseconds: 200), onTimeout: () => '');
         if (lastNav.isNotEmpty) {
           navigationContext =
               '\n\n(For context — my latest daily navigation: $lastNav)';
@@ -310,7 +310,7 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
 
     // Private inference is the primary route. It does not require cloud
     // consent, a provider key, or sending conversation context off device.
-    final localStatus = await _localInference.refreshStatus();
+    final localStatus = await _localInference.refreshStatus().timeout(const Duration(seconds: 1), onTimeout: () => _localSnapshot);
     if (mounted) setState(() => _localSnapshot = localStatus);
     final cloudCanClarify =
         widget.appState.cloudAiEnabled && widget.appState.aiAvailable;
@@ -359,7 +359,7 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
         plan.augment(text) + navigationContext,
         history: priorConversation,
         onToken: onToken,
-      );
+      ).timeout(const Duration(seconds: 2), onTimeout: () => null);
       // Anti-loop guard: if the reply mostly repeats the previous Navigator
       // turn ("consider the next step…" circles), retry ONCE with an explicit
       // variation instruction so the model moves somewhere new.
@@ -373,7 +373,7 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
           '${plan.augment(text)}\n\nImportant: your previous reply repeated what you already said. Respond with ONE concrete, different suggestion or question you have not used in this conversation. Reference the member\'s latest words specifically.',
           history: priorConversation,
           onToken: onToken,
-        );
+        ).timeout(const Duration(seconds: 2), onTimeout: () => null);
       }
       // Fallback ladder: a null reply usually means the full prompt
       // (system + routing + history) overflowed the engine context or the
@@ -387,11 +387,11 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
               ? priorConversation.sublist(priorConversation.length - 2)
               : priorConversation,
           onToken: onToken,
-        );
+        ).timeout(const Duration(seconds: 2), onTimeout: () => null);
       }
       if (reply == null || reply.trim().isEmpty) {
         await _log('FALLBACK: retrying with bare prompt');
-        reply = await _localInference.infer(text, onToken: onToken);
+        reply = await _localInference.infer(text, onToken: onToken).timeout(const Duration(seconds: 2), onTimeout: () => null);
       }
       // If the model streamed words but the final clean text came back
       // empty, the streamed text itself is the reply.
@@ -1077,7 +1077,7 @@ class _PresenceHeader extends StatelessWidget {
                   localReady
                       ? 'Private · on device'
                       : cloudAvailable
-                          ? 'Cloud · connected'
+                          ? 'Cloud guidance ready · consent required per conversation'
                           : 'Tap Cloud AI to connect',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 11.5),
                 ),
@@ -1265,6 +1265,11 @@ class _OpeningSuggestions extends StatelessWidget {
       spacing: 8,
       runSpacing: 8,
       children: [
+        ActionChip(
+          label: const Text('Begin daily navigation'),
+          avatar: const Icon(Icons.route_rounded, size: 18),
+          onPressed: () => onSelected('Begin my daily navigation. Guide me one step at a time.'),
+        ),
         ActionChip(
           label: const Text('I need a quick reset'),
           avatar: const Icon(Icons.bolt_rounded, size: 18),

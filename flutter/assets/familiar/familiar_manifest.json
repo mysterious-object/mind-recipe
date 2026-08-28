@@ -1,0 +1,9 @@
+{
+  "id": "familiar-orb-v1",
+  "name": "Navigator Familiar",
+  "version": "1.0.0+2085",
+  "model": "assets/familiar/familiar-orb.glb",
+  "description": "3D familiar companion — iridescent orb with tendril physics, shader-driven glow, and motion-reactive presence.",
+  "themes": ["chimera-native","cyberpunk-neon","organic-bioluminescent","quantum-void","holographic-matrix","midnight-trading","neon-samurai","deep-ocean","solar-flare","void-walker","crystal-matrix","aurora-borealis","obsidian-forge","orchid-vapor","tidal-glass"],
+  "capabilities": ["idle_float", "attention_follow", "voice_reactive", "touch_interact", "theme_reactive"]
+}

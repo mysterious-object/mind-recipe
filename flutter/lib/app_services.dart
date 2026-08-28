@@ -455,6 +455,7 @@ class SecureAppState extends ChangeNotifier {
   static const _chimeraFxEnabledKey = 'mind_recipe_chimera_fx_enabled';
   static const _chimeraFxIntensityKey = 'mind_recipe_chimera_fx_intensity';
   static const _chimeraFxVariantKey = 'mind_recipe_chimera_fx_variant';
+  static const _familiarEnabledKey = 'mind_recipe_familiar_enabled';
   static const _curriculumProgressKey = 'mind_recipe_curriculum_progress';
 
   AccountSession? session;
@@ -468,6 +469,7 @@ class SecureAppState extends ChangeNotifier {
   bool chimeraFxEnabled = true;
   double chimeraFxIntensity = 0.7;
   String chimeraFxVariant = 'field'; // 12 variants: field, nebula, rivers, tendrils, orbs, lattice, void, prism, aurora, ember, ocean, twilight
+  bool familiarEnabled = true;
   String _activityDate = '';
   int _navigationSessions = 0;
   int _messagesSent = 0;
@@ -505,6 +507,7 @@ class SecureAppState extends ChangeNotifier {
         _storage.read(key: _chimeraFxEnabledKey),
         _storage.read(key: _chimeraFxIntensityKey),
         _storage.read(key: _chimeraFxVariantKey),
+        _storage.read(key: _familiarEnabledKey),
       ]);
       if ((values[0] ?? '').isNotEmpty) {
         session = AccountSession(
@@ -536,6 +539,21 @@ class SecureAppState extends ChangeNotifier {
             'aurora',
             'ember',
             'twilight',
+            'chimera-native',
+            'cyberpunk-neon',
+            'organic-bioluminescent',
+            'quantum-void',
+            'holographic-matrix',
+            'midnight-trading',
+            'neon-samurai',
+            'deep-ocean',
+            'solar-flare',
+            'void-walker',
+            'crystal-matrix',
+            'aurora-borealis',
+            'obsidian-forge',
+            'orchid-vapor',
+            'tidal-glass',
           }.contains(values[8])
           ? values[8]!
           : 'verdant';
@@ -558,6 +576,7 @@ class SecureAppState extends ChangeNotifier {
       }.contains(values[11])
           ? values[11]!
           : 'field';
+      familiarEnabled = values[12] != 'false';
     } catch (_) {
       // Secure storage can be unavailable in some test harnesses. The app stays fail-closed.
     }
@@ -846,6 +865,21 @@ class SecureAppState extends ChangeNotifier {
       'aurora',
       'ember',
       'twilight',
+      'chimera-native',
+      'cyberpunk-neon',
+      'organic-bioluminescent',
+      'quantum-void',
+      'holographic-matrix',
+      'midnight-trading',
+      'neon-samurai',
+      'deep-ocean',
+      'solar-flare',
+      'void-walker',
+      'crystal-matrix',
+      'aurora-borealis',
+      'obsidian-forge',
+      'orchid-vapor',
+      'tidal-glass',
     }.contains(value)) {
       return;
     }
@@ -867,6 +901,12 @@ class SecureAppState extends ChangeNotifier {
       key: _chimeraFxIntensityKey,
       value: chimeraFxIntensity.toString(),
     );
+  }
+
+  Future<void> setFamiliarEnabled(bool value) async {
+    familiarEnabled = value;
+    notifyListeners();
+    await _storage.write(key: _familiarEnabledKey, value: '$value');
   }
 
   Future<void> setChimeraFxVariant(String value) async {

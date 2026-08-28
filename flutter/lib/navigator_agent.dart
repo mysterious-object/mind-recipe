@@ -100,12 +100,13 @@ class NavigatorAgent {
     ])) {
       return const NavigatorAgentPlan(
         tool: 'wellness recipe',
-        instruction: 'Offer one short, voluntary Mind Recipe-style practice and ask whether it feels useful. Avoid diagnosis or treatment claims.',
+        instruction: 'Offer one short, voluntary Mind Recipe-style practice only if the user has signaled wellness interest; otherwise stay in general-assistant mode. Therapist framing is last, not default. Avoid diagnosis or treatment claims.',
       );
     }
+    // General AGI default — only wellness when user explicitly seeks it; therapist last
     return const NavigatorAgentPlan(
-      tool: 'daily check-in',
-      instruction: 'Continue a voluntary reflection with one grounded observation, one useful next step, or one genuine question.',
+      tool: 'general assistance',
+      instruction: 'Respond as a capable general-purpose assistant first. Answer the actual question or request helpfully and directly. Only offer wellness/therapeutic framing as a final, gentle afterthought if the user has signaled they want that kind of support. Do not force a check-in.',
     );
   }
 

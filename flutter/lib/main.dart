@@ -14,6 +14,8 @@ import 'daily_navigation.dart';
 import 'design_tokens.dart';
 import 'navigator_chat.dart';
 import 'mind_recipe_fx.dart';
+import 'navigator_chat_bubble.dart';
+import 'familiar_3d.dart';
 import 'on_device_inference.dart';
 import 'notification_scheduler.dart';
 import 'practitioner_sharing.dart';
@@ -83,25 +85,101 @@ class _MindRecipeAppState extends State<MindRecipeApp> {
       _ => ThemeMode.system,
     };
     final (seed, secondary, tertiary) = switch (appState.chimeraTheme) {
+      // DarkStar chimera-fx themes — full 15-theme parity (plus legacy aliases)
       'ocean' => (
         const Color(0xff006d91),
         const Color(0xff0088a8),
         const Color(0xff315da8),
+      ),
+      'deep-ocean' => (
+        const Color(0xff0066ff),
+        const Color(0xff00e5cc),
+        const Color(0xff0a4a7a),
       ),
       'aurora' => (
         const Color(0xff6750a4),
         const Color(0xff008f83),
         const Color(0xffa13b86),
       ),
+      'aurora-borealis' => (
+        const Color(0xff00e68a),
+        const Color(0xff7c3aed),
+        const Color(0xff0a5a44),
+      ),
       'ember' => (
         const Color(0xffa34213),
         const Color(0xffc26a00),
         const Color(0xff8b3a62),
       ),
+      'solar-flare' => (
+        const Color(0xffff7a00),
+        const Color(0xffffd166),
+        const Color(0xff8a3a00),
+      ),
       'twilight' => (
         const Color(0xff4648a3),
         const Color(0xff7651a8),
         const Color(0xff007c91),
+      ),
+      'tidal-glass' => (
+        const Color(0xff06b6d4),
+        const Color(0xffe7fffb),
+        const Color(0xff0a4a5a),
+      ),
+      'chimera-native' => (
+        const Color(0xff00e5cc),
+        const Color(0xff7c3aed),
+        const Color(0xff007a4d),
+      ),
+      'cyberpunk-neon' => (
+        const Color(0xffff2daf),
+        const Color(0xff00e5ff),
+        const Color(0xff8a0a5a),
+      ),
+      'organic-bioluminescent' => (
+        const Color(0xff00e68a),
+        const Color(0xff7defff),
+        const Color(0xff0a4a33),
+      ),
+      'quantum-void' => (
+        const Color(0xff7c3aed),
+        const Color(0xff111827),
+        const Color(0xff3a1a8a),
+      ),
+      'holographic-matrix' => (
+        const Color(0xff7defff),
+        const Color(0xff00e5cc),
+        const Color(0xff0a5a6a),
+      ),
+      'midnight-trading' => (
+        const Color(0xff2563eb),
+        const Color(0xff00e68a),
+        const Color(0xff1a2a6a),
+      ),
+      'neon-samurai' => (
+        const Color(0xffff3b5c),
+        const Color(0xff7c3aed),
+        const Color(0xff8a1a2a),
+      ),
+      'void-walker' => (
+        const Color(0xff8b5cf6),
+        const Color(0xff020203),
+        const Color(0xff3a2a6a),
+      ),
+      'crystal-matrix' => (
+        const Color(0xff7defff),
+        const Color(0xffe7fffb),
+        const Color(0xff0a5a6a),
+      ),
+      'obsidian-forge' => (
+        const Color(0xffff6b35),
+        const Color(0xff111827),
+        const Color(0xff8a3a1a),
+      ),
+      'orchid-vapor' => (
+        const Color(0xffd946ef),
+        const Color(0xff7defff),
+        const Color(0xff6a2a7a),
       ),
       _ => (
         const Color(0xff007d71),
@@ -183,7 +261,6 @@ class _MemberHomeState extends State<MemberHome> {
   final tools = <String>{};
   final chatMessages = <ChatMessage>[];
   final labels = const [
-    'Daily Nav',
     'Navigator',
     'Recipes',
     'Pulse',
@@ -191,7 +268,6 @@ class _MemberHomeState extends State<MemberHome> {
     'Settings',
   ];
   final icons = const [
-    Icons.route_rounded,
     Icons.explore_rounded,
     Icons.menu_book,
     Icons.monitor_heart,
@@ -207,6 +283,7 @@ class _MemberHomeState extends State<MemberHome> {
   String? _lastAssistantSnippet;
   DateTime? _bubbleDismissedAt;
   String? _lastSeenAssistantText;
+  DateTime? _bubbleShownAt;
 
   @override
   void initState() {
@@ -228,23 +305,33 @@ class _MemberHomeState extends State<MemberHome> {
         if (chatMessages[i].role == ChatRole.assistant) { snippet = chatMessages[i].text; break; }
       }
       final isNewSnippet = snippet != _lastSeenAssistantText;
+      final now = DateTime.now();
       if (isNewSnippet && snippet != null) {
         _lastSeenAssistantText = snippet;
         // New assistant message clears dismissal so bubble can reappear
         _bubbleDismissedAt = null;
+        _bubbleShownAt = now;
       }
       // If dismissed, keep hidden for 90s or until a new assistant message arrives
       final dismissedRecently = _bubbleDismissedAt != null &&
-          DateTime.now().difference(_bubbleDismissedAt!).inSeconds < 90 &&
+          now.difference(_bubbleDismissedAt!).inSeconds < 90 &&
           !isNewSnippet;
       String? visibleSnippet = dismissedRecently ? null : snippet;
-      // Also keep bubble visible for 12s after last assistant message even when not speaking
-      // The snippet is already the visible one - no extra logic needed beyond dismissal
+      // Auto-hide after 12s of quiet (no voice) - fixes doesnt hide bug
+      final isNavigatorTab = index == 0;
+      if (!isNavigatorTab && visibleSnippet != null && !speaking && !listening && _bubbleShownAt != null && now.difference(_bubbleShownAt!).inSeconds >= 12) {
+        visibleSnippet = null;
+      }
+      // Also respect Navigator tab - always hide on Navigator
+      if (isNavigatorTab) visibleSnippet = null;
       if (visibleSnippet != _lastAssistantSnippet || speaking != _voiceIsSpeaking || listening != _voiceIsListening) {
         if (mounted) setState(() {
           _voiceIsSpeaking = speaking;
           _voiceIsListening = listening;
           _lastAssistantSnippet = visibleSnippet;
+          if (visibleSnippet != null && _bubbleShownAt == null) {
+            _bubbleShownAt = now;
+          }
         });
       }
     });
@@ -367,7 +454,7 @@ class _MemberHomeState extends State<MemberHome> {
       chatMessages.add(ChatMessage(role: ChatRole.member, text: prompt));
       chatMessages.add(ChatMessage(role: ChatRole.assistant, text: response, localGenerated: true));
     });
-    goToPage(1);
+    goToPage(0);
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Added to Navigator — continue the conversation there')),
     );
@@ -377,36 +464,13 @@ class _MemberHomeState extends State<MemberHome> {
   Widget build(BuildContext context) {
     final screens = [
       _KeepAlivePage(
-        child: DailyNavigation(
-          appState: widget.appState,
-          syncSummary: '',
-          onSeePulse: () => goToPage(3),
-          onComplete: () {
-            widget.appState.recordAssistantMessage(startsSession: true);
-            widget.appState.recordAiReflection();
-            final mood = MoodState.fromCheckIn(checkIn);
-            widget.appState.recordMoodPulse(
-              valence: mood.valence,
-              activation: mood.activation,
-              source: 'navigation',
-            );
-            chatMessages.add(
-              const ChatMessage(
-                role: ChatRole.status,
-                text: 'Daily navigation complete — your pulse was updated.',
-              ),
-            );
-            setState(() {});
-          },
-        ),
-      ),
-      _KeepAlivePage(
         child: NavigatorChatExperience(
           state: checkIn,
           onChanged: () => setState(() {}),
           api: widget.api,
           appState: widget.appState,
           messages: chatMessages,
+          onStartDailyNav: _showDailyNav,
         ),
       ),
       _KeepAlivePage(child: RecipesScreen(api: widget.api, appState: widget.appState, onAskNavigator: _onRecipeAskNavigator)),
@@ -418,7 +482,7 @@ class _MemberHomeState extends State<MemberHome> {
             setState(() {
               chatMessages.add(ChatMessage(role: ChatRole.member, text: message));
             });
-            goToPage(1);
+            goToPage(0);
           },
         ),
       ),
@@ -500,66 +564,41 @@ class _MemberHomeState extends State<MemberHome> {
                         },
                         children: screens,
                       ),
-                      if (((_voiceIsSpeaking || _voiceIsListening) || _lastAssistantSnippet != null) && index != 1 && (_bubbleDismissedAt == null || DateTime.now().difference(_bubbleDismissedAt!).inSeconds >= 90))
+                      // Navigator bubble — now backed by dedicated widget with proper hide semantics
+                      if (_lastAssistantSnippet != null || _voiceIsSpeaking || _voiceIsListening)
                         Positioned(
                           left: 12,
                           right: 12,
                           bottom: 12,
-                          child: Material(
-                            elevation: 8,
-                            borderRadius: BorderRadius.circular(18),
-                            color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.96),
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(18),
-                              onTap: () => goToPage(1),
-                              child: Padding(
-                                padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
-                                child: Row(
-                                  children: [
-                                    MindRecipeOrbBadge(
-                                      size: 26,
-                                      active: _voiceIsSpeaking || _voiceIsListening,
-                                    ),
-                                    const SizedBox(width: 10),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Text(
-                                            _voiceIsSpeaking
-                                                ? 'Navigator is speaking…'
-                                                : _voiceIsListening
-                                                    ? 'Navigator is listening…'
-                                                    : 'Navigator replied — tap to view',
-                                            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
-                                          ),
-                                          Text(
-                                            _lastAssistantSnippet != null
-                                                ? (_lastAssistantSnippet!.length > 92 ? '${_lastAssistantSnippet!.substring(0, 92)}…' : _lastAssistantSnippet!)
-                                                : 'Tap to return to chat — audio continues in background',
-                                            style: const TextStyle(fontSize: 11),
-                                            maxLines: 2,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    IconButton(
-                                      icon: const Icon(Icons.close_rounded, size: 18),
-                                      tooltip: 'Close',
-                                      onPressed: () async {
-                                        await VoiceInterface().stopSpeaking();
-                                        await VoiceInterface().stopListening();
-                                        setState(() {
-                                          _lastAssistantSnippet = null;
-                                          _bubbleDismissedAt = DateTime.now();
-                                        });
-                                      },
-                                    ),
-                                    const Icon(Icons.chevron_right_rounded, size: 18),
-                                  ],
-                                ),
+                          child: NavigatorChatBubble(
+                            snippet: index == 0 ? null : _lastAssistantSnippet,
+                            isSpeaking: _voiceIsSpeaking,
+                            isListening: _voiceIsListening,
+                            onTap: () => goToPage(1),
+                            onDismiss: () => setState(() {
+                              _lastAssistantSnippet = null;
+                              _bubbleDismissedAt = DateTime.now();
+                              _bubbleShownAt = null;
+                            }),
+                            onCloseVoice: () async {
+                              await VoiceInterface().stopSpeaking();
+                              await VoiceInterface().stopListening();
+                            },
+                          ),
+                        ),
+                      // 3D Familiar — floats when enabled, hides on Navigator to avoid overlap with chat
+                      if (widget.appState.familiarEnabled && index != 0)
+                        Positioned(
+                          right: 16,
+                          bottom: 96,
+                          child: SafeArea(
+                            child: Semantics(
+                              label: 'Navigator Familiar 3D companion',
+                              child: FamiliarOrb3D(
+                                size: 86,
+                                isSpeaking: _voiceIsSpeaking,
+                                isListening: _voiceIsListening,
+                                onTap: () => goToPage(1),
                               ),
                             ),
                           ),
@@ -1521,32 +1560,122 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             for (final theme in const [
               (
+                id: 'chimera-native',
+                name: 'DarkStar Core',
+                description: 'Teal + violet — original chimera signal',
+                colors: [Color(0xff00e5cc), Color(0xff7c3aed)],
+              ),
+              (
                 id: 'verdant',
                 name: 'Verdant Signal',
-                description: 'Signature teal, green, and violet',
+                description: 'Signature teal, green, and violet (legacy)',
                 colors: [Color(0xff007d71), Color(0xff7c3aed)],
               ),
               (
+                id: 'cyberpunk-neon',
+                name: 'Neon Circuit',
+                description: 'Magenta + cyan — cyberpunk pulse',
+                colors: [Color(0xffff2daf), Color(0xff00e5ff)],
+              ),
+              (
+                id: 'organic-bioluminescent',
+                name: 'Bioluminescent',
+                description: 'Neon green + sky — living glow',
+                colors: [Color(0xff00e68a), Color(0xff7defff)],
+              ),
+              (
+                id: 'quantum-void',
+                name: 'Quantum Void',
+                description: 'Violet void + deep ink',
+                colors: [Color(0xff7c3aed), Color(0xff111827)],
+              ),
+              (
+                id: 'holographic-matrix',
+                name: 'Holographic Matrix',
+                description: 'Ice cyan + teal holo',
+                colors: [Color(0xff7defff), Color(0xff00e5cc)],
+              ),
+              (
+                id: 'midnight-trading',
+                name: 'Midnight Signal',
+                description: 'Electric blue + neon green',
+                colors: [Color(0xff2563eb), Color(0xff00e68a)],
+              ),
+              (
+                id: 'neon-samurai',
+                name: 'Neon Ronin',
+                description: 'Crimson + violet — neon blade',
+                colors: [Color(0xffff3b5c), Color(0xff7c3aed)],
+              ),
+              (
+                id: 'deep-ocean',
+                name: 'Abyssal Current',
+                description: 'Ocean deep + teal undertow',
+                colors: [Color(0xff0066ff), Color(0xff00e5cc)],
+              ),
+              (
                 id: 'ocean',
-                name: 'Deep Ocean',
+                name: 'Deep Ocean (legacy)',
                 description: 'Cool blue, cyan, and indigo',
                 colors: [Color(0xff006d91), Color(0xff315da8)],
               ),
               (
+                id: 'solar-flare',
+                name: 'Solar Flare',
+                description: 'Solar orange + light gold',
+                colors: [Color(0xffff7a00), Color(0xffffd166)],
+              ),
+              (
+                id: 'void-walker',
+                name: 'Void Walker',
+                description: 'Violet ash + void black',
+                colors: [Color(0xff8b5cf6), Color(0xff020203)],
+              ),
+              (
+                id: 'crystal-matrix',
+                name: 'Crystal Matrix',
+                description: 'Ice + crystal white',
+                colors: [Color(0xff7defff), Color(0xffe7fffb)],
+              ),
+              (
                 id: 'aurora',
-                name: 'Aurora',
+                name: 'Aurora (legacy)',
                 description: 'Violet, turquoise, and orchid',
                 colors: [Color(0xff6750a4), Color(0xff008f83)],
               ),
               (
+                id: 'aurora-borealis',
+                name: 'Aurora Borealis',
+                description: 'Aurora green + violet veil',
+                colors: [Color(0xff00e68a), Color(0xff7c3aed)],
+              ),
+              (
+                id: 'obsidian-forge',
+                name: 'Obsidian Forge',
+                description: 'Forge orange + obsidian ink',
+                colors: [Color(0xffff6b35), Color(0xff111827)],
+              ),
+              (
+                id: 'orchid-vapor',
+                name: 'Orchid Vapor',
+                description: 'Orchid + ice haze',
+                colors: [Color(0xffd946ef), Color(0xff7defff)],
+              ),
+              (
+                id: 'tidal-glass',
+                name: 'Tidal Glass',
+                description: 'Tidal cyan + crystal frost',
+                colors: [Color(0xff06b6d4), Color(0xffe7fffb)],
+              ),
+              (
                 id: 'ember',
-                name: 'Warm Ember',
+                name: 'Warm Ember (legacy)',
                 description: 'Grounded copper, amber, and berry',
                 colors: [Color(0xffa34213), Color(0xffc26a00)],
               ),
               (
                 id: 'twilight',
-                name: 'Twilight',
+                name: 'Twilight (legacy)',
                 description: 'Indigo, purple, and dusk blue',
                 colors: [Color(0xff4648a3), Color(0xff7651a8)],
               ),
@@ -1670,6 +1799,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                       ],
                     ),
+                  ],
+                ),
+              ),
+            const Divider(height: 1),
+            SwitchListTile(
+              title: const Text('3D Familiar companion'),
+              subtitle: const Text('Show the iridescent orb familiar that reacts to voice and follows your theme.'),
+              value: widget.appState.familiarEnabled,
+              onChanged: widget.appState.setFamiliarEnabled,
+              secondary: const Icon(Icons.bubble_chart_rounded),
+            ),
+            if (widget.appState.familiarEnabled)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                child: Row(
+                  children: [
+                    FamiliarOrb3D(size: 54, isSpeaking: false, isListening: false),
+                    const SizedBox(width: 12),
+                    const Expanded(child: Text('Your familiar floats, glows with voice, and tilts with movement. Tap it to return to Navigator.', style: TextStyle(fontSize: 12))),
                   ],
                 ),
               ),
