@@ -60,8 +60,8 @@ class _ThreeBackgroundState extends State<ThreeBackground>
         }))
         ..addJavaScriptChannel(
           'BackgroundBridge',
-          onMessageReceived: (_) {
-            if (_.message == 'context_lost') {
+          onMessageReceived: (message) {
+            if (message.message == 'context_lost') {
               if (mounted) setState(() => _failed = true);
               return;
             }
