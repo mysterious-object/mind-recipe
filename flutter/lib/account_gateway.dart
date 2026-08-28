@@ -178,12 +178,6 @@ class _AccountGatewayState extends State<AccountGateway>
             variant: widget.appState.chimeraFxVariant,
             progress: creating ? .34 : resetting ? .67 : .16,
             intensity: widget.appState.chimeraFxIntensity,
-            fallback: const Stack(
-              children: [
-                Positioned.fill(child: MindRecipeGpuField(progress: 0.16)),
-                Positioned.fill(child: MindRecipeFxBackdrop(progress: 0.16)),
-              ],
-            ),
           ),
         ),
         SafeArea(

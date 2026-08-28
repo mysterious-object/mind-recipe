@@ -189,6 +189,7 @@ class _PulseScreenState extends State<PulseScreen> with WidgetsBindingObserver {
               setState(() => _webReady = true);
               unawaited(_sendState());
             } else if (message.message == 'webgl_error' ||
+                message.message == 'shader_error' ||
                 message.message == 'context_lost') {
               setState(() => _useFallback = true);
             }
@@ -339,9 +340,8 @@ class _PulseScreenState extends State<PulseScreen> with WidgetsBindingObserver {
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
                 : _useFallback
-                ? CustomPaint(
-                    painter: _FamiliarFallback(_familiar),
-                    size: Size.infinite,
+                ? const Center(
+                    child: Icon(Icons.auto_awesome, size: 72),
                   )
                 : Stack(
                     fit: StackFit.expand,

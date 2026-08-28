@@ -18,9 +18,9 @@ import { HolographicMatrix } from './themes/holographic-matrix.js';
 const stage = document.getElementById('stage');
 const themes = [ChimeraNative, OrganicBioluminescent, QuantumVoid, HolographicMatrix, CyberpunkNeon];
 const recipes = {
-  field: ['nebula', 'volumetric'], nebula: ['nebula', 'volumetric', 'reaction'],
+  field: ['nebula', 'tendrils', 'rivers'], nebula: ['nebula', 'tendrils', 'reaction'],
   rivers: ['rivers', 'beams', 'hud'], tendrils: ['tendrils', 'nebula', 'beams'],
-  orbs: ['orb', 'nebula', 'volumetric'], lattice: ['hud', 'rivers', 'beams'],
+  orbs: ['orb', 'nebula', 'tendrils'], lattice: ['hud', 'rivers', 'beams'],
   void: ['orb', 'reaction', 'nebula'], prism: ['metal', 'voronoi', 'beams'],
   aurora: ['volumetric', 'tendrils', 'rivers'], ember: ['nebula', 'voronoi', 'reaction'],
   ocean: ['metal', 'reaction', 'volumetric'], twilight: ['orb', 'tendrils', 'hud', 'nebula'],
@@ -47,6 +47,10 @@ engine.renderer.setSize(innerWidth, innerHeight);
 engine.renderer.setClearColor(0x000000, 0);
 engine.renderer.toneMapping = THREE.ACESFilmicToneMapping;
 engine.renderer.outputColorSpace = THREE.SRGBColorSpace;
+engine.renderer.debug.onShaderError = () => {
+  try { BackgroundBridge.postMessage('shader_error'); } catch (_) {}
+  try { FamiliarBridge.postMessage('shader_error'); } catch (_) {}
+};
 stage.append(engine.renderer.domElement);
 
 let variant = 'field', paused = false, reduced = false, themeIndex = 0;

@@ -573,22 +573,6 @@ class _MemberHomeState extends State<MemberHome> {
                             progress: progress,
                             variant: widget.appState.chimeraFxVariant,
                             intensity: widget.appState.chimeraFxIntensity,
-                            fallback: Stack(
-                              children: [
-                                Positioned.fill(
-                                  child: MindRecipeGpuField(
-                                    progress: progress,
-                                    variant: widget.appState.chimeraFxVariant,
-                                  ),
-                                ),
-                                Positioned.fill(
-                                  child: MindRecipeFxBackdrop(
-                                    progress: progress,
-                                    variant: widget.appState.chimeraFxVariant,
-                                  ),
-                                ),
-                              ],
-                            ),
                           ),
                         ),
                       PageView(

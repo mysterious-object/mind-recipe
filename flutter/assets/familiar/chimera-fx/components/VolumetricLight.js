@@ -60,9 +60,9 @@ const VOLUME_FRAG = /* glsl */ `
       falloff *= falloff;
 
       // Accumulate light
-      vec3 sample = uLightColor * falloff * density * uWeight * uIntensity;
-      sample *= illuminationDecay;
-      accumColor += sample;
+      vec3 lightSample = uLightColor * falloff * density * uWeight * uIntensity;
+      lightSample *= illuminationDecay;
+      accumColor += lightSample;
 
       illuminationDecay *= uDecay;
     }
@@ -73,7 +73,7 @@ const VOLUME_FRAG = /* glsl */ `
     // Subtle pulsing
     float pulse = 0.9 + 0.1 * sin(uTime * 0.5);
 
-    gl_FragColor = vec4(accumColor * radialFade * pulse * 0.12, 1.0);
+    gl_FragColor = vec4(accumColor * radialFade * pulse * 0.12, 0.18);
   }
 `;
 

@@ -112,9 +112,7 @@ class _ThreeBackgroundState extends State<ThreeBackground>
 
   @override
   Widget build(BuildContext context) {
-    if (_failed || _controller == null) {
-      return widget.fallback ?? const SizedBox.expand();
-    }
+    if (_failed || _controller == null) return const SizedBox.expand();
     return IgnorePointer(child: WebViewWidget(controller: _controller!));
   }
 }
