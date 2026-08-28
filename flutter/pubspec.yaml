@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.0+2081
+version: 1.0.0+2082
 
 environment:
   sdk: ^3.13.0
@@ -82,7 +82,10 @@ flutter:
     - assets/familiar/chimera-fx/
     - assets/familiar/chimera-fx/components/
     - assets/familiar/chimera-fx/core/
+    - assets/familiar/chimera-fx/postfx/
     - assets/familiar/chimera-fx/themes/
+    - assets/familiar/three-addons/postprocessing/
+    - assets/familiar/three-addons/shaders/
     - assets/branding/context-field-wordmark.png
   #   - images/a_dot_ham.jpeg
 
