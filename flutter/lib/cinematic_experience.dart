@@ -23,7 +23,7 @@ class _CinematicOnboardingState extends State<CinematicOnboarding>
   late final AnimationController _timeline;
   Timer? _sceneTimer;
   int _scene = 0;
-  bool _brandDone = false;
+  bool _brandDone = true;
 
   static const scenes = [
     (
@@ -51,7 +51,7 @@ class _CinematicOnboardingState extends State<CinematicOnboarding>
     super.initState();
     _timeline = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 6600),
+      duration: const Duration(milliseconds: 400),
     );
   }
 
@@ -74,7 +74,7 @@ class _CinematicOnboardingState extends State<CinematicOnboarding>
   }
 
   void _startScenes() {
-    _sceneTimer ??= Timer.periodic(const Duration(milliseconds: 4600), (_) {
+    _sceneTimer ??= Timer.periodic(const Duration(milliseconds: 3200), (_) {
       if (mounted) setState(() => _scene = (_scene + 1) % scenes.length);
     });
   }
@@ -127,15 +127,16 @@ class _CinematicOnboardingState extends State<CinematicOnboarding>
                 ),
               ),
               Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    // The orb greeter — ContextField waves, then Nav Compass,
-                    // settling into the breathing Pulse orb.
-                    AnimatedBuilder(
-                      animation: _timeline,
-                      builder: (context, _) => SizedBox.square(
-                        dimension: 264,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      // The orb greeter — ContextField waves, then Nav Compass,
+                      // settling into the breathing Pulse orb.
+                      AnimatedBuilder(
+                        animation: _timeline,
+                        builder: (context, _) => SizedBox.square(
+                          dimension: 140,
                         child: CustomPaint(
                           painter: _BrandOrbPainter(
                             t: _timeline.value,
@@ -230,6 +231,7 @@ class _CinematicOnboardingState extends State<CinematicOnboarding>
                   ],
                 ),
               ),
+            ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
                 child: Row(

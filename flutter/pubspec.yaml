@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.0+2072
+version: 1.0.0+2085
 
 environment:
   sdk: ^3.13.0
@@ -67,17 +67,53 @@ flutter:
     - shaders/mind_recipe_field.frag
     - shaders/conversation_viz.frag
 
+  assets:
+    - assets/chimera-fx/chimera-fx-bundle.js
+    - assets/chimera-fx/core/Engine.js
+    - assets/chimera-fx/core/ShapableMatter.js
+    - assets/chimera-fx/core/StateMachine.js
+    - assets/chimera-fx/core/AmbientColors.js
+    - assets/chimera-fx/components/ParticleNebula.js
+    - assets/chimera-fx/components/EnergyTendrils.js
+    - assets/chimera-fx/components/DataRivers.js
+    - assets/chimera-fx/components/VolumetricLight.js
+    - assets/chimera-fx/components/LiquidMetal.js
+    - assets/chimera-fx/components/ReactionDiffusion.js
+    - assets/chimera-fx/components/VoronoiShatter.js
+    - assets/chimera-fx/components/HoloHUD.js
+    - assets/chimera-fx/components/EnergyBeams.js
+    - assets/chimera-fx/components/IridescentOrb.js
+    - assets/chimera-fx/postfx/ChromaticAberrationShader.js
+    - assets/chimera-fx/postfx/FilmGrainShader.js
+    - assets/chimera-fx/postfx/GlitchShader.js
+    - assets/chimera-fx/themes/cyberpunk-neon.js
+    - assets/chimera-fx/themes/organic-bioluminescent.js
+    - assets/chimera-fx/themes/quantum-void.js
+    - assets/chimera-fx/themes/holographic-matrix.js
+    - assets/chimera-fx/themes/chimera-native.js
+    - assets/chimera-fx/themes/midnight-trading.js
+    - assets/chimera-fx/themes/neon-samurai.js
+    - assets/chimera-fx/themes/deep-ocean.js
+    - assets/chimera-fx/themes/solar-flare.js
+    - assets/chimera-fx/themes/void-walker.js
+    - assets/chimera-fx/themes/crystal-matrix.js
+    - assets/chimera-fx/themes/aurora-borealis.js
+    - assets/chimera-fx/themes/obsidian-forge.js
+    - assets/chimera-fx/themes/orchid-vapor.js
+    - assets/chimera-fx/themes/tidal-glass.js
+    - assets/familiar/familiar-orb.glb
+    - assets/familiar/familiar_manifest.json
+    - assets/branding/mind-recipe-mark.png
+    - assets/branding/mind-recipe-app-icon.png
+    - assets/branding/navigator-compass.png
+    - assets/branding/context-field-wordmark.png
+
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
 
-  # To add assets to your application, add an assets section, like this:
-  assets:
-    - assets/branding/mind-recipe-mark.png
-    - assets/branding/mind-recipe-app-icon.png
-    - assets/branding/navigator-compass.png
-    - assets/branding/context-field-wordmark.png
+
   #   - images/a_dot_ham.jpeg
 
   # An image asset can refer to one or more resolution-specific "variants", see
