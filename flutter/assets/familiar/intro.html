@@ -1,17 +1,4 @@
 <!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'">
-<style>html,body,canvas{margin:0;width:100%;height:100%;overflow:hidden;background:#060912}canvas{display:block}</style></head><body><script type="module">
-import * as THREE from './three.module.min.js';
-let variant=0,group=new THREE.Group(),paused=false;const colors=[0x21e6c1,0x8459ff,0x18d7c1,0x16efb0,0x00dcc5,0x3be8d0,0x553ca8,0x33ddff,0x45f2ba,0xff8b42,0x1abbd1,0x7764d9];
-const scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera(42,innerWidth/innerHeight,.1,100);camera.position.z=5;scene.add(group);
-const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});renderer.setPixelRatio(Math.min(devicePixelRatio,1.6));renderer.setSize(innerWidth,innerHeight);renderer.setClearColor(0x060912);renderer.outputColorSpace=THREE.SRGBColorSpace;document.body.append(renderer.domElement);
-scene.add(new THREE.AmbientLight(0x6f8cff,2));const key=new THREE.PointLight(0xffffff,22);key.position.set(2.5,2.2,3);scene.add(key);
-function clear(){group.traverse(n=>{n.geometry?.dispose?.();n.material?.dispose?.()});scene.remove(group);group=new THREE.Group();scene.add(group)}
-function rebuild(){clear();const c=colors[variant%12],accent=colors[(variant+3)%12];let geometry;
- if(variant===6)geometry=new THREE.TorusKnotGeometry(1,.18,180,20,3,5);else if(variant===7)geometry=new THREE.OctahedronGeometry(1.2,2);else if(variant===5)geometry=new THREE.DodecahedronGeometry(1.1,1);else geometry=new THREE.IcosahedronGeometry(1.12,5);
- const material=new THREE.MeshPhysicalMaterial({color:c,roughness:.18,metalness:.2,transmission:.22,clearcoat:1,wireframe:variant===3||variant===5||variant===6});const core=new THREE.Mesh(geometry,material);core.userData.core=true;group.add(core);
- const ringCount=variant===5?7:variant===11?5:3;for(let i=0;i<ringCount;i++){const ring=new THREE.Mesh(new THREE.TorusGeometry(1.45+i*.15,.01+i*.003,8,160),new THREE.MeshBasicMaterial({color:i%2?accent:c,transparent:true,opacity:.48,blending:THREE.AdditiveBlending}));ring.rotation.set(.8+i*.21,.25+i*.19,i*.3);ring.userData.ring=i;group.add(ring)}
- const count=variant===1?260:variant===9?190:80;const pos=new Float32Array(count*3);for(let i=0;i<count;i++){const a=i*.618*6.283,r=1.6+(i%17)/17*1.3;pos[i*3]=Math.cos(a)*r;pos[i*3+1]=Math.sin(a)*r;pos[i*3+2]=Math.sin(i*.41)*1.2}const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(pos,3));const pts=new THREE.Points(g,new THREE.PointsMaterial({color:accent,size:variant===9?.045:.025,transparent:true,opacity:.72,blending:THREE.AdditiveBlending}));pts.userData.points=true;group.add(pts);key.color.setHex(accent)}
-const clock=new THREE.Clock();function animate(){requestAnimationFrame(animate);if(paused)return;const t=clock.getElapsedTime();group.children.forEach(o=>{if(o.userData.core){o.rotation.y=t*(.16+variant*.008);o.rotation.x=Math.sin(t*.35)*.16;const p=1+Math.sin(t*1.35+variant)*.035;o.scale.setScalar(p)}if(o.userData.ring!==undefined)o.rotation.z=t*(o.userData.ring%2?.12:-.1);if(o.userData.points)o.rotation.y=-t*.025});renderer.render(scene,camera)}
-window.setIntroPaused=v=>paused=!!v;window.setIntroVariant=v=>{variant=Math.abs(Number(v)||0)%12;rebuild()};addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});rebuild();animate();try{IntroBridge.postMessage('ready')}catch(e){}
-</script></body></html>
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'unsafe-inline'">
+<style>html,body,#stage{margin:0;width:100%;height:100%;overflow:hidden;background:#060912}canvas{display:block}</style></head>
+<body><div id="stage"></div><script type="module" src="./chimera-fx/mobile-engine.js"></script></body></html>
