@@ -219,6 +219,7 @@ class _MemberHomeState extends State<MemberHome> {
   String? _lastAssistantSnippet;
   DateTime? _bubbleDismissedAt;
   String? _lastSeenAssistantText;
+  Offset _navigatorBubbleOffset = Offset.zero;
 
   @override
   void initState() {
@@ -429,7 +430,7 @@ class _MemberHomeState extends State<MemberHome> {
       useSafeArea: true,
       backgroundColor: Theme.of(context).colorScheme.surface,
       builder: (sheetContext) => FractionallySizedBox(
-        heightFactor: .88,
+        heightFactor: .68,
         child: Column(
           children: [
             Padding(
@@ -591,76 +592,30 @@ class _MemberHomeState extends State<MemberHome> {
                       ),
                       if (index != 1)
                         Positioned(
-                          left: 12,
-                          right: 12,
-                          bottom: 12,
-                          child: Material(
-                            elevation: 8,
-                            borderRadius: BorderRadius.circular(18),
-                            color: Theme.of(context)
-                                .colorScheme
-                                .primaryContainer
-                                .withValues(alpha: 0.96),
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(18),
-                              onTap: _showContextNavigator,
-                              child: Padding(
-                                padding: const EdgeInsets.fromLTRB(
-                                  14,
-                                  10,
-                                  10,
-                                  10,
-                                ),
-                                child: Row(
-                                  children: [
-                                    MindRecipeOrbBadge(
-                                      size: 26,
-                                      active:
-                                          _voiceIsSpeaking || _voiceIsListening,
-                                    ),
-                                    const SizedBox(width: 10),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Text(
-                                            _voiceIsSpeaking
-                                                ? 'Navigator is speaking…'
-                                                : _voiceIsListening
-                                                ? 'Navigator is listening…'
-                                                : 'Navigator · ${labels[index]}',
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.w800,
-                                              fontSize: 13,
-                                            ),
-                                          ),
-                                          Text(
-                                            _lastAssistantSnippet != null
-                                                ? (_lastAssistantSnippet!
-                                                              .length >
-                                                          92
-                                                      ? '${_lastAssistantSnippet!.substring(0, 92)}…'
-                                                      : _lastAssistantSnippet!)
-                                                : 'Talk freely or ask for help here without leaving this tab',
-                                            style: const TextStyle(
-                                              fontSize: 11,
-                                            ),
-                                            maxLines: 2,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    const Icon(
-                                      Icons.expand_less_rounded,
-                                      size: 18,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
+                          right: (12 - _navigatorBubbleOffset.dx)
+                              .clamp(8, 220)
+                              .toDouble(),
+                          bottom: (18 - _navigatorBubbleOffset.dy)
+                              .clamp(8, 440)
+                              .toDouble(),
+                          child: _NavigatorMiniChatBubble(
+                            location: labels[index],
+                            snippet: _lastAssistantSnippet,
+                            active: _voiceIsSpeaking || _voiceIsListening,
+                            speaking: _voiceIsSpeaking,
+                            listening: _voiceIsListening,
+                            onTap: _showContextNavigator,
+                            onDrag: (delta) => setState(() {
+                              _navigatorBubbleOffset += delta;
+                              _navigatorBubbleOffset = Offset(
+                                _navigatorBubbleOffset.dx
+                                    .clamp(-190, 4)
+                                    .toDouble(),
+                                _navigatorBubbleOffset.dy
+                                    .clamp(-380, 10)
+                                    .toDouble(),
+                              );
+                            }),
                           ),
                         ),
                     ],
@@ -697,6 +652,113 @@ class _MemberHomeState extends State<MemberHome> {
           ),
         );
       },
+    );
+  }
+}
+
+class _NavigatorMiniChatBubble extends StatelessWidget {
+  const _NavigatorMiniChatBubble({
+    required this.location,
+    required this.snippet,
+    required this.active,
+    required this.speaking,
+    required this.listening,
+    required this.onTap,
+    required this.onDrag,
+  });
+
+  final String location;
+  final String? snippet;
+  final bool active;
+  final bool speaking;
+  final bool listening;
+  final VoidCallback onTap;
+  final ValueChanged<Offset> onDrag;
+
+  @override
+  Widget build(BuildContext context) {
+    final preview = snippet == null || snippet!.trim().isEmpty
+        ? 'Talk freely'
+        : snippet!;
+    return Semantics(
+      button: true,
+      label: 'Open Navigator mini chat',
+      child: GestureDetector(
+        onPanUpdate: (details) => onDrag(details.delta),
+        onTap: onTap,
+        child: Material(
+          elevation: 12,
+          color: Theme.of(context).colorScheme.surface.withValues(alpha: .96),
+          borderRadius: BorderRadius.circular(28),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 276),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(8, 8, 14, 8),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      MindRecipeOrbBadge(size: 42, active: active),
+                      Positioned(
+                        right: -1,
+                        bottom: -1,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: active
+                                ? Theme.of(context).colorScheme.tertiary
+                                : Theme.of(context).colorScheme.primary,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: Theme.of(context).colorScheme.surface,
+                              width: 2,
+                            ),
+                          ),
+                          child: const SizedBox(width: 10, height: 10),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(width: 9),
+                  Flexible(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          speaking
+                              ? 'Navigator is speaking'
+                              : listening
+                              ? 'Navigator is listening'
+                              : 'Navigator · $location',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        Text(
+                          preview,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 3),
+                  const Icon(Icons.chat_bubble_rounded, size: 17),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
