@@ -49,6 +49,7 @@ class NavigatorChatExperience extends StatefulWidget {
 class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
     with SingleTickerProviderStateMixin {
   final composer = TextEditingController();
+  final composerFocus = FocusNode();
   final scrollController = ScrollController();
   late final AnimationController fxController;
   Timer? _activityTimer;
@@ -276,14 +277,68 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
 
   @override
   void dispose() {
+    composerFocus.dispose();
+    composer.dispose();
     if (widget.localInference == null) {
       OnDeviceInference.snapshotNotifier.removeListener(_onSnapshotChanged);
     }
-    composer.dispose();
     scrollController.dispose();
     _activityTimer?.cancel();
     fxController.dispose();
     super.dispose();
+  }
+
+  Future<void> _runQuickFunction(String function) async {
+    switch (function) {
+      case 'plan':
+        composer.text = 'Help me plan ';
+        composer.selection = TextSelection.collapsed(
+          offset: composer.text.length,
+        );
+        composerFocus.requestFocus();
+        break;
+      case 'reminder':
+        composer.text = 'Remind me to ';
+        composer.selection = TextSelection.collapsed(
+          offset: composer.text.length,
+        );
+        composerFocus.requestFocus();
+        break;
+      case 'module':
+        final progress = await widget.appState.loadCurriculumProgress();
+        final current = progress?['current_lesson_id']?.toString();
+        if (!mounted) return;
+        setState(() {
+          widget.messages.add(
+            ChatMessage(
+              role: ChatRole.assistant,
+              text: current == null || current.isEmpty
+                  ? 'Your next module begins with the Guided Foundations path in Mind Recipe. Open the Mind Recipe tab to review it; nothing is locked, and you can choose a different starting point.'
+                  : 'Your saved journey currently points to $current. Open the Mind Recipe tab to continue it, review why it was recommended, or choose a different module.',
+              localGenerated: true,
+            ),
+          );
+          turn++;
+        });
+        widget.onChanged();
+        _scrollToEnd();
+        break;
+      case 'reset':
+        if (!mounted) return;
+        setState(() {
+          widget.messages.add(
+            const ChatMessage(
+              role: ChatRole.assistant,
+              text: 'For the next 60 seconds, lower the demand instead of forcing calm: put both feet down, release your jaw, and make three unhurried exhales slightly longer than your inhales. Stop if it feels uncomfortable. When the minute ends, you can return to what you were doing or tell me what kind of help you want next.',
+              localGenerated: true,
+            ),
+          );
+          turn++;
+        });
+        widget.onChanged();
+        _scrollToEnd();
+        break;
+    }
   }
 
   /// Edits an earlier member message: drops that message and everything
@@ -917,7 +972,7 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
                   if (sending && index == widget.messages.length) {
                     return const _ThinkingBubble();
                   }
-                  return _OpeningSuggestions(onSelected: send);
+                  return _OpeningSuggestions(onFunction: _runQuickFunction);
                 },
               ),
             ),
@@ -941,6 +996,7 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
             ),
             _Composer(
               controller: composer,
+              focusNode: composerFocus,
               canSend: canSend,
               cloudAvailable: cloudAvailable,
               sending: sending,
@@ -1382,8 +1438,8 @@ class _ChatBubble extends StatelessWidget {
 }
 
 class _OpeningSuggestions extends StatelessWidget {
-  const _OpeningSuggestions({required this.onSelected});
-  final ValueChanged<String> onSelected;
+  const _OpeningSuggestions({required this.onFunction});
+  final ValueChanged<String> onFunction;
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.only(top: 14),
@@ -1394,30 +1450,22 @@ class _OpeningSuggestions extends StatelessWidget {
         ActionChip(
           label: const Text('Plan my next step'),
           avatar: const Icon(Icons.route_rounded, size: 18),
-          onPressed: () => onSelected(
-            'Help me decide and plan the most useful next step. Listen to what I want before recommending anything.',
-          ),
+          onPressed: () => onFunction('plan'),
         ),
         ActionChip(
           label: const Text('Create a reminder'),
           avatar: const Icon(Icons.notifications_active_outlined, size: 18),
-          onPressed: () => onSelected(
-            'Help me create a reminder. Ask only for the missing details, then show me the editable phone action before anything opens.',
-          ),
+          onPressed: () => onFunction('reminder'),
         ),
         ActionChip(
           label: const Text('Find my next module'),
           avatar: const Icon(Icons.auto_stories_outlined, size: 18),
-          onPressed: () => onSelected(
-            'Use my approved goals and progress to suggest a next module, explain why, and give me alternatives.',
-          ),
+          onPressed: () => onFunction('module'),
         ),
         ActionChip(
           label: const Text('60-second reset'),
           avatar: const Icon(Icons.bolt_rounded, size: 18),
-          onPressed: () => onSelected(
-            'Give me a 60-second reset fitted to what I tell you. Do not start a full daily navigation unless I ask.',
-          ),
+          onPressed: () => onFunction('reset'),
         ),
       ],
     ),
@@ -1450,6 +1498,7 @@ class _ThinkingBubble extends StatelessWidget {
 class _Composer extends StatelessWidget {
   const _Composer({
     required this.controller,
+    required this.focusNode,
     required this.canSend,
     required this.cloudAvailable,
     required this.sending,
@@ -1461,6 +1510,7 @@ class _Composer extends StatelessWidget {
     this.onToggleVoiceConversation,
   });
   final TextEditingController controller;
+  final FocusNode focusNode;
   final bool canSend;
   final bool cloudAvailable;
   final bool sending;
@@ -1494,15 +1544,16 @@ class _Composer extends StatelessWidget {
             Expanded(
               child: TextField(
                 controller: controller,
-                enabled: canSend && !sending,
+                focusNode: focusNode,
+                enabled: !sending,
                 minLines: 1,
                 maxLines: 4,
                 textCapitalization: TextCapitalization.sentences,
                 onSubmitted: (_) => onSend(),
                 decoration: InputDecoration(
                   hintText: canSend
-                      ? 'Tell Navigator what is present…'
-                      : 'Install private AI or connect cloud AI',
+                      ? 'Tell Navigator what you want…'
+                      : 'Write here; connect AI before sending',
                   filled: true,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(22),

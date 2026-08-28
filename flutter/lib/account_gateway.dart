@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'app_services.dart';
+import 'mind_recipe_fx.dart';
 import 'three_background.dart';
 
 class AccountGateway extends StatefulWidget {
@@ -172,11 +173,16 @@ class _AccountGatewayState extends State<AccountGateway>
   Widget build(BuildContext context) => Scaffold(
     body: Stack(
       children: [
+        const Positioned.fill(child: MindRecipeGpuField(progress: 0.16)),
+        const Positioned.fill(child: MindRecipeFxBackdrop(progress: 0.16)),
         Positioned.fill(
-          child: ThreeBackground(
-            variant: widget.appState.chimeraFxVariant,
-            progress: creating ? .34 : resetting ? .67 : .16,
-            intensity: widget.appState.chimeraFxIntensity,
+          child: Opacity(
+            opacity: .72,
+            child: ThreeBackground(
+              variant: widget.appState.chimeraFxVariant,
+              progress: creating ? .34 : resetting ? .67 : .16,
+              intensity: widget.appState.chimeraFxIntensity,
+            ),
           ),
         ),
         SafeArea(

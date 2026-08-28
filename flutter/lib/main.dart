@@ -569,10 +569,33 @@ class _MemberHomeState extends State<MemberHome> {
                     children: [
                       if (widget.appState.chimeraFxEnabled)
                         Positioned.fill(
-                          child: ThreeBackground(
-                            progress: progress,
-                            variant: widget.appState.chimeraFxVariant,
-                            intensity: widget.appState.chimeraFxIntensity,
+                          child: Opacity(
+                            opacity: widget.appState.chimeraFxIntensity,
+                            child: MindRecipeGpuField(
+                              progress: progress,
+                              variant: widget.appState.chimeraFxVariant,
+                            ),
+                          ),
+                        ),
+                      if (widget.appState.chimeraFxEnabled)
+                        Positioned.fill(
+                          child: Opacity(
+                            opacity: widget.appState.chimeraFxIntensity,
+                            child: MindRecipeFxBackdrop(
+                              progress: progress,
+                              variant: widget.appState.chimeraFxVariant,
+                            ),
+                          ),
+                        ),
+                      if (widget.appState.chimeraFxEnabled)
+                        Positioned.fill(
+                          child: Opacity(
+                            opacity: .58,
+                            child: ThreeBackground(
+                              progress: progress,
+                              variant: widget.appState.chimeraFxVariant,
+                              intensity: widget.appState.chimeraFxIntensity,
+                            ),
                           ),
                         ),
                       PageView(
