@@ -59,9 +59,9 @@ pipeline {
           sh '''
             chmod +x ci/upload_drive.sh
             ci/upload_drive.sh flutter/build/app/outputs/flutter-apk/app-release.apk \
-              Mind-Recipe-1.0.0-2083-Android.apk "$MIND_RECIPE_DRIVE_FOLDER"
+              Mind-Recipe-1.0.0-2084-Android.apk "$MIND_RECIPE_DRIVE_FOLDER"
             ci/upload_drive.sh flutter/build/ios/ipa/mind-recipe-ios-unsigned.ipa \
-              Mind-Recipe-1.0.0-2083-iOS-unsigned.ipa "$MIND_RECIPE_DRIVE_FOLDER" \
+              Mind-Recipe-1.0.0-2084-iOS-unsigned.ipa "$MIND_RECIPE_DRIVE_FOLDER" \
               victoria@contextfield.co
           '''
         }
