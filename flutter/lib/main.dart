@@ -144,7 +144,7 @@ class _MindRecipeAppState extends State<MindRecipeApp> {
       home: !_introComplete
           ? ThreeIntroScreen(
               variant:
-                  (DateTime.now().millisecondsSinceEpoch ~/ 86400000 ~/ 2) % 6,
+                  (DateTime.now().millisecondsSinceEpoch ~/ 86400000 ~/ 2) % 12,
               onComplete: () => setState(() => _introComplete = true),
             )
           : !appState.loaded || _initializing
@@ -569,32 +569,25 @@ class _MemberHomeState extends State<MemberHome> {
                     children: [
                       if (widget.appState.chimeraFxEnabled)
                         Positioned.fill(
-                          child: Opacity(
-                            opacity: widget.appState.chimeraFxIntensity,
-                            child: MindRecipeGpuField(
-                              progress: progress,
-                              variant: widget.appState.chimeraFxVariant,
-                            ),
-                          ),
-                        ),
-                      if (widget.appState.chimeraFxEnabled)
-                        Positioned.fill(
-                          child: Opacity(
-                            opacity: widget.appState.chimeraFxIntensity,
-                            child: MindRecipeFxBackdrop(
-                              progress: progress,
-                              variant: widget.appState.chimeraFxVariant,
-                            ),
-                          ),
-                        ),
-                      if (widget.appState.chimeraFxEnabled)
-                        Positioned.fill(
-                          child: Opacity(
-                            opacity: .58,
-                            child: ThreeBackground(
-                              progress: progress,
-                              variant: widget.appState.chimeraFxVariant,
-                              intensity: widget.appState.chimeraFxIntensity,
+                          child: ThreeBackground(
+                            progress: progress,
+                            variant: widget.appState.chimeraFxVariant,
+                            intensity: widget.appState.chimeraFxIntensity,
+                            fallback: Stack(
+                              children: [
+                                Positioned.fill(
+                                  child: MindRecipeGpuField(
+                                    progress: progress,
+                                    variant: widget.appState.chimeraFxVariant,
+                                  ),
+                                ),
+                                Positioned.fill(
+                                  child: MindRecipeFxBackdrop(
+                                    progress: progress,
+                                    variant: widget.appState.chimeraFxVariant,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ),

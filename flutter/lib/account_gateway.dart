@@ -173,15 +173,16 @@ class _AccountGatewayState extends State<AccountGateway>
   Widget build(BuildContext context) => Scaffold(
     body: Stack(
       children: [
-        const Positioned.fill(child: MindRecipeGpuField(progress: 0.16)),
-        const Positioned.fill(child: MindRecipeFxBackdrop(progress: 0.16)),
         Positioned.fill(
-          child: Opacity(
-            opacity: .72,
-            child: ThreeBackground(
-              variant: widget.appState.chimeraFxVariant,
-              progress: creating ? .34 : resetting ? .67 : .16,
-              intensity: widget.appState.chimeraFxIntensity,
+          child: ThreeBackground(
+            variant: widget.appState.chimeraFxVariant,
+            progress: creating ? .34 : resetting ? .67 : .16,
+            intensity: widget.appState.chimeraFxIntensity,
+            fallback: const Stack(
+              children: [
+                Positioned.fill(child: MindRecipeGpuField(progress: 0.16)),
+                Positioned.fill(child: MindRecipeFxBackdrop(progress: 0.16)),
+              ],
             ),
           ),
         ),
@@ -199,21 +200,34 @@ class _AccountGatewayState extends State<AccountGateway>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Center(
-                          child: AnimatedBuilder(
-                            animation: _logoController,
-                            builder: (context, child) => Transform.rotate(
-                              angle: (_logoController.value - .5) * .035,
-                              child: Transform.scale(
-                                scale: .96 + _logoController.value * .08,
-                                child: child,
+                        SizedBox(
+                          height: 132,
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              Positioned.fill(
+                                child: ThreeBackground(
+                                  variant: widget.appState.chimeraFxVariant,
+                                  progress: creating ? .34 : .16,
+                                  intensity: .9,
+                                ),
                               ),
-                            ),
-                            child: Image.asset(
-                              'assets/branding/mind-recipe-mark.png',
-                              height: 92,
-                              fit: BoxFit.contain,
-                            ),
+                              AnimatedBuilder(
+                                animation: _logoController,
+                                builder: (context, child) => Transform.rotate(
+                                  angle: (_logoController.value - .5) * .035,
+                                  child: Transform.scale(
+                                    scale: .96 + _logoController.value * .08,
+                                    child: child,
+                                  ),
+                                ),
+                                child: Image.asset(
+                                  'assets/branding/mind-recipe-mark.png',
+                                  height: 82,
+                                  fit: BoxFit.contain,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                         const SizedBox(height: 18),

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -11,10 +12,12 @@ class ThreeBackground extends StatefulWidget {
     required this.variant,
     required this.progress,
     required this.intensity,
+    this.fallback,
   });
   final String variant;
   final double progress;
   final double intensity;
+  final Widget? fallback;
 
   @override
   State<ThreeBackground> createState() => _ThreeBackgroundState();
@@ -24,12 +27,17 @@ class _ThreeBackgroundState extends State<ThreeBackground>
     with WidgetsBindingObserver {
   WebViewController? _controller;
   bool _ready = false;
+  bool _failed = false;
+  Timer? _deadline;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _open();
+    _deadline = Timer(const Duration(seconds: 5), () {
+      if (mounted && !_ready) setState(() => _failed = true);
+    });
   }
 
   Future<void> _open() async {
@@ -45,10 +53,19 @@ class _ThreeBackgroundState extends State<ThreeBackground>
           return local
               ? NavigationDecision.navigate
               : NavigationDecision.prevent;
+        }, onWebResourceError: (error) {
+          if (error.isForMainFrame == true && mounted) {
+            setState(() => _failed = true);
+          }
         }))
         ..addJavaScriptChannel(
           'BackgroundBridge',
           onMessageReceived: (_) {
+            if (_.message == 'context_lost') {
+              if (mounted) setState(() => _failed = true);
+              return;
+            }
+            _deadline?.cancel();
             _ready = true;
             _send();
           },
@@ -57,6 +74,7 @@ class _ThreeBackgroundState extends State<ThreeBackground>
       if (mounted) setState(() => _controller = controller);
     } catch (_) {
       // Native theme color remains as the accessible fallback.
+      if (mounted) setState(() => _failed = true);
     }
   }
 
@@ -87,14 +105,16 @@ class _ThreeBackgroundState extends State<ThreeBackground>
 
   @override
   void dispose() {
+    _deadline?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
   @override
-  Widget build(BuildContext context) => IgnorePointer(
-        child: _controller == null
-            ? const SizedBox.expand()
-            : WebViewWidget(controller: _controller!),
-      );
+  Widget build(BuildContext context) {
+    if (_failed || _controller == null) {
+      return widget.fallback ?? const SizedBox.expand();
+    }
+    return IgnorePointer(child: WebViewWidget(controller: _controller!));
+  }
 }

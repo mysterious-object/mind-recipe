@@ -1,24 +1,4 @@
-<!doctype html>
-<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'none'; img-src 'self' data:">
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; connect-src 'none'; img-src 'self' data:">
 <style>html,body,#stage{margin:0;width:100%;height:100%;overflow:hidden;background:transparent}canvas{display:block}</style></head>
-<body><div id="stage"></div><script type="module">
-import * as THREE from './three.module.min.js';
-const host=document.getElementById('stage');
-let variant='field',progress=0,intensity=.7,paused=false,t=0;
-const scene=new THREE.Scene();
-const camera=new THREE.PerspectiveCamera(48,innerWidth/Math.max(1,innerHeight),.1,30);camera.position.z=5;
-const renderer=new THREE.WebGLRenderer({alpha:true,antialias:false,powerPreference:'low-power'});
-renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.25));renderer.setSize(innerWidth,innerHeight);renderer.setClearAlpha(0);host.append(renderer.domElement);
-const uniforms={uTime:{value:0},uVariant:{value:0},uProgress:{value:0},uIntensity:{value:.7},uResolution:{value:new THREE.Vector2(innerWidth,innerHeight)}};
-const material=new THREE.ShaderMaterial({transparent:true,depthWrite:false,uniforms,vertexShader:`varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,fragmentShader:`precision highp float;varying vec2 vUv;uniform float uTime,uVariant,uProgress,uIntensity;uniform vec2 uResolution;
-float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1)),f.x),f.y);}
-void main(){vec2 uv=(vUv-.5)*vec2(uResolution.x/uResolution.y,1.);float tm=uTime*(.05+.015*uVariant);float n=0.;vec2 q=uv;for(int i=0;i<4;i++){n+=noise(q*2.2+tm)*(.5/pow(2.,float(i)));q=mat2(.8,-.6,.6,.8)*q*1.8+float(i);}
-float wave=sin(length(uv+vec2(sin(tm),cos(tm))*.28)*(7.+uVariant)+tm*5.)*.5+.5;float fil=pow(max(0.,1.-abs(n-wave)),3.);float hue=fract(.43+uVariant*.073+uProgress*.08+n*.12);vec3 a=.5+.5*cos(6.2831*(hue+vec3(0.,.16,.34)));float vign=smoothstep(1.25,.12,length(uv));float alpha=(.035+n*.08+fil*.12)*vign*uIntensity;gl_FragColor=vec4(a,alpha);}`});
-const plane=new THREE.Mesh(new THREE.PlaneGeometry(12,12),material);scene.add(plane);
-const names=['field','nebula','rivers','tendrils','orbs','lattice','void','prism','aurora','ember','ocean','twilight'];
-window.setBackgroundState=s=>{if(!s)return;variant=s.variant||variant;progress=Number(s.progress||0);intensity=Number(s.intensity||.7);uniforms.uVariant.value=Math.max(0,names.indexOf(variant));uniforms.uProgress.value=progress;uniforms.uIntensity.value=intensity;};
-window.setBackgroundPaused=v=>paused=!!v;function frame(ms){requestAnimationFrame(frame);if(paused)return;uniforms.uTime.value=ms*.001;renderer.render(scene,camera)}
-addEventListener('resize',()=>{camera.aspect=innerWidth/Math.max(1,innerHeight);camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);uniforms.uResolution.value.set(innerWidth,innerHeight)});frame(0);
-try{BackgroundBridge.postMessage('ready')}catch(e){}
-</script></body></html>
+<body><div id="stage"></div><script type="module" src="./chimera-scene.js"></script></body></html>
