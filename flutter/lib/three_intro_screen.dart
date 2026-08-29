@@ -16,14 +16,17 @@ class ThreeIntroScreen extends StatefulWidget {
   State<ThreeIntroScreen> createState() => _ThreeIntroScreenState();
 }
 
-class _ThreeIntroScreenState extends State<ThreeIntroScreen> {
+class _ThreeIntroScreenState extends State<ThreeIntroScreen>
+    with SingleTickerProviderStateMixin {
   WebViewController? controller;
   Timer? advance;
   bool ready = false;
+  late final AnimationController markMotion;
 
   @override
   void initState() {
     super.initState();
+    markMotion = AnimationController(vsync: this, duration: const Duration(seconds: 4))..repeat(reverse: true);
     _open();
     advance = Timer(const Duration(milliseconds: 2800), widget.onComplete);
   }
@@ -63,6 +66,7 @@ class _ThreeIntroScreenState extends State<ThreeIntroScreen> {
   @override
   void dispose() {
     advance?.cancel();
+    markMotion.dispose();
     super.dispose();
   }
 
@@ -76,16 +80,7 @@ class _ThreeIntroScreenState extends State<ThreeIntroScreen> {
         fit: StackFit.expand,
         children: [
           if (controller != null) WebViewWidget(controller: controller!),
-          Center(
-            child: AnimatedOpacity(
-              opacity: ready ? .88 : 1,
-              duration: const Duration(milliseconds: 700),
-              child: Image.asset(
-                'assets/branding/mind-recipe-mark.png',
-                height: 116,
-              ),
-            ),
-          ),
+          Center(child: AnimatedBuilder(animation: markMotion, builder: (_, child) => Transform.rotate(angle: (markMotion.value - .5) * .16, child: Transform.scale(scale: .88 + markMotion.value * .2, child: Opacity(opacity: ready ? .92 : 1, child: child))), child: Image.asset('assets/branding/mind-recipe-mark.png', height: 116))),
           const Positioned(
             left: 0,
             right: 0,

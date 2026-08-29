@@ -590,14 +590,14 @@ class SecureAppState extends ChangeNotifier {
           : 'system';
       chimeraTheme =
           const {
-            'verdant',
-            'ocean',
-            'aurora',
-            'ember',
-            'twilight',
+            'chimera-native',
+            'cyberpunk-neon',
+            'organic-bioluminescent',
+            'quantum-void',
+            'holographic-matrix',
           }.contains(values[8])
           ? values[8]!
-          : 'verdant';
+          : 'chimera-native';
       chimeraFxEnabled = values[9] != 'false';
       chimeraFxIntensity =
           double.tryParse(values[10] ?? '')?.clamp(0.2, 1.0).toDouble() ?? 0.7;
@@ -920,11 +920,11 @@ class SecureAppState extends ChangeNotifier {
 
   Future<void> setChimeraTheme(String value) async {
     if (!const {
-      'verdant',
-      'ocean',
-      'aurora',
-      'ember',
-      'twilight',
+      'chimera-native',
+      'cyberpunk-neon',
+      'organic-bioluminescent',
+      'quantum-void',
+      'holographic-matrix',
     }.contains(value)) {
       return;
     }

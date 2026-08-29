@@ -89,28 +89,12 @@ class _MindRecipeAppState extends State<MindRecipeApp> {
       _ => ThemeMode.system,
     };
     final (seed, secondary, tertiary) = switch (appState.chimeraTheme) {
-      'ocean' => (
-        const Color(0xff006d91),
-        const Color(0xff0088a8),
-        const Color(0xff315da8),
-      ),
-      'aurora' => (
-        const Color(0xff6750a4),
-        const Color(0xff008f83),
-        const Color(0xffa13b86),
-      ),
-      'ember' => (
-        const Color(0xffa34213),
-        const Color(0xffc26a00),
-        const Color(0xff8b3a62),
-      ),
-      'twilight' => (
-        const Color(0xff4648a3),
-        const Color(0xff7651a8),
-        const Color(0xff007c91),
-      ),
+      'cyberpunk-neon' => (const Color(0xff00d4ff), const Color(0xffff2d95), const Color(0xff8b5cf6)),
+      'organic-bioluminescent' => (const Color(0xff00e68a), const Color(0xff32e0c4), const Color(0xffb2ff59)),
+      'quantum-void' => (const Color(0xff8b5cf6), const Color(0xff4f46e5), const Color(0xffec4899)),
+      'holographic-matrix' => (const Color(0xff39ff88), const Color(0xff00d4ff), const Color(0xffb6ff00)),
       _ => (
-        const Color(0xff007d71),
+        const Color(0xff00d4ff),
         MindRecipeFxPalette.secondary,
         const Color(0xff007a4d),
       ),
@@ -1810,34 +1794,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             for (final theme in const [
               (
-                id: 'verdant',
-                name: 'Verdant Signal',
-                description: 'Signature teal, green, and violet',
-                colors: [Color(0xff007d71), Color(0xff7c3aed)],
+                id: 'chimera-native',
+                name: 'Chimera Native',
+                description: 'Darkstar cyan, green, and violet',
+                colors: [Color(0xff00d4ff), Color(0xff00e68a)],
               ),
               (
-                id: 'ocean',
-                name: 'Deep Ocean',
-                description: 'Cool blue, cyan, and indigo',
-                colors: [Color(0xff006d91), Color(0xff315da8)],
+                id: 'cyberpunk-neon', name: 'Cyberpunk Neon', description: 'Electric cyan, pink, and violet', colors: [Color(0xff00d4ff), Color(0xffff2d95)],
               ),
               (
-                id: 'aurora',
-                name: 'Aurora',
-                description: 'Violet, turquoise, and orchid',
-                colors: [Color(0xff6750a4), Color(0xff008f83)],
+                id: 'organic-bioluminescent', name: 'Organic Bioluminescent', description: 'Living green and sea-glass light', colors: [Color(0xff00e68a), Color(0xffb2ff59)],
               ),
               (
-                id: 'ember',
-                name: 'Warm Ember',
-                description: 'Grounded copper, amber, and berry',
-                colors: [Color(0xffa34213), Color(0xffc26a00)],
+                id: 'quantum-void', name: 'Quantum Void', description: 'Deep indigo, purple, and magenta', colors: [Color(0xff4f46e5), Color(0xffec4899)],
               ),
               (
-                id: 'twilight',
-                name: 'Twilight',
-                description: 'Indigo, purple, and dusk blue',
-                colors: [Color(0xff4648a3), Color(0xff7651a8)],
+                id: 'holographic-matrix', name: 'Holographic Matrix', description: 'Matrix green, cyan, and lime', colors: [Color(0xff39ff88), Color(0xff00d4ff)],
               ),
             ])
               RadioListTile<String>(
