@@ -377,6 +377,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 colors: [Color(0xff0066ff), Color(0xff00e5cc)],
               ),
               (
+                id: 'ocean',
+                name: 'Deep Ocean (legacy)',
+                description: 'Cool blue, cyan, and indigo',
+                colors: [Color(0xff006d91), Color(0xff315da8)],
+              ),
+              (
                 id: 'solar-flare',
                 name: 'Solar Flare',
                 description: 'Solar orange + light gold',
@@ -395,6 +401,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 colors: [Color(0xff7defff), Color(0xffe7fffb)],
               ),
               (
+                id: 'aurora',
+                name: 'Aurora (legacy)',
+                description: 'Violet, turquoise, and orchid',
+                colors: [Color(0xff6750a4), Color(0xff008f83)],
+              ),
+              (
                 id: 'aurora-borealis',
                 name: 'Aurora Borealis',
                 description: 'Aurora green + violet veil',
@@ -411,6 +423,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 name: 'Orchid Vapor',
                 description: 'Orchid + ice haze',
                 colors: [Color(0xffd946ef), Color(0xff7defff)],
+              ),
+              (
+                id: 'tidal-glass',
+                name: 'Tidal Glass',
+                description: 'Tidal cyan + crystal frost',
+                colors: [Color(0xff06b6d4), Color(0xffe7fffb)],
+              ),
+              (
+                id: 'ember',
+                name: 'Warm Ember (legacy)',
+                description: 'Grounded copper, amber, and berry',
+                colors: [Color(0xffa34213), Color(0xffc26a00)],
+              ),
+              (
+                id: 'twilight',
+                name: 'Twilight (legacy)',
+                description: 'Indigo, purple, and dusk blue',
+                colors: [Color(0xff4648a3), Color(0xff7651a8)],
               ),
             ])
               RadioListTile<String>(
