@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'app_services.dart';
 import 'mind_recipe_fx.dart';
 import 'three_background.dart';
+import 'three_brand_mark.dart';
 
 class AccountGateway extends StatefulWidget {
   const AccountGateway({super.key, required this.api, required this.appState});
@@ -13,8 +14,7 @@ class AccountGateway extends StatefulWidget {
   State<AccountGateway> createState() => _AccountGatewayState();
 }
 
-class _AccountGatewayState extends State<AccountGateway>
-    with SingleTickerProviderStateMixin {
+class _AccountGatewayState extends State<AccountGateway> {
   final name = TextEditingController();
   final email = TextEditingController();
   final password = TextEditingController();
@@ -28,15 +28,10 @@ class _AccountGatewayState extends State<AccountGateway>
   bool acceptedTerms = false;
   String? error;
   String? info;
-  late final AnimationController _logoController;
 
   @override
   void initState() {
     super.initState();
-    _logoController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 5),
-    )..repeat(reverse: true);
   }
 
   String? _validationError() {
@@ -77,7 +72,6 @@ class _AccountGatewayState extends State<AccountGateway>
 
   @override
   void dispose() {
-    _logoController.dispose();
     name.dispose();
     email.dispose();
     password.dispose();
@@ -178,6 +172,7 @@ class _AccountGatewayState extends State<AccountGateway>
             variant: widget.appState.chimeraFxVariant,
             progress: creating ? .34 : resetting ? .67 : .16,
             intensity: widget.appState.chimeraFxIntensity,
+            theme: widget.appState.chimeraTheme,
           ),
         ),
         SafeArea(
@@ -204,23 +199,10 @@ class _AccountGatewayState extends State<AccountGateway>
                                   variant: widget.appState.chimeraFxVariant,
                                   progress: creating ? .34 : .16,
                                   intensity: .9,
+                                  theme: widget.appState.chimeraTheme,
                                 ),
                               ),
-                              AnimatedBuilder(
-                                animation: _logoController,
-                                builder: (context, child) => Transform.rotate(
-                                  angle: (_logoController.value - .5) * .035,
-                                  child: Transform.scale(
-                                    scale: .96 + _logoController.value * .08,
-                                    child: child,
-                                  ),
-                                ),
-                                child: Image.asset(
-                                  'assets/branding/mind-recipe-mark.png',
-                                  height: 82,
-                                  fit: BoxFit.contain,
-                                ),
-                              ),
+                              const ThreeBrandMark(),
                             ],
                           ),
                         ),

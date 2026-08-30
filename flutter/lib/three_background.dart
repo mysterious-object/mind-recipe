@@ -12,11 +12,13 @@ class ThreeBackground extends StatefulWidget {
     required this.variant,
     required this.progress,
     required this.intensity,
+    this.theme = 'chimera-native',
     this.fallback,
   });
   final String variant;
   final double progress;
   final double intensity;
+  final String theme;
   final Widget? fallback;
 
   @override
@@ -83,7 +85,8 @@ class _ThreeBackgroundState extends State<ThreeBackground>
     super.didUpdateWidget(oldWidget);
     if (oldWidget.variant != widget.variant ||
         oldWidget.progress != widget.progress ||
-        oldWidget.intensity != widget.intensity) _send();
+        oldWidget.intensity != widget.intensity ||
+        oldWidget.theme != widget.theme) _send();
   }
 
   Future<void> _send() async {
@@ -92,6 +95,7 @@ class _ThreeBackgroundState extends State<ThreeBackground>
       'variant': widget.variant,
       'progress': widget.progress,
       'intensity': widget.intensity,
+      'theme': widget.theme,
     });
     await _controller!.runJavaScript('window.setBackgroundState($state)');
   }

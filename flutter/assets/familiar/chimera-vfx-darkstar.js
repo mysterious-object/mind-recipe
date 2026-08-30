@@ -625,8 +625,13 @@ const ChimeraVFX = (() => {
     function pulse() { pulseFlash=0.8; coreTarget=0.6; aiTarget=1.0; setTimeout(()=>{coreTarget=0.25; aiTarget=0;},2000); }
     function setAI(v) { aiTarget = Math.max(0, Math.min(1, v)); }
     function setIntensity(v) { if(glCanvas) glCanvas.style.opacity=Math.max(0,Math.min(1,v)); }
+    function setPalette(primary, success, secondary) {
+        if (Array.isArray(primary) && primary.length === 3) C1 = primary;
+        if (Array.isArray(success) && success.length === 3) C2 = success;
+        if (Array.isArray(secondary) && secondary.length === 3) C3 = secondary;
+    }
 
-    return { init, toggle, setThinking, pulse, setIntensity, addRipple, setAI, setText };
+    return { init, toggle, setThinking, pulse, setIntensity, setPalette, addRipple, setAI, setText };
 })();
 
 if (document.readyState==='loading') document.addEventListener('DOMContentLoaded', ChimeraVFX.init);
@@ -645,6 +650,15 @@ function mindRecipeApply(state) {
     ChimeraVFX.setIntensity(Math.max(.72, Math.min(1, activation)));
     ChimeraVFX.setAI(Math.max(0, Math.min(1, (progress + activation) / 2)));
     ChimeraVFX.setThinking(progress > .28 || activation > .72);
+    const palettes = {
+        'chimera-native': [[.35,.95,.82],[0.0,.56,.45],[.72,.78,.78]],
+        'cyberpunk-neon': [[0.0,.83,1.0],[1.0,.18,.58],[.55,.36,.96]],
+        'organic-bioluminescent': [[.20,.88,.77],[0.0,.90,.54],[.70,1.0,.35]],
+        'quantum-void': [[.31,.27,.90],[.55,.36,.96],[.93,.28,.60]],
+        'holographic-matrix': [[0.0,.83,1.0],[.22,1.0,.53],[.71,1.0,0.0]],
+    };
+    const palette = palettes[state?.theme] || palettes['chimera-native'];
+    ChimeraVFX.setPalette(palette[0], palette[1], palette[2]);
     if (progress > .72) ChimeraVFX.pulse();
 }
 window.setBackgroundState = mindRecipeApply;

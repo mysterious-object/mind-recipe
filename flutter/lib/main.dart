@@ -94,9 +94,9 @@ class _MindRecipeAppState extends State<MindRecipeApp> {
       'quantum-void' => (const Color(0xff8b5cf6), const Color(0xff4f46e5), const Color(0xffec4899)),
       'holographic-matrix' => (const Color(0xff39ff88), const Color(0xff00d4ff), const Color(0xffb6ff00)),
       _ => (
-        const Color(0xff00d4ff),
-        MindRecipeFxPalette.secondary,
-        const Color(0xff007a4d),
+        const Color(0xff159a85),
+        const Color(0xff79e8d0),
+        const Color(0xff9eaeae),
       ),
     };
     final scheme = ColorScheme.fromSeed(
@@ -558,6 +558,7 @@ class _MemberHomeState extends State<MemberHome> {
                             progress: progress,
                             variant: widget.appState.chimeraFxVariant,
                             intensity: widget.appState.chimeraFxIntensity,
+                            theme: widget.appState.chimeraTheme,
                           ),
                         ),
                       PageView(
@@ -1796,8 +1797,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
               (
                 id: 'chimera-native',
                 name: 'Chimera Native',
-                description: 'Darkstar cyan, green, and violet',
-                colors: [Color(0xff00d4ff), Color(0xff00e68a)],
+                description: 'Mind Recipe mint, teal, charcoal, and silver',
+                colors: [Color(0xff159a85), Color(0xff9eaeae)],
               ),
               (
                 id: 'cyberpunk-neon', name: 'Cyberpunk Neon', description: 'Electric cyan, pink, and violet', colors: [Color(0xff00d4ff), Color(0xffff2d95)],
