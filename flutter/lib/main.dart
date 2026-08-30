@@ -16,6 +16,7 @@ import 'navigator_chat.dart';
 import 'mind_recipe_fx.dart';
 import 'navigator_chat_bubble.dart';
 import 'familiar_3d.dart';
+import 'bubble_overlay.dart';
 import 'on_device_inference.dart';
 import 'notification_scheduler.dart';
 import 'practitioner_sharing.dart';
@@ -254,7 +255,7 @@ class MemberHome extends StatefulWidget {
   State<MemberHome> createState() => _MemberHomeState();
 }
 
-class _MemberHomeState extends State<MemberHome> {
+class _MemberHomeState extends State<MemberHome> with WidgetsBindingObserver {
   int index = 0;
   int previousIndex = 0;
   final checkIn = CheckInState();
@@ -284,12 +285,16 @@ class _MemberHomeState extends State<MemberHome> {
   DateTime? _bubbleDismissedAt;
   String? _lastSeenAssistantText;
   DateTime? _bubbleShownAt;
+  bool _bubbleOverlayPermissionGranted = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     pageController = PageController();
     railController = ScrollController();
+    // Check overlay permission for system bubble (stays on home screen / other apps)
+    _refreshOverlayPermission();
     // Readiness belongs to the signed-in app lifecycle, not to whether the
     // Navigator page happened to be laid out by PageView yet.
     unawaited(_primeNavigator());
@@ -333,8 +338,46 @@ class _MemberHomeState extends State<MemberHome> {
             _bubbleShownAt = now;
           }
         });
+        // Sync to system overlay — stays on home screen / other apps (2090 fix)
+        _syncSystemBubble(visibleSnippet, speaking, listening);
+      } else if (visibleSnippet != null || speaking || listening) {
+        // Keep overlay refreshed even without state tick
+        _syncSystemBubble(visibleSnippet, speaking, listening);
       }
     });
+  }
+
+  Future<void> _refreshOverlayPermission() async {
+    _bubbleOverlayPermissionGranted = await BubbleOverlay.hasPermission();
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _syncSystemBubble(String? snippet, bool speaking, bool listening) async {
+    if (!_bubbleOverlayPermissionGranted) {
+      // Try to refresh permission silently; user can grant from Settings
+      _bubbleOverlayPermissionGranted = await BubbleOverlay.hasPermission();
+    }
+    if (!_bubbleOverlayPermissionGranted) return;
+    final shouldShow = snippet != null || speaking || listening;
+    if (shouldShow) {
+      await BubbleOverlay.show(snippet: snippet, isSpeaking: speaking, isListening: listening, textFallback: snippet ?? '');
+    } else {
+      await BubbleOverlay.hide();
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+      // App going to background — ensure system bubble remains if needed
+      _syncSystemBubble(_lastAssistantSnippet, _voiceIsSpeaking, _voiceIsListening);
+    } else if (state == AppLifecycleState.resumed) {
+      _refreshOverlayPermission();
+      // Re-evaluate hide rules when returning
+      if (_lastAssistantSnippet != null && index == 0) {
+        BubbleOverlay.hide();
+      }
+    }
   }
 
   Future<void> _primeNavigator() async {
@@ -347,6 +390,8 @@ class _MemberHomeState extends State<MemberHome> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    BubbleOverlay.hide();
     pageController.dispose();
     railController.dispose();
     navigatorReadinessTimer?.cancel();
@@ -574,19 +619,23 @@ class _MemberHomeState extends State<MemberHome> {
                             snippet: index == 0 ? null : _lastAssistantSnippet,
                             isSpeaking: _voiceIsSpeaking,
                             isListening: _voiceIsListening,
-                            onTap: () => goToPage(1),
-                            onDismiss: () => setState(() {
-                              _lastAssistantSnippet = null;
-                              _bubbleDismissedAt = DateTime.now();
-                              _bubbleShownAt = null;
-                            }),
+                            onTap: () => goToPage(0),
+                            onDismiss: () {
+                              BubbleOverlay.hide();
+                              setState(() {
+                                _lastAssistantSnippet = null;
+                                _bubbleDismissedAt = DateTime.now();
+                                _bubbleShownAt = null;
+                              });
+                            },
                             onCloseVoice: () async {
                               await VoiceInterface().stopSpeaking();
                               await VoiceInterface().stopListening();
+                              await BubbleOverlay.hide();
                             },
                           ),
                         ),
-                      // 3D Familiar — floats when enabled, hides on Navigator to avoid overlap with chat
+                      // 3D Familiar — floats when enabled, hides on Navigator to avoid overlap with chat (2090: restored)
                       if (widget.appState.familiarEnabled && index != 0)
                         Positioned(
                           right: 16,
@@ -598,7 +647,7 @@ class _MemberHomeState extends State<MemberHome> {
                                 size: 86,
                                 isSpeaking: _voiceIsSpeaking,
                                 isListening: _voiceIsListening,
-                                onTap: () => goToPage(1),
+                                onTap: () => goToPage(0),
                               ),
                             ),
                           ),
@@ -1821,6 +1870,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ],
                 ),
               ),
+            const Divider(height: 1),
+            _BubbleOverlayPermissionTile(),
           ],
         ),
       ),
@@ -2106,6 +2157,51 @@ String _formatModelTime(Duration value) {
   if (value.inHours > 0) return '${value.inHours}h ${(value.inMinutes % 60)}m';
   if (value.inMinutes > 0) return '${value.inMinutes} min';
   return '${value.inSeconds.clamp(1, 59)} sec';
+}
+
+class _BubbleOverlayPermissionTile extends StatefulWidget {
+  const _BubbleOverlayPermissionTile();
+  @override
+  State<_BubbleOverlayPermissionTile> createState() => _BubbleOverlayPermissionTileState();
+}
+
+class _BubbleOverlayPermissionTileState extends State<_BubbleOverlayPermissionTile> {
+  bool _hasPermission = false;
+  bool _checking = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _check();
+  }
+
+  Future<void> _check() async {
+    final v = await BubbleOverlay.hasPermission();
+    if (mounted) setState(() { _hasPermission = v; _checking = false; });
+  }
+
+  @override
+  Widget build(BuildContext context) => ListTile(
+        leading: Icon(_hasPermission ? Icons.picture_in_picture_alt_rounded : Icons.open_in_new_rounded, color: _hasPermission ? Colors.green : null),
+        title: const Text('Navigator bubble over other apps'),
+        subtitle: Text(_checking
+            ? 'Checking permission…'
+            : _hasPermission
+                ? 'Bubble will stay on home screen and other apps. Tap to manage.'
+                : 'Allow “Display over other apps” so the Navigator bubble stays when you leave the app.'),
+        trailing: _hasPermission ? const Icon(Icons.check_circle, color: Colors.green) : const Icon(Icons.chevron_right),
+        onTap: () async {
+          if (_hasPermission) {
+            await BubbleOverlay.hide();
+            await _check();
+            if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Overlay hidden. It will reappear with the next Navigator reply.')));
+          } else {
+            final granted = await BubbleOverlay.requestPermission();
+            await _check();
+            if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(granted ? 'Permission granted — bubble will now stay on home screen.' : 'Permission not granted. Enable “Display over other apps” in Settings.')));
+          }
+        },
+      );
 }
 
 class PractitionerHome extends StatelessWidget {

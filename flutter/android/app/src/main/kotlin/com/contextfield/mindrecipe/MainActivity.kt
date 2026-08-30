@@ -9,5 +9,6 @@ class MainActivity : FlutterActivity() {
         flutterEngine.plugins.add(VoicePlugin())
         flutterEngine.plugins.add(MindRecipeDeviceHarnessPlugin())
         flutterEngine.plugins.add(MindRecipeMobileAutomationPlugin())
+        flutterEngine.plugins.add(NavigatorBubbleOverlayPlugin())
     }
 }
