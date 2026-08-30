@@ -10,6 +10,7 @@ class ThreeBrandMark extends StatefulWidget {
 
 class _ThreeBrandMarkState extends State<ThreeBrandMark> {
   WebViewController? controller;
+  bool _webReady = false;
   @override
   void initState() {
     super.initState();
@@ -43,7 +44,14 @@ class _ThreeBrandMarkState extends State<ThreeBrandMark> {
             },
           ),
         )
-        ..addJavaScriptChannel('BrandBridge', onMessageReceived: (_) {})
+        ..addJavaScriptChannel(
+          'BrandBridge',
+          onMessageReceived: (message) {
+            if (message.message == 'ready' && mounted) {
+              setState(() => _webReady = true);
+            }
+          },
+        )
         ..loadFlutterAsset('assets/familiar/brand.html');
       await Future<void>.delayed(const Duration(milliseconds: 120));
       await c.runJavaScript('window.setBrandSceneVariant?.(${widget.variant})');
@@ -52,7 +60,26 @@ class _ThreeBrandMarkState extends State<ThreeBrandMark> {
   }
 
   @override
-  Widget build(BuildContext context) => controller == null
-      ? Image.asset('assets/branding/mind-recipe-mark.png')
-      : IgnorePointer(child: WebViewWidget(controller: controller!));
+  Widget build(BuildContext context) => Stack(
+    fit: StackFit.expand,
+    children: [
+      if (controller != null)
+        IgnorePointer(child: WebViewWidget(controller: controller!)),
+      // Keep the actual Mind Recipe mark visible until its WebGL texture has
+      // loaded. A WebView allocation must never result in an empty login card.
+      AnimatedOpacity(
+        opacity: _webReady ? 0 : 1,
+        duration: const Duration(milliseconds: 220),
+        child: IgnorePointer(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            child: Image.asset(
+              'assets/branding/mind-recipe-mark.png',
+              fit: BoxFit.contain,
+            ),
+          ),
+        ),
+      ),
+    ],
+  );
 }
