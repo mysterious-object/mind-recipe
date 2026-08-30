@@ -21,7 +21,8 @@ const ChimeraVFX = (() => {
     let TEXT_W = 2048, TEXT_H = 1024;
 
     // Colors
-    let C1 = [0, 0.83, 1.0], C2 = [0, 0.9, 0.54], C3 = [0.6, 0.2, 1.0];
+    // Mind Recipe mark: sea-glass highlight, deep teal, brushed silver.
+    let C1 = [0.6588, 0.8157, 0.7920], C2 = [0.1106, 0.5176, 0.4796], C3 = [0.8020, 0.8139, 0.8176];
     let _colorProbe = null, _colorCache = {};
 
     function cssToRGB(c) {
@@ -231,7 +232,7 @@ const ChimeraVFX = (() => {
         vec3 col = vec3(0.);
 
         // Base: very dark with faint scale texture
-        col += vec3(0.004, 0.008, 0.006) * (1. + scales * 4.);
+        col += vec3(0.012, 0.018, 0.019) * (1. + scales * 4.);
 
         // Scale edges: dim green outline
         col += u_c2 * 0.06 * scaleEdge * smoothstep(0.06, 0.02, scaleEdge);
@@ -248,14 +249,14 @@ const ChimeraVFX = (() => {
         col += u_c2 * creatureEdge * 0.25;   // bioluminescent edge outline
         col += u_c1 * creatureShadow * 0.03;  // faint internal glow
 
-        // Core: warm accent (not dominant, just warmth at bottom)
-        col += vec3(0.5, 0.15, 0.03) * core * 1.0;
+        // Core is drawn from the mark's sea-glass and silver, never orange.
+        col += mix(u_c1, u_c3, 0.42) * core * 1.15;
 
         // Mouse awareness
         col += u_c2 * mGlow * 1.5;
 
         // Ripple: green flash through the mass
-        col += mix(u_c2, vec3(0.5, 1., 0.7), 0.4) * ripple;
+        col += mix(u_c2, u_c3, 0.46) * ripple;
 
         // Ambient green floor (never fully black)
         col += u_c2 * 0.006;
@@ -325,7 +326,7 @@ const ChimeraVFX = (() => {
 
             // Sparkle
             float sparkle = pow(noise(st * 60.0 + t * 4.0), 4.0) * letterBody;
-            col += vec3(0.3, 0.9, 0.5) * sparkle * 2.0;
+            col += mix(u_c1, u_c3, 0.5) * sparkle * 2.0;
         }
 
         // ── Ambient holographic enhancements (always active, subtle) ──
@@ -387,7 +388,8 @@ const ChimeraVFX = (() => {
         for (const p of particles) {
             if (p.life <= 0) continue;
             const a = p.life * 0.4;
-            ctx2d.fillStyle = `rgba(0,200,100,${a})`;
+            const rgb = C3.map(v => Math.round(v * 255));
+            ctx2d.fillStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${a})`;
             ctx2d.beginPath();
             ctx2d.arc(p.x, p.y, p.size*p.life, 0, Math.PI*2);
             ctx2d.fill();
@@ -651,7 +653,7 @@ function mindRecipeApply(state) {
     ChimeraVFX.setAI(Math.max(0, Math.min(1, (progress + activation) / 2)));
     ChimeraVFX.setThinking(progress > .28 || activation > .72);
     const palettes = {
-        'chimera-native': [[.35,.95,.82],[0.0,.56,.45],[.72,.78,.78]],
+        'chimera-native': [[.6588,.8157,.7920],[.1106,.5176,.4796],[.8020,.8139,.8176]],
         'cyberpunk-neon': [[0.0,.83,1.0],[1.0,.18,.58],[.55,.36,.96]],
         'organic-bioluminescent': [[.20,.88,.77],[0.0,.90,.54],[.70,1.0,.35]],
         'quantum-void': [[.31,.27,.90],[.55,.36,.96],[.93,.28,.60]],
@@ -662,7 +664,11 @@ function mindRecipeApply(state) {
     if (progress > .72) ChimeraVFX.pulse();
 }
 window.setBackgroundState = mindRecipeApply;
-window.setIntroVariant = value => { mindRecipeApply({ progress: .45 + (Number(value || 0) % 3) * .12, intensity: .92 }); ChimeraVFX.pulse(); };
+window.setIntroVariant = value => {
+    mindRecipeApply({ theme: 'chimera-native', progress: .45 + (Number(value || 0) % 3) * .12, intensity: .96 });
+    window.setBrandSceneVariant?.(value);
+    ChimeraVFX.pulse();
+};
 window.setFamiliarState = mindRecipeApply;
 window.setBackgroundPaused = paused => ChimeraVFX.toggle(!paused);
 window.setIntroPaused = window.setBackgroundPaused;

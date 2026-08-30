@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import 'app_services.dart';
-import 'mind_recipe_fx.dart';
 import 'three_background.dart';
 import 'three_brand_mark.dart';
 
@@ -170,7 +169,11 @@ class _AccountGatewayState extends State<AccountGateway> {
         Positioned.fill(
           child: ThreeBackground(
             variant: widget.appState.chimeraFxVariant,
-            progress: creating ? .34 : resetting ? .67 : .16,
+            progress: creating
+                ? .34
+                : resetting
+                ? .67
+                : .16,
             intensity: widget.appState.chimeraFxIntensity,
             theme: widget.appState.chimeraTheme,
           ),
@@ -190,7 +193,7 @@ class _AccountGatewayState extends State<AccountGateway> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         SizedBox(
-                          height: 132,
+                          height: 196,
                           child: Stack(
                             alignment: Alignment.center,
                             children: [
@@ -202,7 +205,13 @@ class _AccountGatewayState extends State<AccountGateway> {
                                   theme: widget.appState.chimeraTheme,
                                 ),
                               ),
-                              const ThreeBrandMark(),
+                              ThreeBrandMark(
+                                variant: creating
+                                    ? 4
+                                    : resetting
+                                    ? 8
+                                    : 1,
+                              ),
                             ],
                           ),
                         ),

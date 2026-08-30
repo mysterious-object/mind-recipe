@@ -89,14 +89,30 @@ class _MindRecipeAppState extends State<MindRecipeApp> {
       _ => ThemeMode.system,
     };
     final (seed, secondary, tertiary) = switch (appState.chimeraTheme) {
-      'cyberpunk-neon' => (const Color(0xff00d4ff), const Color(0xffff2d95), const Color(0xff8b5cf6)),
-      'organic-bioluminescent' => (const Color(0xff00e68a), const Color(0xff32e0c4), const Color(0xffb2ff59)),
-      'quantum-void' => (const Color(0xff8b5cf6), const Color(0xff4f46e5), const Color(0xffec4899)),
-      'holographic-matrix' => (const Color(0xff39ff88), const Color(0xff00d4ff), const Color(0xffb6ff00)),
+      'cyberpunk-neon' => (
+        const Color(0xff00d4ff),
+        const Color(0xffff2d95),
+        const Color(0xff8b5cf6),
+      ),
+      'organic-bioluminescent' => (
+        const Color(0xff00e68a),
+        const Color(0xff32e0c4),
+        const Color(0xffb2ff59),
+      ),
+      'quantum-void' => (
+        const Color(0xff8b5cf6),
+        const Color(0xff4f46e5),
+        const Color(0xffec4899),
+      ),
+      'holographic-matrix' => (
+        const Color(0xff39ff88),
+        const Color(0xff00d4ff),
+        const Color(0xffb6ff00),
+      ),
       _ => (
-        const Color(0xff159a85),
-        const Color(0xff79e8d0),
-        const Color(0xff9eaeae),
+        const Color(0xff1c847a),
+        const Color(0xffa8d0cb),
+        const Color(0xffcdd0d0),
       ),
     };
     final scheme = ColorScheme.fromSeed(
@@ -503,10 +519,7 @@ class _MemberHomeState extends State<MemberHome> {
         ),
       ),
       _KeepAlivePage(
-        child: PulseScreen(
-          checkIn: checkIn,
-          appState: widget.appState,
-        ),
+        child: PulseScreen(checkIn: checkIn, appState: widget.appState),
       ),
       const _KeepAlivePage(child: BookingScreen()),
       _KeepAlivePage(
@@ -729,7 +742,9 @@ class _NavigatorMiniChatBubble extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurfaceVariant,
                             fontSize: 11,
                           ),
                         ),
@@ -1798,19 +1813,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 id: 'chimera-native',
                 name: 'Chimera Native',
                 description: 'Mind Recipe mint, teal, charcoal, and silver',
-                colors: [Color(0xff159a85), Color(0xff9eaeae)],
+                colors: [Color(0xff1c847a), Color(0xffcdd0d0)],
               ),
               (
-                id: 'cyberpunk-neon', name: 'Cyberpunk Neon', description: 'Electric cyan, pink, and violet', colors: [Color(0xff00d4ff), Color(0xffff2d95)],
+                id: 'cyberpunk-neon',
+                name: 'Cyberpunk Neon',
+                description: 'Electric cyan, pink, and violet',
+                colors: [Color(0xff00d4ff), Color(0xffff2d95)],
               ),
               (
-                id: 'organic-bioluminescent', name: 'Organic Bioluminescent', description: 'Living green and sea-glass light', colors: [Color(0xff00e68a), Color(0xffb2ff59)],
+                id: 'organic-bioluminescent',
+                name: 'Organic Bioluminescent',
+                description: 'Living green and sea-glass light',
+                colors: [Color(0xff00e68a), Color(0xffb2ff59)],
               ),
               (
-                id: 'quantum-void', name: 'Quantum Void', description: 'Deep indigo, purple, and magenta', colors: [Color(0xff4f46e5), Color(0xffec4899)],
+                id: 'quantum-void',
+                name: 'Quantum Void',
+                description: 'Deep indigo, purple, and magenta',
+                colors: [Color(0xff4f46e5), Color(0xffec4899)],
               ),
               (
-                id: 'holographic-matrix', name: 'Holographic Matrix', description: 'Matrix green, cyan, and lime', colors: [Color(0xff39ff88), Color(0xff00d4ff)],
+                id: 'holographic-matrix',
+                name: 'Holographic Matrix',
+                description: 'Matrix green, cyan, and lime',
+                colors: [Color(0xff39ff88), Color(0xff00d4ff)],
               ),
             ])
               RadioListTile<String>(

@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
-import 'three_brand_mark.dart';
 
 class ThreeIntroScreen extends StatefulWidget {
   const ThreeIntroScreen({
@@ -26,7 +25,7 @@ class _ThreeIntroScreenState extends State<ThreeIntroScreen> {
   void initState() {
     super.initState();
     _open();
-    advance = Timer(const Duration(milliseconds: 2800), widget.onComplete);
+    advance = Timer(const Duration(milliseconds: 4200), widget.onComplete);
   }
 
   Future<void> _open() async {
@@ -77,11 +76,10 @@ class _ThreeIntroScreenState extends State<ThreeIntroScreen> {
         fit: StackFit.expand,
         children: [
           if (controller != null) WebViewWidget(controller: controller!),
-          const Center(child: SizedBox(width: 210, height: 210, child: ThreeBrandMark())),
           const Positioned(
             left: 0,
             right: 0,
-            bottom: 64,
+            bottom: 58,
             child: Text(
               'MIND RECIPE',
               textAlign: TextAlign.center,
