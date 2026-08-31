@@ -13,6 +13,7 @@ const ChimeraVFX = (() => {
     const MAX_RIPPLES = 6, PARTICLE_COUNT = 140;
     let _ulocs = null, _lastFrame = 0, _frameCount = 0;
     let aiIntensity = 0, aiTarget = 0, holoPhase = 0;
+    let visualVariant = 0;
 
     // ── Text-to-matter system ──
     let textCanvas = null, textCtx = null, textTexture = null;
@@ -59,6 +60,7 @@ const ChimeraVFX = (() => {
     uniform vec4 u_ripples[6];
     uniform int u_ripple_count;
     uniform float u_ai_intensity;   // 0=idle, 0.5=thinking, 1.0=executing
+    uniform float u_variant;        // background composition 0..11
     uniform float u_holo_phase;     // animated phase for holographic sweep
     uniform sampler2D u_text_tex;   // text rendered as white-on-black density mask
     uniform float u_text_alpha;     // 0=no text, 1=full text formation
@@ -171,9 +173,14 @@ const ChimeraVFX = (() => {
         float ar = u_resolution.x / u_resolution.y;
         vec2 st = uv * vec2(ar, 1.0);
         float t = u_time;
+        float variant = floor(mod(u_variant, 12.0));
+        float angle = (variant - 5.5) * 0.055;
+        mat2 variantRotation = mat2(cos(angle), -sin(angle), sin(angle), cos(angle));
+        st = variantRotation * (st - vec2(ar * .5, .5)) + vec2(ar * .5, .5);
 
         // ── 1. SCALE TEXTURE (voronoi) ──
-        float scaleEdge = voroEdge(st * 10.0);
+        float scaleDensity = 6.0 + mod(variant, 5.0) * 2.25;
+        float scaleEdge = voroEdge(st * scaleDensity);
         float scales = smoothstep(0.02, 0.06, scaleEdge) * 0.08;
 
         // ── 2. GREEN SCALAR MASS (large aquatic creature swimming) ──
@@ -186,6 +193,27 @@ const ChimeraVFX = (() => {
         vec2 q = vec2(fbm(st*1.5 + swim + t*.02), fbm(st*1.5 + vec2(3.7,8.2) + swim*0.7 + t*.018));
         vec2 r2 = vec2(fbm(st*1.5 + q*2.0 + t*.008), fbm(st*1.5 + q + vec2(2.8,4.1) + t*.012));
         float massField = fbm(st*1.5 + r2*1.5 + swim*0.5);
+
+        // Every background choice changes the field composition, rather than
+        // merely renaming or recoloring the same animation.
+        float bands = .5 + .5 * sin((st.x * (3.0 + mod(variant, 4.0)) +
+            st.y * (1.0 + mod(variant, 3.0)) + t * .11) * 6.28318);
+        float radial = 1.0 - smoothstep(.05, .62,
+            abs(length(st - vec2(ar * .5, .5)) - (.16 + .08 * sin(t * .16))));
+        float lattice = max(
+            smoothstep(.475, .5, abs(sin(st.x * (12.0 + variant)))),
+            smoothstep(.475, .5, abs(sin(st.y * (12.0 + variant)))));
+        if (variant == 1.0) massField = mix(massField, fbm(st * 2.2 - t * .025), .50);
+        else if (variant == 2.0) massField = mix(massField, bands, .62);
+        else if (variant == 3.0) massField = mix(massField, pow(abs(sin((massField + st.y) * 12.0)), 3.0), .52);
+        else if (variant == 4.0) massField = mix(massField, radial, .68);
+        else if (variant == 5.0) massField = mix(massField, lattice, .58);
+        else if (variant == 6.0) massField *= .32;
+        else if (variant == 7.0) massField = mix(massField, abs(sin(atan(st.y-.5, st.x-ar*.5)*7.0+t*.1)), .46);
+        else if (variant == 8.0) massField = mix(massField, smoothstep(.38,.72,bands + fbm(st*1.2)*.45), .58);
+        else if (variant == 9.0) massField = mix(massField, pow(fbm(st*3.4-vec2(0,t*.04)), 2.2), .55);
+        else if (variant == 10.0) massField = mix(massField, fbm(st*1.05+vec2(t*.018,-t*.012)), .62);
+        else if (variant == 11.0) massField = mix(massField, fbm(st*2.0+r2*.8-t*.012), .50);
 
         // The mass: broad, wavy — like watching a huge body undulate
         float mass = pow(massField, 1.2) * 2.5;
@@ -582,7 +610,7 @@ const ChimeraVFX = (() => {
         gl.useProgram(program);
         if (!_ulocs) {
             _ulocs = {};
-            for (const n of ['u_time','u_resolution','u_c1','u_c2','u_c3','u_core','u_pulse','u_mouse','u_ripples','u_ripple_count','u_ai_intensity','u_holo_phase','u_text_tex','u_text_alpha'])
+            for (const n of ['u_time','u_resolution','u_c1','u_c2','u_c3','u_core','u_pulse','u_mouse','u_ripples','u_ripple_count','u_ai_intensity','u_variant','u_holo_phase','u_text_tex','u_text_alpha'])
                 _ulocs[n] = gl.getUniformLocation(program, n);
         }
         if (_frameCount % 300 === 0) resolveColors();
@@ -594,6 +622,7 @@ const ChimeraVFX = (() => {
         gl.uniform1f(_ulocs.u_pulse, pulseFlash);
         gl.uniform2f(_ulocs.u_mouse, mouseX, mouseY);
         gl.uniform1f(_ulocs.u_ai_intensity, aiIntensity);
+        gl.uniform1f(_ulocs.u_variant, visualVariant);
         gl.uniform1f(_ulocs.u_holo_phase, holoPhase);
 
         // Text-to-matter: update texture if dirty, bind it
@@ -632,8 +661,9 @@ const ChimeraVFX = (() => {
         if (Array.isArray(success) && success.length === 3) C2 = success;
         if (Array.isArray(secondary) && secondary.length === 3) C3 = secondary;
     }
+    function setVariant(value) { visualVariant = Math.max(0, Math.min(11, Number(value) || 0)); }
 
-    return { init, toggle, setThinking, pulse, setIntensity, setPalette, addRipple, setAI, setText };
+    return { init, toggle, setThinking, pulse, setIntensity, setPalette, setVariant, addRipple, setAI, setText };
 })();
 
 if (document.readyState==='loading') document.addEventListener('DOMContentLoaded', ChimeraVFX.init);
@@ -661,6 +691,9 @@ function mindRecipeApply(state) {
     };
     const palette = palettes[state?.theme] || palettes['chimera-native'];
     ChimeraVFX.setPalette(palette[0], palette[1], palette[2]);
+    const variants = ['field','nebula','rivers','tendrils','orbs','lattice','void','prism','aurora','ember','ocean','twilight'];
+    const variantIndex = variants.indexOf(state?.variant);
+    if (variantIndex >= 0) ChimeraVFX.setVariant(variantIndex);
     if (progress > .72) ChimeraVFX.pulse();
 }
 window.setBackgroundState = mindRecipeApply;

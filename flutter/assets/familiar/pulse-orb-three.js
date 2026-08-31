@@ -126,10 +126,18 @@ function evolve(next={}) {
 function resize(){renderer.setSize(Math.max(1,innerWidth),Math.max(1,innerHeight),false);camera.aspect=innerWidth/Math.max(1,innerHeight);camera.updateProjectionMatrix();}
 let started=performance.now();
 function frame(now){requestAnimationFrame(frame);if(state.paused)return;const t=(now-started)/1000;const speed=state.reduceMotion?.08:.16+state.activation*.22;const breath=state.reduceMotion?1:1+Math.sin(t*(.7+state.activation*1.2))*(.025+state.activation*.035);familiar.scale.setScalar(breath);familiar.rotation.y=t*speed;familiar.rotation.x=state.reduceMotion?.04:Math.sin(t*.22)*.1;membrane.rotation.y=-t*(.06+state.complexity*.14);particles.rotation.y=t*(.04+state.complexity*.14);crystals.rotation.y=-t*.12;branches.rotation.z=Math.sin(t*.28)*.09;crown.rotation.y=t*.08;rings.forEach((ring,i)=>ring.rotation.z+=(state.reduceMotion?.0002:.0018+state.activation*.004)*(i%2?-1:1));renderer.render(scene,camera);}
-window.setFamiliarState=((darkstarApply)=>value=>{darkstarApply?.(value);evolve(value);})(window.setFamiliarState);
-window.setFamiliarPaused=((darkstarPause)=>value=>{darkstarPause?.(value);state.paused=!!value;})(window.setFamiliarPaused);
+window.setFamiliarState=value=>evolve(value);
+window.setFamiliarPaused=value=>{state.paused=!!value;};
 window.addEventListener('resize',resize);
 renderer.domElement.addEventListener('webglcontextlost',event=>{event.preventDefault();try{FamiliarBridge.postMessage('context_lost');}catch(_){}});
-resize(); evolve({seed:17,hue:174,growth:.08,activation:.35,complexity:.08,form:0});
-try{FamiliarBridge.postMessage('ready');}catch(_){}
-frame(performance.now());
+try {
+  resize();
+  evolve({seed:17,hue:174,growth:.08,activation:.35,complexity:.08,form:0});
+  // Only report ready after an actual Three.js frame succeeds.
+  renderer.compile(scene,camera);
+  renderer.render(scene,camera);
+  try{FamiliarBridge.postMessage('ready');}catch(_){}
+  frame(performance.now());
+} catch (_) {
+  try{FamiliarBridge.postMessage('shader_error');}catch(__){}
+}

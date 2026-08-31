@@ -47,19 +47,25 @@ class _ThreeBackgroundState extends State<ThreeBackground>
       final controller = WebViewController()
         ..setJavaScriptMode(JavaScriptMode.unrestricted)
         ..setBackgroundColor(Colors.transparent)
-        ..setNavigationDelegate(NavigationDelegate(onNavigationRequest: (r) {
-          final uri = Uri.tryParse(r.url);
-          final local = uri != null &&
-              (uri.scheme == 'file' ||
-                  uri.host == 'appassets.androidplatform.net');
-          return local
-              ? NavigationDecision.navigate
-              : NavigationDecision.prevent;
-        }, onWebResourceError: (error) {
-          if (error.isForMainFrame == true && mounted) {
-            setState(() => _failed = true);
-          }
-        }))
+        ..setNavigationDelegate(
+          NavigationDelegate(
+            onNavigationRequest: (r) {
+              final uri = Uri.tryParse(r.url);
+              final local =
+                  uri != null &&
+                  (uri.scheme == 'file' ||
+                      uri.host == 'appassets.androidplatform.net');
+              return local
+                  ? NavigationDecision.navigate
+                  : NavigationDecision.prevent;
+            },
+            onWebResourceError: (error) {
+              if (error.isForMainFrame == true && mounted) {
+                setState(() => _failed = true);
+              }
+            },
+          ),
+        )
         ..addJavaScriptChannel(
           'BackgroundBridge',
           onMessageReceived: (message) {
@@ -73,7 +79,12 @@ class _ThreeBackgroundState extends State<ThreeBackground>
           },
         )
         ..loadFlutterAsset('assets/familiar/background.html');
-      if (mounted) setState(() => _controller = controller);
+      if (mounted) {
+        setState(() => _controller = controller);
+        // The page can report ready before the cascade assigns the controller.
+        // Send once here as well so the saved theme is never missed.
+        if (_ready) unawaited(_send());
+      }
     } catch (_) {
       // Native theme color remains as the accessible fallback.
       if (mounted) setState(() => _failed = true);
@@ -86,7 +97,9 @@ class _ThreeBackgroundState extends State<ThreeBackground>
     if (oldWidget.variant != widget.variant ||
         oldWidget.progress != widget.progress ||
         oldWidget.intensity != widget.intensity ||
-        oldWidget.theme != widget.theme) _send();
+        oldWidget.theme != widget.theme) {
+      _send();
+    }
   }
 
   Future<void> _send() async {

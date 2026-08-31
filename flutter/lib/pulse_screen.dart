@@ -139,18 +139,31 @@ class _PulseScreenState extends State<PulseScreen> with WidgetsBindingObserver {
       final results = await Future.wait<dynamic>([
         widget.appState.loadMoodPulses(),
         widget.appState.loadCurriculumProgress(),
-        MindRecipeApiClient()
-            .getPulse(widget.appState.session?.token ?? '')
-            .catchError((_) => <String, dynamic>{}),
       ]);
       _pulses = (results[0] as List).cast<Map<String, dynamic>>();
       _curriculum = results[1] as Map<String, dynamic>?;
-      _pulseSummary = results[2] as Map<String, dynamic>;
       _familiar = _deriveFamiliar();
     } finally {
       if (mounted) setState(() => _loading = false);
     }
     await _sendState();
+    unawaited(_loadRemoteSummary());
+  }
+
+  Future<void> _loadRemoteSummary() async {
+    try {
+      final summary = await MindRecipeApiClient()
+          .getPulse(widget.appState.session?.token ?? '')
+          .timeout(const Duration(seconds: 8));
+      if (!mounted) return;
+      setState(() {
+        _pulseSummary = summary;
+        _familiar = _deriveFamiliar();
+      });
+      await _sendState();
+    } catch (_) {
+      // Pulse is local-first. A missing service must never hide the familiar.
+    }
   }
 
   void _initRenderer() {
