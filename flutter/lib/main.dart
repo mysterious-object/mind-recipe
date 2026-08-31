@@ -90,29 +90,29 @@ class _MindRecipeAppState extends State<MindRecipeApp> {
     };
     final (seed, secondary, tertiary) = switch (appState.chimeraTheme) {
       'cyberpunk-neon' => (
-        const Color(0xff00d4ff),
-        const Color(0xffff2d95),
-        const Color(0xff8b5cf6),
+        const Color(0xffff0066),
+        const Color(0xff00ffff),
+        const Color(0xff39ff14),
       ),
       'organic-bioluminescent' => (
-        const Color(0xff00e68a),
-        const Color(0xff32e0c4),
-        const Color(0xffb2ff59),
+        const Color(0xff00e5ff),
+        const Color(0xff76ff03),
+        const Color(0xffffab00),
       ),
       'quantum-void' => (
-        const Color(0xff8b5cf6),
-        const Color(0xff4f46e5),
-        const Color(0xffec4899),
+        const Color(0xff7c4dff),
+        const Color(0xff448aff),
+        const Color(0xffff6e40),
       ),
       'holographic-matrix' => (
-        const Color(0xff39ff88),
-        const Color(0xff00d4ff),
-        const Color(0xffb6ff00),
+        const Color(0xff00ff41),
+        const Color(0xff00bcd4),
+        const Color(0xffff4081),
       ),
       _ => (
-        const Color(0xff1c847a),
-        const Color(0xffa8d0cb),
-        const Color(0xffcdd0d0),
+        const Color(0xff00e5cc),
+        const Color(0xff7c3aed),
+        const Color(0xff00e68a),
       ),
     };
     final scheme = ColorScheme.fromSeed(
