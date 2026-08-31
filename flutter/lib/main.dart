@@ -2008,7 +2008,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Choose a Darkstar matter-field composition. Each scene changes geometry, flow, density, and motion—not only color.',
+                      'Choose an original VFX scene. Each one uses its own source component stack, not a recolored copy of the same background.',
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                     const SizedBox(height: 10),
@@ -2017,26 +2017,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       runSpacing: 8,
                       children: [
                         for (final v in const [
-                          ('field', 'Field Flux', Icons.gradient_rounded),
-                          ('nebula', 'Nebula Drift', Icons.blur_on_rounded),
-                          ('rivers', 'Data Rivers', Icons.water_rounded),
-                          ('tendrils', 'Energy Tendrils', Icons.bolt_rounded),
-                          ('orbs', 'Orb Glow', Icons.circle_outlined),
-                          ('lattice', 'Lattice Mesh', Icons.grid_on_rounded),
-                          ('void', 'Void Minimal', Icons.nights_stay_rounded),
-                          ('prism', 'Prism Burst', Icons.auto_awesome_rounded),
-                          ('aurora', 'Aurora Bloom', Icons.wb_twilight_rounded),
+                          ('full', 'Full', Icons.auto_awesome_rounded),
+                          ('lite', 'Lite', Icons.blur_on_rounded),
+                          ('trading', 'Trading', Icons.show_chart_rounded),
                           (
-                            'ember',
-                            'Ember Warm',
-                            Icons.local_fire_department_rounded,
+                            'cinematic',
+                            'Cinematic',
+                            Icons.movie_filter_rounded,
                           ),
-                          ('ocean', 'Ocean Depth', Icons.waves_rounded),
-                          (
-                            'twilight',
-                            'Twilight Veil',
-                            Icons.nightlight_rounded,
-                          ),
+                          ('holographic', 'Holographic', Icons.hub_rounded),
+                          ('minimal', 'Minimal', Icons.nights_stay_rounded),
                         ])
                           ChoiceChip(
                             label: Text(v.$2),

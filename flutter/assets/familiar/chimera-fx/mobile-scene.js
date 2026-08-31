@@ -15,7 +15,29 @@ const sceneKind = window.MIND_RECIPE_SCENE_MODE || 'pulse';
 const host = document.getElementById('stage') || document.body;
 let engine = null;
 let activeTheme = 'chimera-native';
+let activePreset = 'full';
 let lastState = {};
+
+// This is the source Chimera FX background catalog.  Keep the identifiers in
+// lock-step with ChimeraFX.presets: each item is a distinct component stack,
+// not a color treatment of one generic background.
+const backgroundPresetIds = new Set([
+  'full', 'lite', 'trading', 'cinematic', 'holographic', 'minimal',
+]);
+
+// Existing installations saved one of the temporary Mind Recipe scene names.
+// Migrate those choices into the actual source presets without discarding a
+// person's visual preference.
+const legacyPresetMap = {
+  field: 'full', nebula: 'lite', rivers: 'trading', tendrils: 'holographic',
+  orbs: 'cinematic', lattice: 'trading', void: 'minimal', prism: 'holographic',
+  aurora: 'cinematic', ember: 'trading', ocean: 'full', twilight: 'minimal',
+};
+
+function backgroundPreset(value) {
+  if (backgroundPresetIds.has(value)) return value;
+  return legacyPresetMap[value] || 'full';
+}
 
 const extendedThemeSpecs = {
   'darkstar-cyan': [0x00f5ff, 0x00a8ff, 0xb7f2ff, 0x010d18],
@@ -182,11 +204,9 @@ function optionsFor(kind) {
       container: host,
       fps: 30,
       theme: activeTheme,
-      components: ['nebula', 'tendrils', 'rivers', 'hud'],
-      nebula: { count: 520, spread: 38 },
-      tendrils: { count: 4, segments: 28, height: 16 },
-      rivers: { rivers: 3, particles: 110 },
-      hud: { scanSpeed: .55 },
+      // Use the original renderer presets verbatim.  The source library owns
+      // the component selection for these modes.
+      preset: activePreset,
     };
   }
   return {
@@ -212,9 +232,33 @@ function configureCanvas() {
   engine.renderer.setClearColor(0x000000, sceneKind === 'background' ? 0 : 1);
 }
 
+function attachContextHandler() {
+  engine?.renderer?.domElement?.addEventListener('webglcontextlost', event => {
+    event.preventDefault();
+    bridge('context_lost');
+  });
+}
+
+function createEngine() {
+  engine = seededCreate(lastState.seed, () => ChimeraFX.create(optionsFor(sceneKind)));
+  if (sceneKind === 'pulse') engine.addComponent(new EvolvingOrb(lastState.seed));
+  configureCanvas();
+  attachContextHandler();
+  engine.renderer.compile(engine.scene, engine.camera);
+  engine.renderer.render(engine.scene, engine.camera);
+}
+
+function replaceBackgroundPreset(nextPreset) {
+  if (sceneKind !== 'background' || nextPreset === activePreset) return;
+  engine?.dispose();
+  activePreset = nextPreset;
+  createEngine();
+}
+
 function apply(state = {}) {
   lastState = { ...lastState, ...state };
   if (!engine) return;
+  replaceBackgroundPreset(backgroundPreset(lastState.variant));
   const nextTheme = ChimeraFX.themes[lastState.theme] ? lastState.theme : 'chimera-native';
   if (nextTheme !== activeTheme) {
     activeTheme = nextTheme;
@@ -246,15 +290,8 @@ function apply(state = {}) {
 function start() {
   try {
     activeTheme = ChimeraFX.themes[lastState.theme] ? lastState.theme : 'chimera-native';
-    engine = seededCreate(lastState.seed, () => ChimeraFX.create(optionsFor(sceneKind)));
-    if (sceneKind === 'pulse') engine.addComponent(new EvolvingOrb(lastState.seed));
-    configureCanvas();
-    engine.renderer.domElement.addEventListener('webglcontextlost', event => {
-      event.preventDefault();
-      bridge('context_lost');
-    });
-    engine.renderer.compile(engine.scene, engine.camera);
-    engine.renderer.render(engine.scene, engine.camera);
+    activePreset = backgroundPreset(lastState.variant);
+    createEngine();
     apply(lastState);
     bridge('ready');
   } catch (error) {

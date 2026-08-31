@@ -516,7 +516,7 @@ class SecureAppState extends ChangeNotifier {
   String chimeraTheme = 'chimera-native';
   bool chimeraFxEnabled = true;
   double chimeraFxIntensity = 0.7;
-  String chimeraFxVariant = 'field'; // 12 variants: field, nebula, rivers, tendrils, orbs, lattice, void, prism, aurora, ember, ocean, twilight
+  String chimeraFxVariant = 'full';
   String _activityDate = '';
   int _navigationSessions = 0;
   int _messagesSent = 0;
@@ -608,22 +608,7 @@ class SecureAppState extends ChangeNotifier {
       chimeraFxEnabled = values[9] != 'false';
       chimeraFxIntensity =
           double.tryParse(values[10] ?? '')?.clamp(0.2, 1.0).toDouble() ?? 0.7;
-      chimeraFxVariant = const {
-        'field',
-        'nebula',
-        'rivers',
-        'tendrils',
-        'orbs',
-        'lattice',
-        'void',
-        'prism',
-        'aurora',
-        'ember',
-        'ocean',
-        'twilight',
-      }.contains(values[11])
-          ? values[11]!
-          : 'field';
+      chimeraFxVariant = _sourceBackgroundPreset(values[11]);
       selectedCloudModel = (values[12] ?? '').trim().isEmpty
           ? 'anthropic/claude-sonnet-5'
           : values[12]!.trim();
@@ -964,24 +949,45 @@ class SecureAppState extends ChangeNotifier {
 
   Future<void> setChimeraFxVariant(String value) async {
     if (!const {
-      'field',
-      'nebula',
-      'rivers',
-      'tendrils',
-      'orbs',
-      'lattice',
-      'void',
-      'prism',
-      'aurora',
-      'ember',
-      'ocean',
-      'twilight',
+      'full',
+      'lite',
+      'trading',
+      'cinematic',
+      'holographic',
+      'minimal',
     }.contains(value)) {
       return;
     }
     chimeraFxVariant = value;
     notifyListeners();
     await _storage.write(key: _chimeraFxVariantKey, value: value);
+  }
+
+  static String _sourceBackgroundPreset(String? value) {
+    const source = {
+      'full',
+      'lite',
+      'trading',
+      'cinematic',
+      'holographic',
+      'minimal',
+    };
+    if (source.contains(value)) return value!;
+    const legacy = {
+      'field': 'full',
+      'nebula': 'lite',
+      'rivers': 'trading',
+      'tendrils': 'holographic',
+      'orbs': 'cinematic',
+      'lattice': 'trading',
+      'void': 'minimal',
+      'prism': 'holographic',
+      'aurora': 'cinematic',
+      'ember': 'trading',
+      'ocean': 'full',
+      'twilight': 'minimal',
+    };
+    return legacy[value] ?? 'full';
   }
 
   Future<void> signOut() async {
