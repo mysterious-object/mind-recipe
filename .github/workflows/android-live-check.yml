@@ -1,0 +1,36 @@
+name: Mind Recipe Android live-check APK
+
+on:
+  push:
+    branches: ['codex/mobile-build-*']
+
+permissions:
+  contents: read
+
+env:
+  MIND_RECIPE_STAGING_API_URL: https://staging-api.mindrecipe.142.93.201.156.sslip.io
+  ORG_GRADLE_PROJECT_mindRecipeApplicationIdSuffix: .livecheck
+
+jobs:
+  apk:
+    name: Build side-by-side live-check APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.0'
+          channel: stable
+          cache: true
+      - run: flutter pub get
+        working-directory: flutter
+      - name: Build ARM64 live-check APK
+        run: flutter build apk --release --target-platform android-arm64 --no-pub --dart-define=MIND_RECIPE_API_BASE=${MIND_RECIPE_STAGING_API_URL}
+        working-directory: flutter
+      - run: test -s flutter/build/app/outputs/flutter-apk/app-release.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mind-recipe-android-live-check-apk
+          path: flutter/build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 3

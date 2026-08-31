@@ -1812,32 +1812,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
               (
                 id: 'chimera-native',
                 name: 'Chimera Native',
-                description: 'Mind Recipe mint, teal, charcoal, and silver',
-                colors: [Color(0xff1c847a), Color(0xffcdd0d0)],
+                description: 'Teal-green, neon green, and ultraviolet',
+                colors: [Color(0xff00e5cc), Color(0xff7c3aed)],
               ),
               (
                 id: 'cyberpunk-neon',
                 name: 'Cyberpunk Neon',
-                description: 'Electric cyan, pink, and violet',
-                colors: [Color(0xff00d4ff), Color(0xffff2d95)],
+                description: 'Hot pink, electric cyan, and toxic green',
+                colors: [Color(0xffff0066), Color(0xff00ffff)],
               ),
               (
                 id: 'organic-bioluminescent',
                 name: 'Organic Bioluminescent',
-                description: 'Living green and sea-glass light',
-                colors: [Color(0xff00e68a), Color(0xffb2ff59)],
+                description: 'Bioluminescent blue, phosphor green, and amber',
+                colors: [Color(0xff00e5ff), Color(0xff76ff03)],
               ),
               (
                 id: 'quantum-void',
                 name: 'Quantum Void',
-                description: 'Deep indigo, purple, and magenta',
-                colors: [Color(0xff4f46e5), Color(0xffec4899)],
+                description: 'Ultraviolet, quantum blue, and photon orange',
+                colors: [Color(0xff7c4dff), Color(0xff448aff)],
               ),
               (
                 id: 'holographic-matrix',
                 name: 'Holographic Matrix',
-                description: 'Matrix green, cyan, and lime',
-                colors: [Color(0xff39ff88), Color(0xff00d4ff)],
+                description: 'Matrix green, hologram cyan, and magenta',
+                colors: [Color(0xff00ff41), Color(0xff00bcd4)],
               ),
             ])
               RadioListTile<String>(

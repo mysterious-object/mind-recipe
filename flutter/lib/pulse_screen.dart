@@ -202,7 +202,7 @@ class _PulseScreenState extends State<PulseScreen> with WidgetsBindingObserver {
               setState(() => _webReady = true);
               unawaited(_sendState());
             } else if (message.message == 'webgl_error' ||
-                message.message == 'shader_error' ||
+                message.message.startsWith('shader_error') ||
                 message.message == 'context_lost') {
               setState(() => _useFallback = true);
             }

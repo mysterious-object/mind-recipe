@@ -15,7 +15,11 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.contextfield.mindrecipe"
+        val applicationIdSuffix = providers
+            .gradleProperty("mindRecipeApplicationIdSuffix")
+            .orNull
+            .orEmpty()
+        applicationId = "com.contextfield.mindrecipe$applicationIdSuffix"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
