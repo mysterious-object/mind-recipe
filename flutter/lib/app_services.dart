@@ -513,7 +513,7 @@ class SecureAppState extends ChangeNotifier {
   bool publicResearchEnabled = false;
   String selectedCloudModel = 'anthropic/claude-sonnet-5';
   String appearanceMode = 'system';
-  String chimeraTheme = 'verdant';
+  String chimeraTheme = 'chimera-native';
   bool chimeraFxEnabled = true;
   double chimeraFxIntensity = 0.7;
   String chimeraFxVariant = 'field'; // 12 variants: field, nebula, rivers, tendrils, orbs, lattice, void, prism, aurora, ember, ocean, twilight
@@ -595,6 +595,13 @@ class SecureAppState extends ChangeNotifier {
             'organic-bioluminescent',
             'quantum-void',
             'holographic-matrix',
+            'darkstar-cyan',
+            'solar-ember',
+            'deep-ocean',
+            'aurora-spectrum',
+            'crimson-pulse',
+            'monochrome-glass',
+            'ultraviolet-bloom',
           }.contains(values[8])
           ? values[8]!
           : 'chimera-native';
@@ -925,6 +932,13 @@ class SecureAppState extends ChangeNotifier {
       'organic-bioluminescent',
       'quantum-void',
       'holographic-matrix',
+      'darkstar-cyan',
+      'solar-ember',
+      'deep-ocean',
+      'aurora-spectrum',
+      'crimson-pulse',
+      'monochrome-glass',
+      'ultraviolet-bloom',
     }.contains(value)) {
       return;
     }

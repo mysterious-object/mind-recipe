@@ -17,6 +17,35 @@ let engine = null;
 let activeTheme = 'chimera-native';
 let lastState = {};
 
+const extendedThemeSpecs = {
+  'darkstar-cyan': [0x00f5ff, 0x00a8ff, 0xb7f2ff, 0x010d18],
+  'solar-ember': [0xff4f0d, 0xffc214, 0x7a0503, 0x170401],
+  'deep-ocean': [0x00b3d9, 0x034080, 0x0df2b3, 0x000b1a],
+  'aurora-spectrum': [0x26ffa6, 0x9940ff, 0xff2699, 0x08031a],
+  'crimson-pulse': [0xff0d1f, 0xbf0061, 0xff990d, 0x180006],
+  'monochrome-glass': [0xe6f5ff, 0x7a8c9e, 0xffffff, 0x05080b],
+  'ultraviolet-bloom': [0x9e1aff, 0x33ccff, 0xff1abf, 0x0c0218],
+};
+
+for (const [name, [primaryHex, secondaryHex, tertiaryHex, backgroundHex]] of Object.entries(extendedThemeSpecs)) {
+  const primary = new THREE.Color(primaryHex);
+  const secondary = new THREE.Color(secondaryHex);
+  const tertiary = new THREE.Color(tertiaryHex);
+  const background = new THREE.Color(backgroundHex);
+  const base = ChimeraFX.ChimeraNative;
+  ChimeraFX.registerTheme(name, {
+    ...base,
+    name,
+    colors: { ...base.colors, primary, secondary, tertiary, background, surface: background.clone().offsetHSL(0, 0, .035) },
+    particleColors: [primary.toArray(), secondary.toArray(), tertiary.toArray()],
+    tendrilColors: [primary, secondary, tertiary],
+    riverColors: [primary.toArray(), secondary.toArray(), tertiary.toArray()],
+    metalColors: [primary, secondary],
+    reactionColors: [primary, secondary, tertiary],
+    fogColor: background,
+  });
+}
+
 // The original Darkstar ray-marched IridescentOrb is retained in the engine,
 // but some mobile WebViews compile it without drawing its surface. This is a
 // geometry-backed Three.js familiar that runs in that same Darkstar scene and

@@ -676,6 +676,7 @@ function mindRecipeBridge(message) {
         try { window[name]?.postMessage(message); } catch (_) {}
     }
 }
+const mindRecipeVariants = ['field','nebula','rivers','tendrils','orbs','lattice','void','prism','aurora','ember','ocean','twilight'];
 function mindRecipeApply(state) {
     const progress = Number(state?.progress ?? state?.growth ?? state?.form ?? 0);
     const activation = Number(state?.intensity ?? state?.activation ?? .72);
@@ -683,22 +684,31 @@ function mindRecipeApply(state) {
     ChimeraVFX.setAI(Math.max(0, Math.min(1, (progress + activation) / 2)));
     ChimeraVFX.setThinking(progress > .28 || activation > .72);
     const palettes = {
-        'chimera-native': [[.6588,.8157,.7920],[.1106,.5176,.4796],[.8020,.8139,.8176]],
-        'cyberpunk-neon': [[0.0,.83,1.0],[1.0,.18,.58],[.55,.36,.96]],
-        'organic-bioluminescent': [[.20,.88,.77],[0.0,.90,.54],[.70,1.0,.35]],
-        'quantum-void': [[.31,.27,.90],[.55,.36,.96],[.93,.28,.60]],
-        'holographic-matrix': [[0.0,.83,1.0],[.22,1.0,.53],[.71,1.0,0.0]],
+        // The original five Darkstar theme modules.
+        'chimera-native': [[0.0,.898,.800],[0.0,.902,.541],[.486,.227,.929]],
+        'cyberpunk-neon': [[1.0,0.0,.400],[.224,1.0,.078],[0.0,1.0,1.0]],
+        'organic-bioluminescent': [[0.0,.898,1.0],[.463,1.0,.012],[1.0,.671,0.0]],
+        'quantum-void': [[.486,.302,1.0],[1.0,.431,.251],[.267,.541,1.0]],
+        'holographic-matrix': [[0.0,1.0,.255],[1.0,.251,.506],[0.0,.737,.831]],
+        // Additional high-separation color banks for the full mobile scene set.
+        'darkstar-cyan': [[0.0,.961,1.0],[0.0,.659,1.0],[.718,.949,1.0]],
+        'solar-ember': [[1.0,.310,.050],[1.0,.760,.080],[.480,.020,.010]],
+        'deep-ocean': [[0.0,.700,.850],[.010,.250,.500],[.050,.950,.700]],
+        'aurora-spectrum': [[.150,1.0,.650],[.600,.250,1.0],[1.0,.150,.650]],
+        'crimson-pulse': [[1.0,.050,.120],[.750,0.0,.380],[1.0,.600,.050]],
+        'monochrome-glass': [[.900,.960,1.0],[.480,.550,.620],[1.0,1.0,1.0]],
+        'ultraviolet-bloom': [[.620,.100,1.0],[.200,.800,1.0],[1.0,.100,.750]],
     };
     const palette = palettes[state?.theme] || palettes['chimera-native'];
     ChimeraVFX.setPalette(palette[0], palette[1], palette[2]);
-    const variants = ['field','nebula','rivers','tendrils','orbs','lattice','void','prism','aurora','ember','ocean','twilight'];
-    const variantIndex = variants.indexOf(state?.variant);
+    const variantIndex = mindRecipeVariants.indexOf(state?.variant);
     if (variantIndex >= 0) ChimeraVFX.setVariant(variantIndex);
     if (progress > .72) ChimeraVFX.pulse();
 }
 window.setBackgroundState = mindRecipeApply;
 window.setIntroVariant = value => {
-    mindRecipeApply({ theme: 'chimera-native', progress: .45 + (Number(value || 0) % 3) * .12, intensity: .96 });
+    const index = Math.abs(Number(value || 0)) % mindRecipeVariants.length;
+    mindRecipeApply({ theme: 'chimera-native', variant: mindRecipeVariants[index], progress: .45 + (index % 3) * .12, intensity: .96 });
     window.setBrandSceneVariant?.(value);
     ChimeraVFX.pulse();
 };

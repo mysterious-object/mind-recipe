@@ -109,6 +109,41 @@ class _MindRecipeAppState extends State<MindRecipeApp> {
         const Color(0xff00bcd4),
         const Color(0xffff4081),
       ),
+      'darkstar-cyan' => (
+        const Color(0xff00f5ff),
+        const Color(0xff00a8ff),
+        const Color(0xffb7f2ff),
+      ),
+      'solar-ember' => (
+        const Color(0xffff4f0d),
+        const Color(0xffffc214),
+        const Color(0xff7a0503),
+      ),
+      'deep-ocean' => (
+        const Color(0xff00b3d9),
+        const Color(0xff034080),
+        const Color(0xff0df2b3),
+      ),
+      'aurora-spectrum' => (
+        const Color(0xff26ffa6),
+        const Color(0xff9940ff),
+        const Color(0xffff2699),
+      ),
+      'crimson-pulse' => (
+        const Color(0xffff0d1f),
+        const Color(0xffbf0061),
+        const Color(0xffff990d),
+      ),
+      'monochrome-glass' => (
+        const Color(0xffe6f5ff),
+        const Color(0xff7a8c9e),
+        const Color(0xffffffff),
+      ),
+      'ultraviolet-bloom' => (
+        const Color(0xff9e1aff),
+        const Color(0xff33ccff),
+        const Color(0xffff1abf),
+      ),
       _ => (
         const Color(0xff00e5cc),
         const Color(0xff7c3aed),
@@ -1839,6 +1874,48 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 description: 'Matrix green, hologram cyan, and magenta',
                 colors: [Color(0xff00ff41), Color(0xff00bcd4)],
               ),
+              (
+                id: 'darkstar-cyan',
+                name: 'Darkstar Cyan',
+                description: 'Electric cyan, arctic blue, and glass white',
+                colors: [Color(0xff00f5ff), Color(0xff00a8ff)],
+              ),
+              (
+                id: 'solar-ember',
+                name: 'Solar Ember',
+                description: 'Hot orange, solar gold, and deep carbon red',
+                colors: [Color(0xffff4f0d), Color(0xffffc214)],
+              ),
+              (
+                id: 'deep-ocean',
+                name: 'Deep Ocean',
+                description: 'Abyss blue, tidal cyan, and sea-glass green',
+                colors: [Color(0xff00b3d9), Color(0xff034080)],
+              ),
+              (
+                id: 'aurora-spectrum',
+                name: 'Aurora Spectrum',
+                description: 'Aurora mint, spectral violet, and plasma pink',
+                colors: [Color(0xff26ffa6), Color(0xff9940ff)],
+              ),
+              (
+                id: 'crimson-pulse',
+                name: 'Crimson Pulse',
+                description: 'Signal red, deep magenta, and ignition amber',
+                colors: [Color(0xffff0d1f), Color(0xffbf0061)],
+              ),
+              (
+                id: 'monochrome-glass',
+                name: 'Monochrome Glass',
+                description: 'Frost white, brushed steel, and cold shadow',
+                colors: [Color(0xffe6f5ff), Color(0xff7a8c9e)],
+              ),
+              (
+                id: 'ultraviolet-bloom',
+                name: 'Ultraviolet Bloom',
+                description: 'Ultraviolet, ion blue, and neon orchid',
+                colors: [Color(0xff9e1aff), Color(0xff33ccff)],
+              ),
             ])
               RadioListTile<String>(
                 title: Text(theme.name),
@@ -1931,7 +2008,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Choose from 12 animated backgrounds. They stay subtle and react to swipes and movement.',
+                      'Choose a Darkstar matter-field composition. Each scene changes geometry, flow, density, and motion—not only color.',
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                     const SizedBox(height: 10),
