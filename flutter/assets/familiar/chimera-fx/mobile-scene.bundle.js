@@ -13983,6 +13983,7 @@
   var engine = null;
   var activeTheme = "chimera-native";
   var activePreset = "full";
+  var requestedPreset = "full";
   var lastState = {};
   var backgroundPresetIds = /* @__PURE__ */ new Set([
     "full",
@@ -14010,16 +14011,28 @@
     if (backgroundPresetIds.has(value)) return value;
     return legacyPresetMap[value] || "full";
   }
-  var extendedThemeSpecs = {
-    "darkstar-cyan": [62975, 43263, 12055295, 68888],
-    "solar-ember": [16731917, 16761364, 7996675, 1508353],
-    "deep-ocean": [46041, 213120, 914099, 2842],
-    "aurora-spectrum": [2555814, 10043647, 16721561, 525082],
-    "crimson-pulse": [16715039, 12517473, 16750861, 1572870],
-    "monochrome-glass": [15136255, 8031390, 16777215, 329739],
-    "ultraviolet-bloom": [10361599, 3394815, 16718527, 786968]
+  var visualThemeSpecs = {
+    "mind-recipe-orbit": [55744, 9133302, 16103746, 398619, "full", 0.42, 0.46, 0.025],
+    "midnight-signal": [1342463, 60844, 11111679, 132889, "trading", 0.3, 0.32, 0.018],
+    "neon-ronin": [15608948, 7354623, 5234687, 1442836, "holographic", 0.58, 0.35, 0.05],
+    "abyssal-current": [30719, 58322, 7733209, 3877, "cinematic", 0.32, 0.68, 0.018],
+    "solar-flare": [16751872, 16764764, 16731427, 1707010, "cinematic", 0.62, 0.28, 0.04],
+    "void-walker": [4599989, 10318591, 12956671, 328207, "minimal", 0.24, 0.72, 0.015],
+    "crystal-matrix": [7731199, 15335167, 6006985, 464155, "lite", 0.28, 0.55, 0.012],
+    "aurora": [2354603, 10114815, 16741560, 463133, "full", 0.48, 0.5, 0.026],
+    "obsidian-forge": [15689526, 16756811, 8862511, 1313033, "cinematic", 0.38, 0.24, 0.065],
+    "orchid-vapor": [14374120, 8317439, 12951807, 1444640, "holographic", 0.52, 0.64, 0.03],
+    "tidal-glass": [50908, 14942207, 4578484, 204069, "trading", 0.3, 0.58, 0.015]
   };
-  for (const [name, [primaryHex, secondaryHex, tertiaryHex, backgroundHex]] of Object.entries(extendedThemeSpecs)) {
+  var sourceThemePresets = {
+    "chimera-native": "full",
+    "cyberpunk-neon": "holographic",
+    "organic-bioluminescent": "cinematic",
+    "quantum-void": "minimal",
+    "holographic-matrix": "trading"
+  };
+  var themePreset = (name) => visualThemeSpecs[name]?.[4] || sourceThemePresets[name] || "full";
+  for (const [name, [primaryHex, secondaryHex, tertiaryHex, backgroundHex, _preset, bloom, radius, grain]] of Object.entries(visualThemeSpecs)) {
     const primary = new Pr(primaryHex);
     const secondary = new Pr(secondaryHex);
     const tertiary = new Pr(tertiaryHex);
@@ -14029,12 +14042,22 @@
       ...base,
       name,
       colors: { ...base.colors, primary, secondary, tertiary, background, surface: background.clone().offsetHSL(0, 0, 0.035) },
-      particleColors: [primary.toArray(), secondary.toArray(), tertiary.toArray()],
+      particleColors: [primary.toArray(), secondary.toArray(), tertiary.toArray(), primary.clone().lerp(secondary, 0.5).toArray()],
       tendrilColors: [primary, secondary, tertiary],
       riverColors: [primary.toArray(), secondary.toArray(), tertiary.toArray()],
       metalColors: [primary, secondary],
       reactionColors: [primary, secondary, tertiary],
-      fogColor: background
+      fogColor: background,
+      fogDensity: name === "void-walker" ? 32e-4 : name === "crystal-matrix" ? 12e-4 : 2e-3,
+      postfx: { ...base.postfx, bloomStrength: bloom, bloomRadius: radius, grainIntensity: grain },
+      apply(engine2) {
+        engine2.scene.fog.color.copy(this.fogColor);
+        engine2.scene.fog.density = this.fogDensity;
+        engine2.bloomPass.strength = this.postfx.bloomStrength;
+        engine2.bloomPass.radius = this.postfx.bloomRadius;
+        engine2.bloomPass.threshold = this.postfx.bloomThreshold;
+        engine2.grainPass.uniforms.uIntensity.value = this.postfx.grainIntensity;
+      }
     });
   }
   var EvolvingOrb = class {
@@ -14242,11 +14265,16 @@
   function apply(state = {}) {
     lastState = { ...lastState, ...state };
     if (!engine) return;
-    replaceBackgroundPreset(backgroundPreset(lastState.variant));
+    const nextRequestedPreset = backgroundPreset(lastState.variant);
+    if (nextRequestedPreset !== requestedPreset) {
+      requestedPreset = nextRequestedPreset;
+      replaceBackgroundPreset(nextRequestedPreset);
+    }
     const nextTheme = chimera_fx_bundle_default.themes[lastState.theme] ? lastState.theme : "chimera-native";
     if (nextTheme !== activeTheme) {
       activeTheme = nextTheme;
       engine.setTheme(chimera_fx_bundle_default.themes[activeTheme]);
+      replaceBackgroundPreset(backgroundPreset(themePreset(activeTheme)));
     }
     const growth = Math.max(0, Math.min(1, Number(lastState.growth ?? lastState.progress ?? 0)));
     const complexity = Math.max(0, Math.min(1, Number(lastState.complexity ?? growth)));
@@ -14273,6 +14301,7 @@
     try {
       activeTheme = chimera_fx_bundle_default.themes[lastState.theme] ? lastState.theme : "chimera-native";
       activePreset = backgroundPreset(lastState.variant);
+      requestedPreset = activePreset;
       createEngine();
       apply(lastState);
       bridge("ready");

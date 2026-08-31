@@ -16,6 +16,7 @@ const host = document.getElementById('stage') || document.body;
 let engine = null;
 let activeTheme = 'chimera-native';
 let activePreset = 'full';
+let requestedPreset = 'full';
 let lastState = {};
 
 // This is the source Chimera FX background catalog.  Keep the identifiers in
@@ -39,17 +40,34 @@ function backgroundPreset(value) {
   return legacyPresetMap[value] || 'full';
 }
 
-const extendedThemeSpecs = {
-  'darkstar-cyan': [0x00f5ff, 0x00a8ff, 0xb7f2ff, 0x010d18],
-  'solar-ember': [0xff4f0d, 0xffc214, 0x7a0503, 0x170401],
-  'deep-ocean': [0x00b3d9, 0x034080, 0x0df2b3, 0x000b1a],
-  'aurora-spectrum': [0x26ffa6, 0x9940ff, 0xff2699, 0x08031a],
-  'crimson-pulse': [0xff0d1f, 0xbf0061, 0xff990d, 0x180006],
-  'monochrome-glass': [0xe6f5ff, 0x7a8c9e, 0xffffff, 0x05080b],
-  'ultraviolet-bloom': [0x9e1aff, 0x33ccff, 0xff1abf, 0x0c0218],
+// The source package supplies the first five named themes. These additional
+// visual systems are full renderer themes—not palette aliases. Each has its
+// own fog, post-processing, component colors, and preferred composition.
+const visualThemeSpecs = {
+  'mind-recipe-orbit': [0x00d9c0, 0x8b5cf6, 0xf5b942, 0x06151b, 'full', .42, .46, .025],
+  'midnight-signal': [0x147bff, 0x00edac, 0xa98cff, 0x020719, 'trading', .30, .32, .018],
+  'neon-ronin': [0xee2c74, 0x7038ff, 0x4fdfff, 0x160414, 'holographic', .58, .35, .05],
+  'abyssal-current': [0x0077ff, 0x00e3d2, 0x75ffd9, 0x000f25, 'cinematic', .32, .68, .018],
+  'solar-flare': [0xff9d00, 0xffcf5c, 0xff4d23, 0x1a0c02, 'cinematic', .62, .28, .04],
+  'void-walker': [0x4630b5, 0x9d72ff, 0xc5b3ff, 0x05020f, 'minimal', .24, .72, .015],
+  'crystal-matrix': [0x75f7ff, 0xe9feff, 0x5ba8c9, 0x07151b, 'lite', .28, .55, .012],
+  'aurora': [0x23edab, 0x9a56ff, 0xff74b8, 0x07111d, 'full', .48, .50, .026],
+  'obsidian-forge': [0xef6736, 0xffb04b, 0x873b2f, 0x140909, 'cinematic', .38, .24, .065],
+  'orchid-vapor': [0xdb54e8, 0x7ee9ff, 0xc5a0ff, 0x160b20, 'holographic', .52, .64, .03],
+  'tidal-glass': [0x00c6dc, 0xe3ffff, 0x45dcb4, 0x031d25, 'trading', .30, .58, .015],
 };
 
-for (const [name, [primaryHex, secondaryHex, tertiaryHex, backgroundHex]] of Object.entries(extendedThemeSpecs)) {
+const sourceThemePresets = {
+  'chimera-native': 'full',
+  'cyberpunk-neon': 'holographic',
+  'organic-bioluminescent': 'cinematic',
+  'quantum-void': 'minimal',
+  'holographic-matrix': 'trading',
+};
+
+const themePreset = name => visualThemeSpecs[name]?.[4] || sourceThemePresets[name] || 'full';
+
+for (const [name, [primaryHex, secondaryHex, tertiaryHex, backgroundHex, _preset, bloom, radius, grain]] of Object.entries(visualThemeSpecs)) {
   const primary = new THREE.Color(primaryHex);
   const secondary = new THREE.Color(secondaryHex);
   const tertiary = new THREE.Color(tertiaryHex);
@@ -59,12 +77,22 @@ for (const [name, [primaryHex, secondaryHex, tertiaryHex, backgroundHex]] of Obj
     ...base,
     name,
     colors: { ...base.colors, primary, secondary, tertiary, background, surface: background.clone().offsetHSL(0, 0, .035) },
-    particleColors: [primary.toArray(), secondary.toArray(), tertiary.toArray()],
+    particleColors: [primary.toArray(), secondary.toArray(), tertiary.toArray(), primary.clone().lerp(secondary, .5).toArray()],
     tendrilColors: [primary, secondary, tertiary],
     riverColors: [primary.toArray(), secondary.toArray(), tertiary.toArray()],
     metalColors: [primary, secondary],
     reactionColors: [primary, secondary, tertiary],
     fogColor: background,
+    fogDensity: name === 'void-walker' ? .0032 : name === 'crystal-matrix' ? .0012 : .002,
+    postfx: { ...base.postfx, bloomStrength: bloom, bloomRadius: radius, grainIntensity: grain },
+    apply(engine) {
+      engine.scene.fog.color.copy(this.fogColor);
+      engine.scene.fog.density = this.fogDensity;
+      engine.bloomPass.strength = this.postfx.bloomStrength;
+      engine.bloomPass.radius = this.postfx.bloomRadius;
+      engine.bloomPass.threshold = this.postfx.bloomThreshold;
+      engine.grainPass.uniforms.uIntensity.value = this.postfx.grainIntensity;
+    },
   });
 }
 
@@ -258,11 +286,18 @@ function replaceBackgroundPreset(nextPreset) {
 function apply(state = {}) {
   lastState = { ...lastState, ...state };
   if (!engine) return;
-  replaceBackgroundPreset(backgroundPreset(lastState.variant));
+  const nextRequestedPreset = backgroundPreset(lastState.variant);
+  if (nextRequestedPreset !== requestedPreset) {
+    requestedPreset = nextRequestedPreset;
+    replaceBackgroundPreset(nextRequestedPreset);
+  }
   const nextTheme = ChimeraFX.themes[lastState.theme] ? lastState.theme : 'chimera-native';
   if (nextTheme !== activeTheme) {
     activeTheme = nextTheme;
     engine.setTheme(ChimeraFX.themes[activeTheme]);
+    // A theme change is a real visual-system change. Rebuild against its
+    // distinct source composition so it cannot look like a recolored clone.
+    replaceBackgroundPreset(backgroundPreset(themePreset(activeTheme)));
   }
   const growth = Math.max(0, Math.min(1, Number(lastState.growth ?? lastState.progress ?? 0)));
   const complexity = Math.max(0, Math.min(1, Number(lastState.complexity ?? growth)));
@@ -291,6 +326,7 @@ function start() {
   try {
     activeTheme = ChimeraFX.themes[lastState.theme] ? lastState.theme : 'chimera-native';
     activePreset = backgroundPreset(lastState.variant);
+    requestedPreset = activePreset;
     createEngine();
     apply(lastState);
     bridge('ready');

@@ -499,6 +499,7 @@ class SecureAppState extends ChangeNotifier {
       'mind_recipe_public_research_enabled';
   static const _appearanceModeKey = 'mind_recipe_appearance_mode';
   static const _chimeraThemeKey = 'mind_recipe_chimera_theme';
+  static const _chimeraVfxThemeKey = 'mind_recipe_chimera_vfx_theme';
   static const _chimeraFxEnabledKey = 'mind_recipe_chimera_fx_enabled';
   static const _chimeraFxIntensityKey = 'mind_recipe_chimera_fx_intensity';
   static const _chimeraFxVariantKey = 'mind_recipe_chimera_fx_variant';
@@ -513,7 +514,10 @@ class SecureAppState extends ChangeNotifier {
   bool publicResearchEnabled = false;
   String selectedCloudModel = 'anthropic/claude-sonnet-5';
   String appearanceMode = 'system';
+  // Native palette selection. This intentionally remains independent from
+  // the WebGL visual theme so all twelve app palettes remain available.
   String chimeraTheme = 'chimera-native';
+  String chimeraVfxTheme = 'mind-recipe-orbit';
   bool chimeraFxEnabled = true;
   double chimeraFxIntensity = 0.7;
   String chimeraFxVariant = 'full';
@@ -557,6 +561,7 @@ class SecureAppState extends ChangeNotifier {
         _storage.read(key: _publicResearchEnabledKey),
         _storage.read(key: _appearanceModeKey),
         _storage.read(key: _chimeraThemeKey),
+        _storage.read(key: _chimeraVfxThemeKey),
         _storage.read(key: _chimeraFxEnabledKey),
         _storage.read(key: _chimeraFxIntensityKey),
         _storage.read(key: _chimeraFxVariantKey),
@@ -605,13 +610,14 @@ class SecureAppState extends ChangeNotifier {
           }.contains(values[8])
           ? values[8]!
           : 'chimera-native';
-      chimeraFxEnabled = values[9] != 'false';
+      chimeraVfxTheme = _visualTheme(values[9]);
+      chimeraFxEnabled = values[10] != 'false';
       chimeraFxIntensity =
-          double.tryParse(values[10] ?? '')?.clamp(0.2, 1.0).toDouble() ?? 0.7;
-      chimeraFxVariant = _sourceBackgroundPreset(values[11]);
-      selectedCloudModel = (values[12] ?? '').trim().isEmpty
+          double.tryParse(values[11] ?? '')?.clamp(0.2, 1.0).toDouble() ?? 0.7;
+      chimeraFxVariant = _sourceBackgroundPreset(values[12]);
+      selectedCloudModel = (values[13] ?? '').trim().isEmpty
           ? 'anthropic/claude-sonnet-5'
-          : values[12]!.trim();
+          : values[13]!.trim();
     } catch (_) {
       // Secure storage can be unavailable in some test harnesses. The app stays fail-closed.
     }
@@ -931,6 +937,35 @@ class SecureAppState extends ChangeNotifier {
     notifyListeners();
     await _storage.write(key: _chimeraThemeKey, value: value);
   }
+
+  Future<void> setChimeraVfxTheme(String value) async {
+    if (!_visualThemes.contains(value)) return;
+    chimeraVfxTheme = value;
+    notifyListeners();
+    await _storage.write(key: _chimeraVfxThemeKey, value: value);
+  }
+
+  static const _visualThemes = {
+    'chimera-native',
+    'cyberpunk-neon',
+    'organic-bioluminescent',
+    'quantum-void',
+    'holographic-matrix',
+    'midnight-signal',
+    'neon-ronin',
+    'abyssal-current',
+    'solar-flare',
+    'void-walker',
+    'crystal-matrix',
+    'aurora',
+    'obsidian-forge',
+    'orchid-vapor',
+    'tidal-glass',
+    'mind-recipe-orbit',
+  };
+
+  static String _visualTheme(String? value) =>
+      _visualThemes.contains(value) ? value! : 'mind-recipe-orbit';
 
   Future<void> setChimeraFxEnabled(bool value) async {
     chimeraFxEnabled = value;

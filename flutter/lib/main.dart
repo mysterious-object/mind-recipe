@@ -606,7 +606,7 @@ class _MemberHomeState extends State<MemberHome> {
                             progress: progress,
                             variant: widget.appState.chimeraFxVariant,
                             intensity: widget.appState.chimeraFxIntensity,
-                            theme: widget.appState.chimeraTheme,
+                            theme: widget.appState.chimeraVfxTheme,
                           ),
                         ),
                       PageView(
@@ -1944,6 +1944,151 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
             const Divider(height: 1),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 14, 16, 6),
+              child: Text(
+                'LIVING VFX THEME',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.1,
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: Text(
+                'Choose the live WebGL visual system separately from the app color palette. It changes the background and Pulse familiar immediately.',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ),
+            for (final theme in const [
+              (
+                id: 'mind-recipe-orbit',
+                name: 'Mind Recipe Orbit',
+                description:
+                    'Compass teal, restorative violet, and warm focus gold',
+                colors: [Color(0xff00d9c0), Color(0xff8b5cf6)],
+              ),
+              (
+                id: 'chimera-native',
+                name: 'Core',
+                description: 'Living teal, green, and ultraviolet matter',
+                colors: [Color(0xff00e5cc), Color(0xff7c3aed)],
+              ),
+              (
+                id: 'cyberpunk-neon',
+                name: 'Neon Circuit',
+                description: 'Hot pink, electric cyan, and toxic green',
+                colors: [Color(0xffff0066), Color(0xff00ffff)],
+              ),
+              (
+                id: 'organic-bioluminescent',
+                name: 'Bioluminescent',
+                description: 'Deep blue, phosphor green, and amber',
+                colors: [Color(0xff00e5ff), Color(0xff76ff03)],
+              ),
+              (
+                id: 'quantum-void',
+                name: 'Quantum Void',
+                description: 'Ultraviolet, quantum blue, and photon orange',
+                colors: [Color(0xff7c4dff), Color(0xff448aff)],
+              ),
+              (
+                id: 'holographic-matrix',
+                name: 'Holographic Matrix',
+                description: 'Matrix green, hologram cyan, and magenta',
+                colors: [Color(0xff00ff41), Color(0xff00bcd4)],
+              ),
+              (
+                id: 'midnight-signal',
+                name: 'Midnight Signal',
+                description: 'Electric blue, signal mint, and midnight glass',
+                colors: [Color(0xff147bff), Color(0xff00edac)],
+              ),
+              (
+                id: 'neon-ronin',
+                name: 'Neon Ronin',
+                description: 'Electric blue, crimson, and violet haze',
+                colors: [Color(0xffee2c74), Color(0xff7038ff)],
+              ),
+              (
+                id: 'abyssal-current',
+                name: 'Abyssal Current',
+                description: 'Abyss blue, cyan current, and sea glass',
+                colors: [Color(0xff0077ff), Color(0xff00e3d2)],
+              ),
+              (
+                id: 'solar-flare',
+                name: 'Solar Flare',
+                description: 'Solar gold, ember orange, and charcoal',
+                colors: [Color(0xffff9d00), Color(0xffffcf5c)],
+              ),
+              (
+                id: 'void-walker',
+                name: 'Void Walker',
+                description: 'Dark indigo, ultraviolet, and soft silver',
+                colors: [Color(0xff12072f), Color(0xff8d5bff)],
+              ),
+              (
+                id: 'crystal-matrix',
+                name: 'Crystal Matrix',
+                description: 'Ice crystal, cyan light, and slate',
+                colors: [Color(0xff75f7ff), Color(0xffe9feff)],
+              ),
+              (
+                id: 'aurora',
+                name: 'Aurora',
+                description: 'Aurora mint, spectral violet, and rose plasma',
+                colors: [Color(0xff23edab), Color(0xff9a56ff)],
+              ),
+              (
+                id: 'obsidian-forge',
+                name: 'Obsidian Forge',
+                description: 'Forged copper, ember, and obsidian',
+                colors: [Color(0xffef6736), Color(0xff180e10)],
+              ),
+              (
+                id: 'orchid-vapor',
+                name: 'Orchid Vapor',
+                description: 'Orchid, vapor blue, and soft lavender',
+                colors: [Color(0xffdb54e8), Color(0xff7ee9ff)],
+              ),
+              (
+                id: 'tidal-glass',
+                name: 'Tidal Glass',
+                description: 'Tidal cyan, seafoam, and glass white',
+                colors: [Color(0xff00c6dc), Color(0xffe3ffff)],
+              ),
+            ])
+              RadioListTile<String>(
+                title: Text(theme.name),
+                subtitle: Text(theme.description),
+                value: theme.id,
+                groupValue: widget.appState.chimeraVfxTheme,
+                onChanged: (value) =>
+                    widget.appState.setChimeraVfxTheme(value!),
+                secondary: SizedBox(
+                  width: 42,
+                  child: Stack(
+                    children: [
+                      CircleAvatar(
+                        radius: 13,
+                        backgroundColor: theme.colors.first,
+                      ),
+                      Positioned(
+                        left: 16,
+                        top: 8,
+                        child: CircleAvatar(
+                          radius: 13,
+                          backgroundColor: theme.colors.last,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            const Divider(height: 1),
             SwitchListTile(
               title: const Text('Living background motion'),
               subtitle: const Text(
@@ -1999,7 +2144,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'BACKGROUND VFX',
+                      'VFX COMPOSITION',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w800,
@@ -2008,7 +2153,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Choose an original VFX scene. Each one uses its own source component stack, not a recolored copy of the same background.',
+                      'Choose the source component composition for the selected visual theme.',
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                     const SizedBox(height: 10),

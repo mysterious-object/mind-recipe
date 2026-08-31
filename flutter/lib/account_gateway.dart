@@ -175,7 +175,7 @@ class _AccountGatewayState extends State<AccountGateway> {
                 ? .67
                 : .16,
             intensity: widget.appState.chimeraFxIntensity,
-            theme: widget.appState.chimeraTheme,
+            theme: widget.appState.chimeraVfxTheme,
           ),
         ),
         SafeArea(
@@ -202,7 +202,7 @@ class _AccountGatewayState extends State<AccountGateway> {
                                   variant: widget.appState.chimeraFxVariant,
                                   progress: creating ? .34 : .16,
                                   intensity: .9,
-                                  theme: widget.appState.chimeraTheme,
+                                  theme: widget.appState.chimeraVfxTheme,
                                 ),
                               ),
                               ThreeBrandMark(

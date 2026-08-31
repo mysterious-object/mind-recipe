@@ -270,7 +270,9 @@ class _PulseScreenState extends State<PulseScreen> with WidgetsBindingObserver {
   Future<void> _sendState() async {
     if (!_webReady || _controller == null) return;
     final reduceMotion = mounted && MediaQuery.disableAnimationsOf(context);
-    final payload = _familiar.toJson()..['reduceMotion'] = reduceMotion;
+    final payload = _familiar.toJson()
+      ..['reduceMotion'] = reduceMotion
+      ..['theme'] = widget.appState.chimeraVfxTheme;
     await _controller!.runJavaScript(
       'window.setFamiliarState(${jsonEncode(payload)})',
     );
