@@ -215,7 +215,17 @@ class _PulseScreenState extends State<PulseScreen> with WidgetsBindingObserver {
             if (!mounted) return;
             if (message.message == 'ready') {
               _rendererDeadline?.cancel();
-              setState(() => _webReady = true);
+              if (mounted) {
+                // A renderer that completes after the watchdog fired is still
+                // a valid renderer. Recover the WebView instead of leaving
+                // the Pulse permanently replaced by the fallback icon.
+                setState(() {
+                  _webReady = true;
+                  _useFallback = false;
+                });
+              } else {
+                _webReady = true;
+              }
               unawaited(_sendState());
             } else if (message.message == 'webgl_error' ||
                 message.message.startsWith('shader_error') ||
@@ -226,7 +236,10 @@ class _PulseScreenState extends State<PulseScreen> with WidgetsBindingObserver {
         )
         ..loadFlutterAsset('assets/familiar/index.html');
       _controller = controller;
-      _rendererDeadline = Timer(const Duration(seconds: 6), () {
+      // The full local VFX catalog compiles several shader/component programs.
+      // Older mobile WebViews can legitimately need more than 6 seconds on
+      // first launch, especially while the background WebView is warming up.
+      _rendererDeadline = Timer(const Duration(seconds: 12), () {
         if (mounted && !_webReady) setState(() => _useFallback = true);
       });
     } catch (_) {

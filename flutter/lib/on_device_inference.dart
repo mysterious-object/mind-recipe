@@ -299,7 +299,11 @@ class OnDeviceInference implements LocalInference {
     // Do not clobber an active download/verify — the UI timer polls this
     // every 500ms and would otherwise reset `downloading` → `notInstalled`
     // while the .partial file is still being written (tab switch bug).
+    // Also guard when a download loop is active in this process — concurrent
+    // refreshes during installModel's 10-min hash would otherwise clobber
+    // `verifying` back to `downloading` and lose the verify state.
     if (_snapshot.status == OnDeviceStatus.downloading ||
+        _downloadActive ||
         (_snapshot.status == OnDeviceStatus.verifying && _refreshing)) {
       return _snapshot;
     }
@@ -344,10 +348,12 @@ class OnDeviceInference implements LocalInference {
       }
       _set(const LocalInferenceSnapshot(OnDeviceStatus.verifying));
       await _inferLog('verifying ${file.path}');
+      // SHA-256 of 1.2 GB on mid-range Android can take 3-6 min with pure Dart
+      // crypto — 4 min is too tight and flakes as "never passes verification".
       if (!await _matchesManifest(
         file,
         _activeManifest,
-      ).timeout(const Duration(minutes: 4))) {
+      ).timeout(const Duration(minutes: 10))) {
         await _inferLog('verify failed: hash mismatch');
         _disposeEngine();
         return _set(
@@ -424,7 +430,11 @@ class OnDeviceInference implements LocalInference {
     var attempt = 0;
     _downloadActive = true;
     try {
-      while (true) {
+      // A complete .partial left by an interrupted verify (app killed after
+      // the 1.2 GB stream finished but before rename) must not be re-GET in
+      // append mode — that doubles the file and fails verification forever.
+      if (resumeOffset < _activeManifest.sizeBytes) {
+        while (true) {
         attempt++;
         HttpClient? client;
         IOSink? sink;
@@ -573,6 +583,18 @@ class OnDeviceInference implements LocalInference {
           'download interrupted ($transientNote) – auto-resume from $received in ${delayMs}ms (attempt $attempt/$maxDownloadAttempts)',
         );
         await Future.delayed(Duration(milliseconds: delayMs));
+        }
+      } else {
+        await _inferLog('complete partial already on disk (${resumeOffset} bytes) — verifying');
+      }
+      // Defensive: a prior append-corruption could have left a >size file;
+      // truncate to the manifest size so verification can pass.
+      final preVerifyLen = await temporary.length();
+      if (preVerifyLen > _activeManifest.sizeBytes) {
+        await _inferLog('truncating over-size partial $preVerifyLen → ${_activeManifest.sizeBytes}');
+        final raf = await temporary.open(mode: FileMode.write);
+        await raf.truncate(_activeManifest.sizeBytes);
+        await raf.close();
       }
       _set(const LocalInferenceSnapshot(OnDeviceStatus.verifying));
       final downloadedLen = await temporary.length();

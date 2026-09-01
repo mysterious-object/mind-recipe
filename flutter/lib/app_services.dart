@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
+import 'package:package_info_plus/package_info_plus.dart';
 
 import 'visual_theme.dart';
 
@@ -864,6 +865,7 @@ class SecureAppState extends ChangeNotifier {
   static const _curriculumProgressKey = 'mind_recipe_curriculum_progress';
   static const _cloudModelKey = 'mind_recipe_cloud_model';
   static const _pendingCheckinsKey = 'mind_recipe_pending_checkins';
+  static const _sessionBuildKey = 'mind_recipe_session_build';
 
   AccountSession? session;
   String openRouterKey = '';
@@ -919,6 +921,7 @@ class SecureAppState extends ChangeNotifier {
         _storage.read(key: _legacyChimeraThemeKey),
         _storage.read(key: _legacyChimeraVfxThemeKey),
         _storage.read(key: _cloudModelKey),
+        _storage.read(key: _sessionBuildKey),
       ]);
       if ((values[0] ?? '').isNotEmpty) {
         session = AccountSession(
@@ -926,6 +929,29 @@ class SecureAppState extends ChangeNotifier {
           displayName: values[1] ?? 'Navigator',
           email: values[2] ?? '',
         );
+      }
+      // Build-scoped sessions: each new build (versionCode bump) asks for
+      // login. This makes staging builds reliably show the gateway after an
+      // update install (same applicationId keeps secure storage). Within the
+      // same build, sessions restore normally. Tests remain safe because
+      // PackageInfo may be unavailable in widget tests.
+      if (session != null) {
+        try {
+          final info = await PackageInfo.fromPlatform();
+          final currentBuild = info.buildNumber.trim();
+          final storedBuild = (values[12] ?? '').trim();
+          if (currentBuild.isNotEmpty && storedBuild != currentBuild) {
+            session = null;
+            await Future.wait([
+              _storage.delete(key: _tokenKey),
+              _storage.delete(key: _nameKey),
+              _storage.delete(key: _emailKey),
+              _storage.delete(key: _sessionBuildKey),
+            ]);
+          }
+        } catch (_) {
+          // PackageInfo unavailable in tests — keep the session.
+        }
       }
       openRouterKey = values[3] ?? '';
       if ((values[4] ?? '').isNotEmpty) {
@@ -1278,6 +1304,10 @@ class SecureAppState extends ChangeNotifier {
       await _storage.write(key: _tokenKey, value: value.token);
       await _storage.write(key: _nameKey, value: value.displayName);
       await _storage.write(key: _emailKey, value: value.email);
+      try {
+        final info = await PackageInfo.fromPlatform();
+        await _storage.write(key: _sessionBuildKey, value: info.buildNumber);
+      } catch (_) {}
     } catch (_) {
       // The authenticated in-memory session remains usable if platform secure
       // storage is temporarily unavailable; the user can sign in next launch.
@@ -1349,6 +1379,7 @@ class SecureAppState extends ChangeNotifier {
       _storage.delete(key: _nameKey),
       _storage.delete(key: _emailKey),
       _storage.delete(key: _assistantActivityKey),
+      _storage.delete(key: _sessionBuildKey),
     ]);
     notifyListeners();
   }
@@ -1359,6 +1390,7 @@ class SecureAppState extends ChangeNotifier {
       _storage.delete(key: _tokenKey),
       _storage.delete(key: _nameKey),
       _storage.delete(key: _emailKey),
+      _storage.delete(key: _sessionBuildKey),
     ]);
     notifyListeners();
   }

@@ -55,6 +55,13 @@ const visualThemeSpecs = {
   'obsidian-forge': [0xef6736, 0xffb04b, 0x873b2f, 0x140909, 'cinematic', .38, .24, .065],
   'orchid-vapor': [0xdb54e8, 0x7ee9ff, 0xc5a0ff, 0x160b20, 'holographic', .52, .64, .03],
   'tidal-glass': [0x00c6dc, 0xe3ffff, 0x45dcb4, 0x031d25, 'trading', .30, .58, .015],
+  // ── Restored Darkstar project themes (missing in 2107) ───────────
+  'chimera-native': [0x00e5cc, 0x7c3aed, 0x7defff, 0x041214, 'full', .42, .48, .025],
+  'verdant': [0x007d71, 0x7c3aed, 0x00e68a, 0x04140f, 'full', .40, .48, .022],
+  'aurora-borealis': [0x00e68a, 0x7c3aed, 0x7defff, 0x05101d, 'full', .46, .52, .024],
+  'deep-ocean': [0x006d91, 0x315da8, 0x7defff, 0x041019, 'full', .30, .50, .015],
+  'ember': [0xa34213, 0xc26a00, 0xff8e3a, 0x140a05, 'trading', .44, .30, .05],
+  'twilight': [0x4648a3, 0x7651a8, 0xb8a1ff, 0x07071a, 'minimal', .30, .55, .014],
 };
 
 const sourceThemePresets = {

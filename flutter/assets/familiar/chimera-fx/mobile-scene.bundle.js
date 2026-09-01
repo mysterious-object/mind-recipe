@@ -1,6 +1,6 @@
 "use strict";
 (() => {
-  // flutter/assets/familiar/three.core.min.js
+  // assets/familiar/three.core.min.js
   var t = "185";
   var i = 0;
   var r = 1;
@@ -6801,7 +6801,7 @@
   }
   "undefined" != typeof __THREE_DEVTOOLS__ && __THREE_DEVTOOLS__.dispatchEvent(new CustomEvent("register", { detail: { revision: t } })), "undefined" != typeof window && (window.__THREE__ ? ai("WARNING: Multiple instances of Three.js being imported.") : window.__THREE__ = t);
 
-  // flutter/assets/familiar/three.module.min.js
+  // assets/familiar/three.module.min.js
   function On2() {
     let e2 = null, t2 = false, n2 = null, i2 = null;
     function r2(t3, a2) {
@@ -10479,7 +10479,7 @@
     }
   };
 
-  // flutter/assets/familiar/three-addons/shaders/CopyShader.js
+  // assets/familiar/three-addons/shaders/CopyShader.js
   var CopyShader = {
     name: "CopyShader",
     uniforms: {
@@ -10519,7 +10519,7 @@
     )
   };
 
-  // flutter/assets/familiar/three-addons/postprocessing/Pass.js
+  // assets/familiar/three-addons/postprocessing/Pass.js
   var Pass = class {
     /**
      * Constructs a new pass.
@@ -10610,7 +10610,7 @@
     }
   };
 
-  // flutter/assets/familiar/three-addons/postprocessing/ShaderPass.js
+  // assets/familiar/three-addons/postprocessing/ShaderPass.js
   var ShaderPass = class extends Pass {
     /**
      * Constructs a new shader pass.
@@ -10675,7 +10675,7 @@
     }
   };
 
-  // flutter/assets/familiar/three-addons/postprocessing/MaskPass.js
+  // assets/familiar/three-addons/postprocessing/MaskPass.js
   var MaskPass = class extends Pass {
     /**
      * Constructs a new mask pass.
@@ -10763,7 +10763,7 @@
     }
   };
 
-  // flutter/assets/familiar/three-addons/postprocessing/EffectComposer.js
+  // assets/familiar/three-addons/postprocessing/EffectComposer.js
   var EffectComposer = class {
     /**
      * Constructs a new effect composer.
@@ -10948,7 +10948,7 @@
     }
   };
 
-  // flutter/assets/familiar/three-addons/postprocessing/RenderPass.js
+  // assets/familiar/three-addons/postprocessing/RenderPass.js
   var RenderPass = class extends Pass {
     /**
      * Constructs a new render pass.
@@ -11021,7 +11021,7 @@
     }
   };
 
-  // flutter/assets/familiar/three-addons/shaders/LuminosityHighPassShader.js
+  // assets/familiar/three-addons/shaders/LuminosityHighPassShader.js
   var LuminosityHighPassShader = {
     name: "LuminosityHighPassShader",
     uniforms: {
@@ -11073,7 +11073,7 @@
     )
   };
 
-  // flutter/assets/familiar/three-addons/postprocessing/UnrealBloomPass.js
+  // assets/familiar/three-addons/postprocessing/UnrealBloomPass.js
   var UnrealBloomPass = class _UnrealBloomPass extends Pass {
     /**
      * Constructs a new Unreal Bloom pass.
@@ -11403,7 +11403,7 @@
   UnrealBloomPass.BlurDirectionX = new _i(1, 0);
   UnrealBloomPass.BlurDirectionY = new _i(0, 1);
 
-  // flutter/assets/familiar/chimera-fx/core/StateMachine.js
+  // assets/familiar/chimera-fx/core/StateMachine.js
   var StateMachine = class {
     constructor(opts = {}) {
       this.states = opts.states || {};
@@ -11448,7 +11448,7 @@
     }
   };
 
-  // flutter/assets/familiar/chimera-fx/postfx/ChromaticAberrationShader.js
+  // assets/familiar/chimera-fx/postfx/ChromaticAberrationShader.js
   var ChromaticAberrationShader = {
     name: "ChromaticAberration",
     uniforms: { tDiffuse: { value: null }, uIntensity: { value: 3e-3 }, uDirection: { value: [1, 0] } },
@@ -11456,7 +11456,7 @@
     fragmentShader: `uniform sampler2D tDiffuse; uniform float uIntensity; uniform vec2 uDirection; varying vec2 vUv; void main() { vec2 offset = uIntensity * normalize(vUv - 0.5); float r = texture2D(tDiffuse, vUv + offset).r; float g = texture2D(tDiffuse, vUv).g; float b = texture2D(tDiffuse, vUv - offset).b; float a = texture2D(tDiffuse, vUv).a; gl_FragColor = vec4(r, g, b, a); }`
   };
 
-  // flutter/assets/familiar/chimera-fx/postfx/FilmGrainShader.js
+  // assets/familiar/chimera-fx/postfx/FilmGrainShader.js
   var FilmGrainShader = {
     name: "FilmGrain",
     uniforms: { tDiffuse: { value: null }, uTime: { value: 0 }, uIntensity: { value: 0.08 }, uSize: { value: 1.5 } },
@@ -11464,7 +11464,7 @@
     fragmentShader: `uniform sampler2D tDiffuse; uniform float uTime; uniform float uIntensity; uniform float uSize; varying vec2 vUv; float hash(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); } void main() { vec4 color = texture2D(tDiffuse, vUv); vec2 grainUv = vUv * uSize + uTime * vec2(12.9898, 78.233); float grain = hash(grainUv) * 2.0 - 1.0; float lum = dot(color.rgb, vec3(0.299, 0.587, 0.114)); color.rgb += grain * uIntensity * mix(1.0, 0.3, lum); gl_FragColor = color; }`
   };
 
-  // flutter/assets/familiar/chimera-fx/postfx/GlitchShader.js
+  // assets/familiar/chimera-fx/postfx/GlitchShader.js
   var GlitchShader = {
     name: "Glitch",
     uniforms: { tDiffuse: { value: null }, uTime: { value: 0 }, uIntensity: { value: 0 }, uResolution: { value: [1920, 1080] } },
@@ -11472,7 +11472,7 @@
     fragmentShader: `uniform sampler2D tDiffuse; uniform float uTime; uniform float uIntensity; uniform vec2 uResolution; varying vec2 vUv; float hash(float n) { return fract(sin(n) * 43758.5453); } float blockNoise(vec2 uv, float blockSize) { vec2 block = floor(uv * blockSize); return hash(block.x + block.y * 337.0 + floor(uTime * 8.0) * 1777.0); } void main() { vec2 uv = vUv; float scanLine = step(0.98, hash(floor(uv.y * 200.0) + uTime * 17.0)); uv.x += scanLine * (hash(uTime * 3.0 + uv.y) - 0.5) * 0.08 * uIntensity; float blockVal = blockNoise(uv, 8.0); uv.x += step(0.92, blockVal) * uIntensity * (hash(blockVal * 100.0 + uTime) - 0.5) * 0.1; float shift = uIntensity * 0.01; vec4 cr = texture2D(tDiffuse, uv + vec2(shift, 0.0)); vec4 cg = texture2D(tDiffuse, uv); vec4 cb = texture2D(tDiffuse, uv - vec2(shift, 0.0)); vec4 color = vec4(cr.r, cg.g, cb.b, cg.a); float noise = hash(uv.x * 10000.0 + uv.y * 10000.0 + uTime * 100.0); color.rgb = mix(color.rgb, vec3(noise), step(0.97, blockNoise(uv, 4.0)) * uIntensity * 0.5); color.rgb *= 1.0 - step(0.95, hash(floor(uTime * 20.0))) * uIntensity * 0.3; gl_FragColor = color; }`
   };
 
-  // flutter/assets/familiar/chimera-fx/core/Engine.js
+  // assets/familiar/chimera-fx/core/Engine.js
   var Engine = class {
     constructor(opts = {}) {
       this.container = typeof opts.container === "string" ? document.querySelector(opts.container) : opts.container || document.body;
@@ -11674,7 +11674,7 @@
     }
   };
 
-  // flutter/assets/familiar/chimera-fx/components/ParticleNebula.js
+  // assets/familiar/chimera-fx/components/ParticleNebula.js
   var PARTICLE_VERT = (
     /* glsl */
     `
@@ -11878,7 +11878,7 @@
     }
   };
 
-  // flutter/assets/familiar/chimera-fx/components/EnergyTendrils.js
+  // assets/familiar/chimera-fx/components/EnergyTendrils.js
   var TENDRIL_VERT = (
     /* glsl */
     `
@@ -12046,7 +12046,7 @@
     }
   };
 
-  // flutter/assets/familiar/chimera-fx/components/DataRivers.js
+  // assets/familiar/chimera-fx/components/DataRivers.js
   var RIVER_VERT = (
     /* glsl */
     `
@@ -12219,7 +12219,7 @@
     }
   };
 
-  // flutter/assets/familiar/chimera-fx/components/VolumetricLight.js
+  // assets/familiar/chimera-fx/components/VolumetricLight.js
   var VOLUME_FRAG = (
     /* glsl */
     `
@@ -12367,7 +12367,7 @@
     }
   };
 
-  // flutter/assets/familiar/chimera-fx/components/LiquidMetal.js
+  // assets/familiar/chimera-fx/components/LiquidMetal.js
   var METAL_FRAG = (
     /* glsl */
     `
@@ -12571,7 +12571,7 @@
     }
   };
 
-  // flutter/assets/familiar/chimera-fx/components/ReactionDiffusion.js
+  // assets/familiar/chimera-fx/components/ReactionDiffusion.js
   var COMPUTE_FRAG = (
     /* glsl */
     `
@@ -12817,7 +12817,7 @@
     }
   };
 
-  // flutter/assets/familiar/chimera-fx/components/VoronoiShatter.js
+  // assets/familiar/chimera-fx/components/VoronoiShatter.js
   var VORONOI_FRAG = (
     /* glsl */
     `
@@ -12999,7 +12999,7 @@
     }
   };
 
-  // flutter/assets/familiar/chimera-fx/components/HoloHUD.js
+  // assets/familiar/chimera-fx/components/HoloHUD.js
   var HUD_FRAG = (
     /* glsl */
     `
@@ -13162,7 +13162,7 @@
     }
   };
 
-  // flutter/assets/familiar/chimera-fx/components/EnergyBeams.js
+  // assets/familiar/chimera-fx/components/EnergyBeams.js
   var BEAM_FRAG = (
     /* glsl */
     `
@@ -13369,7 +13369,7 @@
     }
   };
 
-  // flutter/assets/familiar/chimera-fx/components/IridescentOrb.js
+  // assets/familiar/chimera-fx/components/IridescentOrb.js
   var ORB_FRAG = (
     /* glsl */
     `
@@ -13609,7 +13609,7 @@
     }
   };
 
-  // flutter/assets/familiar/chimera-fx/themes/cyberpunk-neon.js
+  // assets/familiar/chimera-fx/themes/cyberpunk-neon.js
   var CyberpunkNeon = {
     name: "cyberpunk-neon",
     // Core palette
@@ -13677,7 +13677,7 @@
     }
   };
 
-  // flutter/assets/familiar/chimera-fx/themes/organic-bioluminescent.js
+  // assets/familiar/chimera-fx/themes/organic-bioluminescent.js
   var OrganicBioluminescent = {
     name: "organic-bioluminescent",
     colors: {
@@ -13741,7 +13741,7 @@
     }
   };
 
-  // flutter/assets/familiar/chimera-fx/themes/quantum-void.js
+  // assets/familiar/chimera-fx/themes/quantum-void.js
   var QuantumVoid = {
     name: "quantum-void",
     colors: {
@@ -13805,7 +13805,7 @@
     }
   };
 
-  // flutter/assets/familiar/chimera-fx/themes/holographic-matrix.js
+  // assets/familiar/chimera-fx/themes/holographic-matrix.js
   var HolographicMatrix = {
     name: "holographic-matrix",
     colors: {
@@ -13871,7 +13871,7 @@
     }
   };
 
-  // flutter/assets/familiar/chimera-fx/themes/chimera-native.js
+  // assets/familiar/chimera-fx/themes/chimera-native.js
   var ChimeraNative = {
     name: "chimera-native",
     colors: {
@@ -13942,7 +13942,7 @@
     }
   };
 
-  // flutter/assets/familiar/chimera-fx/chimera-fx-bundle.js
+  // assets/familiar/chimera-fx/chimera-fx-bundle.js
   var COMPONENTS = { nebula: ParticleNebula, "particle-nebula": ParticleNebula, tendrils: EnergyTendrils, "energy-tendrils": EnergyTendrils, rivers: DataRivers, "data-rivers": DataRivers, volumetric: VolumetricLight, "volumetric-light": VolumetricLight, metal: LiquidMetal, "liquid-metal": LiquidMetal, reaction: ReactionDiffusion, "reaction-diffusion": ReactionDiffusion, voronoi: VoronoiShatter, "voronoi-shatter": VoronoiShatter, hud: HoloHUD, "holo-hud": HoloHUD, beams: EnergyBeams, "energy-beams": EnergyBeams, orb: IridescentOrb, "iridescent-orb": IridescentOrb };
   var THEMES = { "cyberpunk-neon": CyberpunkNeon, "organic-bioluminescent": OrganicBioluminescent, "quantum-void": QuantumVoid, "holographic-matrix": HolographicMatrix, "chimera-native": ChimeraNative };
   var PRESETS2 = { full: ["nebula", "tendrils", "rivers", "volumetric", "reaction", "voronoi", "hud", "beams", "orb"], lite: ["nebula", "tendrils", "hud"], trading: ["rivers", "tendrils", "voronoi", "hud", "beams"], cinematic: ["nebula", "volumetric", "metal", "reaction", "orb"], holographic: ["orb", "hud", "beams", "tendrils", "rivers"], minimal: ["nebula"] };
@@ -13969,7 +13969,7 @@
   window.ChimeraFX = ChimeraFX;
   var chimera_fx_bundle_default = ChimeraFX;
 
-  // flutter/assets/familiar/chimera-fx/mobile-scene.js
+  // assets/familiar/chimera-fx/mobile-scene.js
   var bridge = (value) => {
     for (const name of ["BackgroundBridge", "FamiliarBridge", "IntroBridge"]) {
       try {
@@ -14022,7 +14022,14 @@
     "aurora": [2354603, 10114815, 16741560, 463133, "full", 0.48, 0.5, 0.026],
     "obsidian-forge": [15689526, 16756811, 8862511, 1313033, "cinematic", 0.38, 0.24, 0.065],
     "orchid-vapor": [14374120, 8317439, 12951807, 1444640, "holographic", 0.52, 0.64, 0.03],
-    "tidal-glass": [50908, 14942207, 4578484, 204069, "trading", 0.3, 0.58, 0.015]
+    "tidal-glass": [50908, 14942207, 4578484, 204069, "trading", 0.3, 0.58, 0.015],
+    // ── Restored Darkstar project themes (missing in 2107) ───────────
+    "chimera-native": [58828, 8141549, 8253439, 266772, "full", 0.42, 0.48, 0.025],
+    "verdant": [32113, 8141549, 59018, 267279, "full", 0.4, 0.48, 0.022],
+    "aurora-borealis": [59018, 8141549, 8253439, 331805, "full", 0.46, 0.52, 0.024],
+    "deep-ocean": [28049, 3235240, 8253439, 266265, "full", 0.3, 0.5, 0.015],
+    "ember": [10699283, 12741120, 16748090, 1313285, "trading", 0.44, 0.3, 0.05],
+    "twilight": [4606115, 7754152, 12100095, 460570, "minimal", 0.3, 0.55, 0.014]
   };
   var sourceThemePresets = {
     "chimera-native": "full",
