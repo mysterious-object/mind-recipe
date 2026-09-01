@@ -65,7 +65,6 @@ class _MindRecipeAppState extends State<MindRecipeApp> {
           await appState.setSession(verified);
         }
       }
-      await appState.flushPendingCheckIns(api);
       appState.setManagedAiAvailable(await api.aiAvailable());
     } finally {
       if (mounted) setState(() => _initializing = false);
