@@ -1,6 +1,7 @@
 import * as THREE from './three.module.min.js';
 
-const isIntro = window.MIND_RECIPE_SCENE_MODE === 'intro';
+const sceneMode = document.body?.dataset.sceneMode || window.MIND_RECIPE_SCENE_MODE || 'compact';
+const isIntro = sceneMode === 'intro';
 const renderer = new THREE.WebGLRenderer({
   alpha: true,
   antialias: true,

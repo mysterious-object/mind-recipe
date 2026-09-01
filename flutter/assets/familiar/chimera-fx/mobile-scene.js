@@ -11,7 +11,7 @@ const bridge = value => {
   }
 };
 
-const sceneKind = window.MIND_RECIPE_SCENE_MODE || 'pulse';
+const sceneKind = document.body?.dataset.sceneMode || window.MIND_RECIPE_SCENE_MODE || 'pulse';
 const host = document.getElementById('stage') || document.body;
 let engine = null;
 let activeTheme = 'chimera-native';
