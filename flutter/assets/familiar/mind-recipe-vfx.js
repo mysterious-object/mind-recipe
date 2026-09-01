@@ -669,7 +669,7 @@ const ChimeraVFX = (() => {
 if (document.readyState==='loading') document.addEventListener('DOMContentLoaded', ChimeraVFX.init);
 else ChimeraVFX.init();
 
-// Mind Recipe's native bridge deliberately uses the existing Darkstar VFX
+// Mind Recipe's native bridge deliberately uses the bundled VFX
 // controls; it does not replace or redraw the shader system.
 function mindRecipeBridge(message) {
     for (const name of ['BackgroundBridge', 'IntroBridge', 'FamiliarBridge']) {
@@ -684,14 +684,14 @@ function mindRecipeApply(state) {
     ChimeraVFX.setAI(Math.max(0, Math.min(1, (progress + activation) / 2)));
     ChimeraVFX.setThinking(progress > .28 || activation > .72);
     const palettes = {
-        // The original five Darkstar theme modules.
+        // The original five source theme modules.
         'chimera-native': [[0.0,.898,.800],[0.0,.902,.541],[.486,.227,.929]],
         'cyberpunk-neon': [[1.0,0.0,.400],[.224,1.0,.078],[0.0,1.0,1.0]],
         'organic-bioluminescent': [[0.0,.898,1.0],[.463,1.0,.012],[1.0,.671,0.0]],
         'quantum-void': [[.486,.302,1.0],[1.0,.431,.251],[.267,.541,1.0]],
         'holographic-matrix': [[0.0,1.0,.255],[1.0,.251,.506],[0.0,.737,.831]],
         // Additional high-separation color banks for the full mobile scene set.
-        'darkstar-cyan': [[0.0,.961,1.0],[0.0,.659,1.0],[.718,.949,1.0]],
+        'oceanic-cyan': [[0.0,.961,1.0],[0.0,.659,1.0],[.718,.949,1.0]],
         'solar-ember': [[1.0,.310,.050],[1.0,.760,.080],[.480,.020,.010]],
         'deep-ocean': [[0.0,.700,.850],[.010,.250,.500],[.050,.950,.700]],
         'aurora-spectrum': [[.150,1.0,.650],[.600,.250,1.0],[1.0,.150,.650]],

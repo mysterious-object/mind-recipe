@@ -1,6 +1,6 @@
-// Native bridge for the original Darkstar Chimera FX engine.
+// Native bridge for the locally bundled Chimera FX engine.
 // This file is bundled for mobile WebViews so the engine and all five official
-// Darkstar themes load as one local script, with no module-resolution or
+// Source visual themes load as one local script, with no module-resolution or
 // network dependency.
 import ChimeraFX from './chimera-fx-bundle.js';
 import * as THREE from '../three.module.min.js';
@@ -96,10 +96,10 @@ for (const [name, [primaryHex, secondaryHex, tertiaryHex, backgroundHex, _preset
   });
 }
 
-// The original Darkstar ray-marched IridescentOrb is retained in the engine,
+// The original ray-marched IridescentOrb is retained in the engine,
 // but some mobile WebViews compile it without drawing its surface. This is a
-// geometry-backed Three.js familiar that runs in that same Darkstar scene and
-// uses the exact selected Darkstar theme. It is deliberately not a Flutter
+// geometry-backed Three.js familiar that runs in that same Three.js scene and
+// uses the exact selected visual theme. It is deliberately not a Flutter
 // imitation or a canvas fallback.
 class EvolvingOrb {
   constructor(seed = 17) {
@@ -214,7 +214,7 @@ class EvolvingOrb {
 }
 
 function seededCreate(seed, create) {
-  // Darkstar components use Math.random while creating their visual genome.
+  // Components use Math.random while creating their visual genome.
   // Supplying a stable per-member seed makes the familiar recognizably theirs
   // across launches without collecting any additional personal information.
   const original = Math.random;
@@ -241,7 +241,7 @@ function optionsFor(kind) {
     container: host,
     fps: 30,
     theme: activeTheme,
-    // The mobile-safe geometry orb is added after the Darkstar engine starts.
+    // The mobile-safe geometry orb is added after the engine starts.
     // Avoid creating the unsupported ray-marched shader orb on this route.
     components: ['nebula', 'tendrils', 'rivers', 'hud'],
     nebula: { count: 1350, spread: 31 },

@@ -14225,7 +14225,7 @@
       container: host,
       fps: 30,
       theme: activeTheme,
-      // The mobile-safe geometry orb is added after the Darkstar engine starts.
+      // The mobile-safe geometry orb is added after the engine starts.
       // Avoid creating the unsupported ray-marched shader orb on this route.
       components: ["nebula", "tendrils", "rivers", "hud"],
       nebula: { count: 1350, spread: 31 },

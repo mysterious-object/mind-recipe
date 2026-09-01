@@ -593,6 +593,7 @@ class SecureAppState extends ChangeNotifier {
       appearanceMode = const {'system', 'light', 'dark'}.contains(values[7])
           ? values[7]!
           : 'system';
+      final storedChimeraTheme = values[8];
       chimeraTheme =
           const {
             'chimera-native',
@@ -600,15 +601,15 @@ class SecureAppState extends ChangeNotifier {
             'organic-bioluminescent',
             'quantum-void',
             'holographic-matrix',
-            'darkstar-cyan',
+            'oceanic-cyan',
             'solar-ember',
             'deep-ocean',
             'aurora-spectrum',
             'crimson-pulse',
             'monochrome-glass',
             'ultraviolet-bloom',
-          }.contains(values[8])
-          ? values[8]!
+          }.contains(storedChimeraTheme)
+          ? storedChimeraTheme!
           : 'chimera-native';
       chimeraVfxTheme = _visualTheme(values[9]);
       chimeraFxEnabled = values[10] != 'false';
@@ -923,7 +924,7 @@ class SecureAppState extends ChangeNotifier {
       'organic-bioluminescent',
       'quantum-void',
       'holographic-matrix',
-      'darkstar-cyan',
+      'oceanic-cyan',
       'solar-ember',
       'deep-ocean',
       'aurora-spectrum',

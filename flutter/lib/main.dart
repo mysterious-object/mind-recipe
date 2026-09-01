@@ -65,6 +65,7 @@ class _MindRecipeAppState extends State<MindRecipeApp> {
           await appState.setSession(verified);
         }
       }
+      await appState.flushPendingCheckIns(api);
       appState.setManagedAiAvailable(await api.aiAvailable());
     } finally {
       if (mounted) setState(() => _initializing = false);
@@ -109,7 +110,7 @@ class _MindRecipeAppState extends State<MindRecipeApp> {
         const Color(0xff00bcd4),
         const Color(0xffff4081),
       ),
-      'darkstar-cyan' => (
+      'oceanic-cyan' => (
         const Color(0xff00f5ff),
         const Color(0xff00a8ff),
         const Color(0xffb7f2ff),
@@ -1875,8 +1876,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 colors: [Color(0xff00ff41), Color(0xff00bcd4)],
               ),
               (
-                id: 'darkstar-cyan',
-                name: 'Darkstar Cyan',
+                id: 'oceanic-cyan',
+                name: 'Oceanic Cyan',
                 description: 'Electric cyan, arctic blue, and glass white',
                 colors: [Color(0xff00f5ff), Color(0xff00a8ff)],
               ),

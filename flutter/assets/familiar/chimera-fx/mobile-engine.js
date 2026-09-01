@@ -1,4 +1,4 @@
-/* App bridge only. Rendering is performed exclusively by Darkstar's
+/* App bridge only. Rendering is performed exclusively by Mind Recipe's
  * chimera-fx-bundle.js factory and Engine post-processing pipeline. */
 import ChimeraFX from './chimera-fx-bundle.js';
 

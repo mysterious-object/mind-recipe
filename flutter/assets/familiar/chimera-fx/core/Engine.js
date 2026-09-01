@@ -1,5 +1,5 @@
 /**
- * Darkstar Chimera FX engine. This is the library renderer: Three core,
+ * Mind Recipe visual engine. This is the library renderer: Three core,
  * original effect composer, AI state machine, component registry and themes.
  */
 import * as THREE from '../../three.module.min.js';
