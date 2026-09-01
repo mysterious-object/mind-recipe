@@ -44,7 +44,7 @@ function backgroundPreset(value) {
 // visual systems are full renderer themes—not palette aliases. Each has its
 // own fog, post-processing, component colors, and preferred composition.
 const visualThemeSpecs = {
-  'mind-recipe-orbit': [0x00d9c0, 0x8b5cf6, 0xf5b942, 0x06151b, 'full', .42, .46, .025],
+  'mind-recipe-orbit': [0x00d9c0, 0x8b5cf6, 0xf5b942, 0x06151b, 'lite', .42, .46, .025],
   'midnight-signal': [0x147bff, 0x00edac, 0xa98cff, 0x020719, 'trading', .30, .32, .018],
   'neon-ronin': [0xee2c74, 0x7038ff, 0x4fdfff, 0x160414, 'holographic', .58, .35, .05],
   'abyssal-current': [0x0077ff, 0x00e3d2, 0x75ffd9, 0x000f25, 'cinematic', .32, .68, .018],

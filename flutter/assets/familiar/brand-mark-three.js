@@ -148,11 +148,31 @@ for (let i = 0; i < 5; i++) {
   orbitals.push(ring);
 }
 
-const markMaterial = new THREE.MeshBasicMaterial({
+const markMaterial = new THREE.ShaderMaterial({
   transparent: true,
   depthWrite: false,
-  opacity: 0,
-  toneMapped: false,
+  uniforms: {
+    uMap: { value: null },
+    uOpacity: { value: 0 },
+  },
+  vertexShader: `
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+  fragmentShader: `
+    precision highp float;
+    uniform sampler2D uMap;
+    uniform float uOpacity;
+    varying vec2 vUv;
+    void main() {
+      vec4 texel = texture2D(uMap, vUv);
+      if (texel.a < 0.015) discard;
+      gl_FragColor = vec4(texel.rgb, texel.a * uOpacity);
+    }
+  `,
 });
 const mark = new THREE.Mesh(new THREE.PlaneGeometry(3.72, 3.72), markMaterial);
 mark.position.z = 0.72;
@@ -163,7 +183,7 @@ new THREE.TextureLoader().load(
   (texture) => {
     texture.colorSpace = THREE.SRGBColorSpace;
     texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
-    markMaterial.map = texture;
+    markMaterial.uniforms.uMap.value = texture;
     markMaterial.needsUpdate = true;
     try { window.BrandBridge?.postMessage('ready'); } catch (_) {}
     try { window.IntroBridge?.postMessage('brand_ready'); } catch (_) {}
@@ -214,7 +234,7 @@ function frame() {
   });
   const breathe = 0.96 + Math.sin(t * 0.82) * 0.025;
   root.scale.setScalar((root.userData.baseScale || 1) * breathe);
-  markMaterial.opacity = Math.min(1, revealed * 1.18);
+  markMaterial.uniforms.uOpacity.value = Math.min(1, revealed * 1.18);
   mark.position.y = Math.sin(t * 0.64 + variant) * 0.035;
   renderer.render(scene, camera);
 }

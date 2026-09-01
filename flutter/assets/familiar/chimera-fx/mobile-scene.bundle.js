@@ -14018,7 +14018,7 @@
     return legacyPresetMap[value] || "full";
   }
   var visualThemeSpecs = {
-    "mind-recipe-orbit": [55744, 9133302, 16103746, 398619, "full", 0.42, 0.46, 0.025],
+    "mind-recipe-orbit": [55744, 9133302, 16103746, 398619, "lite", 0.42, 0.46, 0.025],
     "midnight-signal": [1342463, 60844, 11111679, 132889, "trading", 0.3, 0.32, 0.018],
     "neon-ronin": [15608948, 7354623, 5234687, 1442836, "holographic", 0.58, 0.35, 0.05],
     "abyssal-current": [30719, 58322, 7733209, 3877, "cinematic", 0.32, 0.68, 0.018],

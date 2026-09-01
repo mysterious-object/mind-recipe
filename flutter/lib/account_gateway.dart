@@ -186,7 +186,7 @@ class _AccountGatewayState extends State<AccountGateway> {
                 constraints: const BoxConstraints(maxWidth: 460),
                 child: Card(
                   color: Theme.of(context).colorScheme.surface
-                      .withValues(alpha: 0.92),
+                      .withValues(alpha: 0.82),
                   child: Padding(
                     padding: const EdgeInsets.all(24),
                     child: Column(
@@ -194,25 +194,12 @@ class _AccountGatewayState extends State<AccountGateway> {
                       children: [
                         SizedBox(
                           height: 196,
-                          child: Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              Positioned.fill(
-                                child: ThreeBackground(
-                                  variant: widget.appState.chimeraFxVariant,
-                                  progress: creating ? .34 : .16,
-                                  intensity: .9,
-                                  theme: widget.appState.chimeraVfxTheme,
-                                ),
-                              ),
-                              ThreeBrandMark(
-                                variant: creating
-                                    ? 4
-                                    : resetting
-                                    ? 8
-                                    : 1,
-                              ),
-                            ],
+                          child: ThreeBrandMark(
+                            variant: creating
+                                ? 4
+                                : resetting
+                                ? 8
+                                : 1,
                           ),
                         ),
                         const SizedBox(height: 18),
