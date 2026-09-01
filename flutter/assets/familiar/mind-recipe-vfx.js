@@ -698,11 +698,40 @@ function mindRecipeApply(state) {
         'crimson-pulse': [[1.0,.050,.120],[.750,0.0,.380],[1.0,.600,.050]],
         'monochrome-glass': [[.900,.960,1.0],[.480,.550,.620],[1.0,1.0,1.0]],
         'ultraviolet-bloom': [[.620,.100,1.0],[.200,.800,1.0],[1.0,.100,.750]],
+        // Living VFX catalog used by the app-wide background and Pulse.
+        'mind-recipe-orbit': [[0.0,.851,.753],[.545,.361,.965],[.961,.725,.259]],
+        'midnight-signal': [[.078,.482,1.0],[0.0,.929,.675],[.663,.549,1.0]],
+        'neon-ronin': [[.933,.173,.455],[.439,.220,1.0],[.310,.875,1.0]],
+        'abyssal-current': [[0.0,.467,1.0],[0.0,.890,.824],[.459,1.0,.851]],
+        'solar-flare': [[1.0,.616,0.0],[1.0,.812,.361],[1.0,.302,.137]],
+        'void-walker': [[.275,.188,.710],[.616,.447,1.0],[.773,.702,1.0]],
+        'crystal-matrix': [[.459,.969,1.0],[.914,.996,1.0],[.357,.659,.788]],
+        'aurora': [[.137,.929,.671],[.604,.337,1.0],[1.0,.455,.722]],
+        'obsidian-forge': [[.937,.404,.212],[1.0,.690,.294],[.529,.231,.184]],
+        'orchid-vapor': [[.859,.329,.910],[.494,.914,1.0],[.773,.627,1.0]],
+        'tidal-glass': [[0.0,.776,.863],[.890,1.0,1.0],[.271,.863,.706]],
     };
     const palette = palettes[state?.theme] || palettes['chimera-native'];
     ChimeraVFX.setPalette(palette[0], palette[1], palette[2]);
-    const variantIndex = mindRecipeVariants.indexOf(state?.variant);
-    if (variantIndex >= 0) ChimeraVFX.setVariant(variantIndex);
+    const themeVariants = {
+        'mind-recipe-orbit': 0, 'chimera-native': 1,
+        'cyberpunk-neon': 7, 'organic-bioluminescent': 4,
+        'quantum-void': 6, 'holographic-matrix': 5,
+        'midnight-signal': 2, 'neon-ronin': 3,
+        'abyssal-current': 10, 'solar-flare': 9,
+        'void-walker': 6, 'crystal-matrix': 7,
+        'aurora': 8, 'obsidian-forge': 9,
+        'orchid-vapor': 3, 'tidal-glass': 10,
+    };
+    const presetVariants = {
+        full: 0, lite: 1, trading: 2,
+        cinematic: 4, holographic: 5, minimal: 6,
+    };
+    const namedVariant = mindRecipeVariants.indexOf(state?.variant);
+    const variantIndex = namedVariant >= 0
+        ? namedVariant
+        : ((themeVariants[state?.theme] ?? 0) + (presetVariants[state?.variant] ?? 0)) % mindRecipeVariants.length;
+    ChimeraVFX.setVariant(variantIndex);
     if (progress > .72) ChimeraVFX.pulse();
 }
 window.setBackgroundState = mindRecipeApply;
