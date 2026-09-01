@@ -108,11 +108,13 @@ class _PulseScreenState extends State<PulseScreen> with WidgetsBindingObserver {
   bool _loading = true;
   Timer? _rendererDeadline;
   late _FamiliarState _familiar;
+  late String _lastVfxTheme;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _lastVfxTheme = widget.appState.chimeraVfxTheme;
     _familiar = _FamiliarState.initial(
       widget.appState.session?.email ?? 'local-member',
     );
@@ -126,6 +128,15 @@ class _PulseScreenState extends State<PulseScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     _controller?.runJavaScript('window.setFamiliarPaused(true)');
     super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant PulseScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final nextTheme = widget.appState.chimeraVfxTheme;
+    if (nextTheme == _lastVfxTheme) return;
+    _lastVfxTheme = nextTheme;
+    unawaited(_sendState());
   }
 
   @override
