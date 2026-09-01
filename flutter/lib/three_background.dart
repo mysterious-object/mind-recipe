@@ -37,7 +37,10 @@ class _ThreeBackgroundState extends State<ThreeBackground>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _open();
-    _deadline = Timer(const Duration(seconds: 5), () {
+    // The full local VFX catalog compiles several shader/component programs.
+    // Older mobile WebViews can legitimately need more than five seconds on
+    // first launch, especially while another WebView is warming up.
+    _deadline = Timer(const Duration(seconds: 12), () {
       if (mounted && !_ready) setState(() => _failed = true);
     });
   }
@@ -76,8 +79,18 @@ class _ThreeBackgroundState extends State<ThreeBackground>
               return;
             }
             _deadline?.cancel();
-            _ready = true;
-            _send();
+            if (mounted) {
+              // A renderer that completes after the watchdog fired is still a
+              // valid renderer. Recover the WebView instead of leaving the
+              // live background permanently replaced by an empty box.
+              setState(() {
+                _ready = true;
+                _failed = false;
+              });
+            } else {
+              _ready = true;
+            }
+            unawaited(_send());
           },
         )
         ..loadFlutterAsset('assets/familiar/background.html');
