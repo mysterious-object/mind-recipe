@@ -15,8 +15,8 @@ const sceneKind = document.body?.dataset.sceneMode || window.MIND_RECIPE_SCENE_M
 const host = document.getElementById('stage') || document.body;
 let engine = null;
 let activeTheme = 'chimera-native';
-let activePreset = 'full';
-let requestedPreset = 'full';
+let activePreset = 'lite';
+let requestedPreset = 'lite';
 let lastState = {};
 
 // This is the source Chimera FX background catalog.  Keep the identifiers in
@@ -63,6 +63,20 @@ const sourceThemePresets = {
   'organic-bioluminescent': 'cinematic',
   'quantum-void': 'minimal',
   'holographic-matrix': 'trading',
+};
+
+// These are the source renderer's named compositions with only the
+// ray-marched IridescentOrb removed. That shader is retained for capable
+// desktop renderers, but it prevents the entire background scene from
+// starting on several Android WebViews. Pulse supplies its own geometry-backed
+// Three.js familiar, so omitting the background orb loses no user state.
+const mobileBackgroundComponents = {
+  full: ['nebula', 'tendrils', 'rivers', 'volumetric', 'voronoi', 'hud', 'beams'],
+  lite: ['nebula', 'tendrils', 'hud'],
+  trading: ['rivers', 'tendrils', 'voronoi', 'hud', 'beams'],
+  cinematic: ['nebula', 'volumetric', 'metal', 'reaction'],
+  holographic: ['hud', 'beams', 'tendrils', 'rivers'],
+  minimal: ['nebula'],
 };
 
 const themePreset = name => visualThemeSpecs[name]?.[4] || sourceThemePresets[name] || 'full';
@@ -232,9 +246,9 @@ function optionsFor(kind) {
       container: host,
       fps: 30,
       theme: activeTheme,
-      // Use the original renderer presets verbatim.  The source library owns
-      // the component selection for these modes.
-      preset: activePreset,
+      // Preserve each source composition while avoiding the one ray-marched
+      // component that is not reliable in Android's embedded renderer.
+      components: mobileBackgroundComponents[activePreset] || mobileBackgroundComponents.lite,
     };
   }
   return {
@@ -325,7 +339,9 @@ function apply(state = {}) {
 function start() {
   try {
     activeTheme = ChimeraFX.themes[lastState.theme] ? lastState.theme : 'chimera-native';
-    activePreset = backgroundPreset(lastState.variant);
+    activePreset = lastState.variant
+      ? backgroundPreset(lastState.variant)
+      : themePreset(activeTheme);
     requestedPreset = activePreset;
     createEngine();
     apply(lastState);
