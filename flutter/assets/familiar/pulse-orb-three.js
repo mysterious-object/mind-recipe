@@ -28,6 +28,24 @@ const anatomy = new THREE.Group();
 familiar.add(aura, anatomy);
 scene.add(familiar);
 const state = {seed:17, hue:174, valence:0, activation:.35, growth:0, complexity:.08, form:0, paused:false, reduceMotion:false};
+const themeHues = {
+  'mind-recipe-orbit': 172,
+  'chimera-native': 164,
+  'cyberpunk-neon': 326,
+  'organic-bioluminescent': 142,
+  'quantum-void': 264,
+  'holographic-matrix': 132,
+  'midnight-signal': 214,
+  'neon-ronin': 338,
+  'abyssal-current': 198,
+  'solar-flare': 32,
+  'void-walker': 256,
+  'crystal-matrix': 188,
+  'aurora': 154,
+  'obsidian-forge': 18,
+  'orchid-vapor': 292,
+  'tidal-glass': 181,
+};
 const seeded = n => Math.abs(Math.sin(n * 12.9898) * 43758.5453) % 1;
 const colorFor = (offset=0, saturation=.78, lightness=.55) => new THREE.Color().setHSL((((state.hue + offset) % 360) + 360) % 360 / 360, saturation, lightness);
 
@@ -103,7 +121,11 @@ const key=new THREE.PointLight(0xb8fff0,20,15); key.position.set(2.4,3.1,4.3); s
 const rim=new THREE.PointLight(0x5ca9ff,15,14); rim.position.set(-3,-1.5,3); scene.add(rim);
 
 function evolve(next={}) {
-  state.seed=Number(next.seed ?? state.seed); state.hue=Number(next.hue ?? state.hue);
+  state.seed=Number(next.seed ?? state.seed);
+  const selectedHue = themeHues[next.theme];
+  state.hue=selectedHue == null
+    ? Number(next.hue ?? state.hue)
+    : selectedHue + (state.seed % 17) - 8;
   state.valence=Math.max(-1,Math.min(1,Number(next.valence ?? state.valence)));
   state.growth=Math.max(0,Math.min(1,Number(next.growth ?? state.growth)));
   state.activation=Math.max(0,Math.min(1,Number(next.activation ?? state.activation)));
