@@ -12,14 +12,17 @@ import 'package:url_launcher/url_launcher.dart';
 import 'account_gateway.dart';
 import 'app_services.dart';
 import 'check_in_state.dart';
+import 'commitments_screen.dart';
 import 'cinematic_experience.dart';
 import 'daily_navigation.dart';
 import 'design_tokens.dart';
 import 'navigator_chat.dart';
 import 'mind_recipe_fx.dart';
+import 'memory_screen.dart';
 import 'on_device_inference.dart';
 import 'notification_scheduler.dart';
 import 'practitioner_sharing.dart';
+import 'visual_theme.dart';
 import 'pulse_screen.dart';
 import 'recipes_screen.dart';
 import 'voice_interface.dart';
@@ -65,6 +68,7 @@ class _MindRecipeAppState extends State<MindRecipeApp> {
           await appState.setSession(verified);
         }
       }
+      await appState.flushPendingCheckIns(api);
       appState.setManagedAiAvailable(await api.aiAvailable());
     } finally {
       if (mounted) setState(() => _initializing = false);
@@ -88,74 +92,16 @@ class _MindRecipeAppState extends State<MindRecipeApp> {
       'dark' => ThemeMode.dark,
       _ => ThemeMode.system,
     };
-    final (seed, secondary, tertiary) = switch (appState.chimeraTheme) {
-      'cyberpunk-neon' => (
-        const Color(0xffff0066),
-        const Color(0xff00ffff),
-        const Color(0xff39ff14),
-      ),
-      'organic-bioluminescent' => (
-        const Color(0xff00e5ff),
-        const Color(0xff76ff03),
-        const Color(0xffffab00),
-      ),
-      'quantum-void' => (
-        const Color(0xff7c4dff),
-        const Color(0xff448aff),
-        const Color(0xffff6e40),
-      ),
-      'holographic-matrix' => (
-        const Color(0xff00ff41),
-        const Color(0xff00bcd4),
-        const Color(0xffff4081),
-      ),
-      'oceanic-cyan' => (
-        const Color(0xff00f5ff),
-        const Color(0xff00a8ff),
-        const Color(0xffb7f2ff),
-      ),
-      'solar-ember' => (
-        const Color(0xffff4f0d),
-        const Color(0xffffc214),
-        const Color(0xff7a0503),
-      ),
-      'deep-ocean' => (
-        const Color(0xff00b3d9),
-        const Color(0xff034080),
-        const Color(0xff0df2b3),
-      ),
-      'aurora-spectrum' => (
-        const Color(0xff26ffa6),
-        const Color(0xff9940ff),
-        const Color(0xffff2699),
-      ),
-      'crimson-pulse' => (
-        const Color(0xffff0d1f),
-        const Color(0xffbf0061),
-        const Color(0xffff990d),
-      ),
-      'monochrome-glass' => (
-        const Color(0xffe6f5ff),
-        const Color(0xff7a8c9e),
-        const Color(0xffffffff),
-      ),
-      'ultraviolet-bloom' => (
-        const Color(0xff9e1aff),
-        const Color(0xff33ccff),
-        const Color(0xffff1abf),
-      ),
-      _ => (
-        const Color(0xff00e5cc),
-        const Color(0xff7c3aed),
-        const Color(0xff00e68a),
-      ),
-    };
+    final visual = visualThemeFor(appState.visualThemeId);
+    final seed = visual.primary;
+    final secondary = visual.secondary;
+    final tertiary = visual.tertiary;
     final scheme = ColorScheme.fromSeed(
       seedColor: seed,
       brightness: Brightness.light,
     ).copyWith(primary: seed, secondary: secondary, tertiary: tertiary);
     return MaterialApp(
-      title: 'Mind Recipe',
+      title: 'MindRecipe',
       theme: ThemeData(
         colorScheme: scheme,
         useMaterial3: true,
@@ -390,6 +336,7 @@ class _MemberHomeState extends State<MemberHome> {
       MaterialPageRoute<void>(
         builder: (_) => DailyNavigation(
           appState: widget.appState,
+          onCheckInQueued: _flushPendingCheckIns,
           syncSummary: summary,
           onSeePulse: () {
             Navigator.of(context).pop();
@@ -457,6 +404,9 @@ class _MemberHomeState extends State<MemberHome> {
     );
   }
 
+  Future<void> _flushPendingCheckIns() =>
+      widget.appState.flushPendingCheckIns(widget.api);
+
   Future<void> _showContextNavigator() async {
     final destination = labels[index];
     await showModalBottomSheet<void>(
@@ -515,6 +465,7 @@ class _MemberHomeState extends State<MemberHome> {
       _KeepAlivePage(
         child: DailyNavigation(
           appState: widget.appState,
+          onCheckInQueued: _flushPendingCheckIns,
           syncSummary: '',
           onSeePulse: () => goToPage(3),
           onComplete: () {
@@ -600,15 +551,16 @@ class _MemberHomeState extends State<MemberHome> {
                 Expanded(
                   child: Stack(
                     children: [
-                      if (widget.appState.chimeraFxEnabled)
-                        Positioned.fill(
-                          child: ThreeBackground(
-                            progress: progress,
-                            variant: widget.appState.chimeraFxVariant,
-                            intensity: widget.appState.chimeraFxIntensity,
-                            theme: widget.appState.chimeraVfxTheme,
-                          ),
+                      Positioned.fill(
+                        child: ThreeBackground(
+                          progress: progress,
+                          variant: visualThemeFor(widget.appState.visualThemeId)
+                              .composition,
+                          intensity: .78,
+                          theme: visualThemeFor(widget.appState.visualThemeId)
+                              .engineTheme,
                         ),
+                      ),
                       PageView(
                         controller: pageController,
                         physics: MediaQuery.disableAnimationsOf(context)
@@ -1032,9 +984,9 @@ class _TodayScreenState extends State<TodayScreen> {
 
   Future<void> _loadData() async {
     final api = MindRecipeApiClient();
-    final memberId = widget.appState.session?.email ?? 'dev-member';
-    final trends = await api.getTrends(memberId);
-    final patterns = await api.detectPatterns(memberId);
+    final token = widget.appState.session?.token ?? '';
+    final trends = await api.getTrends(token: token);
+    final patterns = await api.detectPatterns(token: token);
     if (mounted)
       setState(() {
         _trends = trends;
@@ -1126,11 +1078,11 @@ class _TodayScreenState extends State<TodayScreen> {
                     child: Row(
                       children: [
                         Icon(
-                          p['type'] == 'activation_improving'
+                          p['type'] == 'activation_rising'
                               ? Icons.trending_up
                               : Icons.trending_down,
                           size: 18,
-                          color: p['type'] == 'activation_improving'
+                          color: p['type'] == 'activation_rising'
                               ? MindRecipeTokens.success
                               : MindRecipeTokens.warning,
                         ),
@@ -1228,7 +1180,7 @@ class RecipePracticeScreen extends StatelessWidget {
             value: selected.contains(tool),
             onChanged: (_) => onToggle(tool),
             title: Text(tool),
-            subtitle: const Text('Mind Recipe practice'),
+            subtitle: const Text('MindRecipe practice'),
           ),
         ),
       ),
@@ -1486,7 +1438,7 @@ class BookingScreen extends StatelessWidget {
     }
     final match = _healthApps.firstWhere((a) => a.$1 == name);
     final result = await auto.setReminder(
-      title: 'Opened from Mind Recipe Booking',
+      title: 'Opened from MindRecipe Booking',
       notes: '$name — continue in the app if installed.',
     );
     if (!result.success && mounted(context)) {
@@ -1591,13 +1543,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Set<String> _downloadedPrivateModelIds = const {};
   OnDeviceModelChoice _selectedPrivateChoice =
       mindRecipePrivateModelChoices.last;
-  late double _chimeraFxIntensity;
   Timer? _progressTimer;
 
   @override
   void initState() {
     super.initState();
-    _chimeraFxIntensity = widget.appState.chimeraFxIntensity;
     _refreshPrivateModel();
     _progressTimer = Timer.periodic(const Duration(milliseconds: 500), (_) {
       if (!mounted) return;
@@ -1712,6 +1662,72 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _installPrivateModel() async {
+    final otherDownloads = _downloadedPrivateModelIds
+        .where((id) => id != _selectedPrivateChoice.manifest.id)
+        .toList();
+    if (_selectedPrivateChoice.manifest.licenseUrl != null) {
+      final accepted = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Gemma terms'),
+          content: const Text(
+            'Gemma is provided under Google’s Gemma terms. Review and accept those terms before downloading this private model.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => launchUrl(
+                _selectedPrivateChoice.manifest.licenseUrl!,
+                mode: LaunchMode.externalApplication,
+              ),
+              child: const Text('View terms'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Accept & continue'),
+            ),
+          ],
+        ),
+      );
+      if (accepted != true || !mounted) return;
+    }
+    if (otherDownloads.isNotEmpty) {
+      final choice = await showDialog<String>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Keep the other private model?'),
+          content: const Text(
+            'You can keep it for instant switching or remove it to reclaim storage.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, 'cancel'),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, 'remove'),
+              child: const Text('Remove other'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, 'keep'),
+              child: const Text('Keep both'),
+            ),
+          ],
+        ),
+      );
+      if (choice == null || choice == 'cancel' || !mounted) return;
+      if (choice == 'remove') {
+        for (final id in otherDownloads) {
+          final other = mindRecipePrivateModelChoices.firstWhere(
+            (model) => model.manifest.id == id,
+          );
+          await OnDeviceInference().removeDownloadedModel(other.manifest);
+        }
+      }
+    }
     final selectedName = _selectedPrivateChoice.name;
     setState(() => _modelActionInProgress = true);
     var installed = false;
@@ -1806,387 +1822,70 @@ class _ProfileScreenState extends State<ProfileScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const ListTile(
-              leading: Icon(Icons.auto_awesome_rounded),
-              title: Text('Visual appearance'),
+              leading: Icon(Icons.palette_outlined),
+              title: Text('Visual theme'),
               subtitle: Text(
-                'Choose the app theme and control the animated visual atmosphere.',
+                'Each selection changes the app palette and its live local WebGL scene together.',
               ),
             ),
             const Divider(height: 1),
-            RadioListTile<String>(
-              title: const Text('Follow device theme'),
-              value: 'system',
-              groupValue: widget.appState.appearanceMode,
-              onChanged: (value) => widget.appState.setAppearanceMode(value!),
-            ),
-            RadioListTile<String>(
-              title: const Text('Light'),
-              value: 'light',
-              groupValue: widget.appState.appearanceMode,
-              onChanged: (value) => widget.appState.setAppearanceMode(value!),
-            ),
-            RadioListTile<String>(
-              title: const Text('Dark'),
-              value: 'dark',
-              groupValue: widget.appState.appearanceMode,
-              onChanged: (value) => widget.appState.setAppearanceMode(value!),
-            ),
-            const Divider(height: 1),
-            const Padding(
-              padding: EdgeInsets.fromLTRB(16, 14, 16, 6),
-              child: Text(
-                'COLOR THEME',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 1.1,
-                ),
-              ),
-            ),
-            for (final theme in const [
-              (
-                id: 'chimera-native',
-                name: 'Chimera Native',
-                description: 'Teal-green, neon green, and ultraviolet',
-                colors: [Color(0xff00e5cc), Color(0xff7c3aed)],
-              ),
-              (
-                id: 'cyberpunk-neon',
-                name: 'Cyberpunk Neon',
-                description: 'Hot pink, electric cyan, and toxic green',
-                colors: [Color(0xffff0066), Color(0xff00ffff)],
-              ),
-              (
-                id: 'organic-bioluminescent',
-                name: 'Organic Bioluminescent',
-                description: 'Bioluminescent blue, phosphor green, and amber',
-                colors: [Color(0xff00e5ff), Color(0xff76ff03)],
-              ),
-              (
-                id: 'quantum-void',
-                name: 'Quantum Void',
-                description: 'Ultraviolet, quantum blue, and photon orange',
-                colors: [Color(0xff7c4dff), Color(0xff448aff)],
-              ),
-              (
-                id: 'holographic-matrix',
-                name: 'Holographic Matrix',
-                description: 'Matrix green, hologram cyan, and magenta',
-                colors: [Color(0xff00ff41), Color(0xff00bcd4)],
-              ),
-              (
-                id: 'oceanic-cyan',
-                name: 'Oceanic Cyan',
-                description: 'Electric cyan, arctic blue, and glass white',
-                colors: [Color(0xff00f5ff), Color(0xff00a8ff)],
-              ),
-              (
-                id: 'solar-ember',
-                name: 'Solar Ember',
-                description: 'Hot orange, solar gold, and deep carbon red',
-                colors: [Color(0xffff4f0d), Color(0xffffc214)],
-              ),
-              (
-                id: 'deep-ocean',
-                name: 'Deep Ocean',
-                description: 'Abyss blue, tidal cyan, and sea-glass green',
-                colors: [Color(0xff00b3d9), Color(0xff034080)],
-              ),
-              (
-                id: 'aurora-spectrum',
-                name: 'Aurora Spectrum',
-                description: 'Aurora mint, spectral violet, and plasma pink',
-                colors: [Color(0xff26ffa6), Color(0xff9940ff)],
-              ),
-              (
-                id: 'crimson-pulse',
-                name: 'Crimson Pulse',
-                description: 'Signal red, deep magenta, and ignition amber',
-                colors: [Color(0xffff0d1f), Color(0xffbf0061)],
-              ),
-              (
-                id: 'monochrome-glass',
-                name: 'Monochrome Glass',
-                description: 'Frost white, brushed steel, and cold shadow',
-                colors: [Color(0xffe6f5ff), Color(0xff7a8c9e)],
-              ),
-              (
-                id: 'ultraviolet-bloom',
-                name: 'Ultraviolet Bloom',
-                description: 'Ultraviolet, ion blue, and neon orchid',
-                colors: [Color(0xff9e1aff), Color(0xff33ccff)],
-              ),
-            ])
+            for (final theme in visualThemes)
               RadioListTile<String>(
+                value: theme.id,
+                groupValue: widget.appState.visualThemeId,
+                onChanged: (value) => widget.appState.setVisualTheme(value!),
                 title: Text(theme.name),
                 subtitle: Text(theme.description),
-                value: theme.id,
-                groupValue: widget.appState.chimeraTheme,
-                onChanged: (value) => widget.appState.setChimeraTheme(value!),
                 secondary: SizedBox(
                   width: 42,
                   child: Stack(
                     children: [
-                      CircleAvatar(
-                        radius: 13,
-                        backgroundColor: theme.colors.first,
-                      ),
+                      CircleAvatar(radius: 13, backgroundColor: theme.primary),
                       Positioned(
                         left: 16,
                         top: 8,
                         child: CircleAvatar(
                           radius: 13,
-                          backgroundColor: theme.colors.last,
+                          backgroundColor: theme.secondary,
                         ),
                       ),
                     ],
                   ),
-                ),
-              ),
-            const Divider(height: 1),
-            const Padding(
-              padding: EdgeInsets.fromLTRB(16, 14, 16, 6),
-              child: Text(
-                'LIVING VFX THEME',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 1.1,
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-              child: Text(
-                'Choose the live WebGL visual system separately from the app color palette. It changes the background and Pulse familiar immediately.',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ),
-            for (final theme in const [
-              (
-                id: 'mind-recipe-orbit',
-                name: 'Mind Recipe Orbit',
-                description:
-                    'Compass teal, restorative violet, and warm focus gold',
-                colors: [Color(0xff00d9c0), Color(0xff8b5cf6)],
-              ),
-              (
-                id: 'chimera-native',
-                name: 'Core',
-                description: 'Living teal, green, and ultraviolet matter',
-                colors: [Color(0xff00e5cc), Color(0xff7c3aed)],
-              ),
-              (
-                id: 'cyberpunk-neon',
-                name: 'Neon Circuit',
-                description: 'Hot pink, electric cyan, and toxic green',
-                colors: [Color(0xffff0066), Color(0xff00ffff)],
-              ),
-              (
-                id: 'organic-bioluminescent',
-                name: 'Bioluminescent',
-                description: 'Deep blue, phosphor green, and amber',
-                colors: [Color(0xff00e5ff), Color(0xff76ff03)],
-              ),
-              (
-                id: 'quantum-void',
-                name: 'Quantum Void',
-                description: 'Ultraviolet, quantum blue, and photon orange',
-                colors: [Color(0xff7c4dff), Color(0xff448aff)],
-              ),
-              (
-                id: 'holographic-matrix',
-                name: 'Holographic Matrix',
-                description: 'Matrix green, hologram cyan, and magenta',
-                colors: [Color(0xff00ff41), Color(0xff00bcd4)],
-              ),
-              (
-                id: 'midnight-signal',
-                name: 'Midnight Signal',
-                description: 'Electric blue, signal mint, and midnight glass',
-                colors: [Color(0xff147bff), Color(0xff00edac)],
-              ),
-              (
-                id: 'neon-ronin',
-                name: 'Neon Ronin',
-                description: 'Electric blue, crimson, and violet haze',
-                colors: [Color(0xffee2c74), Color(0xff7038ff)],
-              ),
-              (
-                id: 'abyssal-current',
-                name: 'Abyssal Current',
-                description: 'Abyss blue, cyan current, and sea glass',
-                colors: [Color(0xff0077ff), Color(0xff00e3d2)],
-              ),
-              (
-                id: 'solar-flare',
-                name: 'Solar Flare',
-                description: 'Solar gold, ember orange, and charcoal',
-                colors: [Color(0xffff9d00), Color(0xffffcf5c)],
-              ),
-              (
-                id: 'void-walker',
-                name: 'Void Walker',
-                description: 'Dark indigo, ultraviolet, and soft silver',
-                colors: [Color(0xff12072f), Color(0xff8d5bff)],
-              ),
-              (
-                id: 'crystal-matrix',
-                name: 'Crystal Matrix',
-                description: 'Ice crystal, cyan light, and slate',
-                colors: [Color(0xff75f7ff), Color(0xffe9feff)],
-              ),
-              (
-                id: 'aurora',
-                name: 'Aurora',
-                description: 'Aurora mint, spectral violet, and rose plasma',
-                colors: [Color(0xff23edab), Color(0xff9a56ff)],
-              ),
-              (
-                id: 'obsidian-forge',
-                name: 'Obsidian Forge',
-                description: 'Forged copper, ember, and obsidian',
-                colors: [Color(0xffef6736), Color(0xff180e10)],
-              ),
-              (
-                id: 'orchid-vapor',
-                name: 'Orchid Vapor',
-                description: 'Orchid, vapor blue, and soft lavender',
-                colors: [Color(0xffdb54e8), Color(0xff7ee9ff)],
-              ),
-              (
-                id: 'tidal-glass',
-                name: 'Tidal Glass',
-                description: 'Tidal cyan, seafoam, and glass white',
-                colors: [Color(0xff00c6dc), Color(0xffe3ffff)],
-              ),
-            ])
-              RadioListTile<String>(
-                title: Text(theme.name),
-                subtitle: Text(theme.description),
-                value: theme.id,
-                groupValue: widget.appState.chimeraVfxTheme,
-                onChanged: (value) =>
-                    widget.appState.setChimeraVfxTheme(value!),
-                secondary: SizedBox(
-                  width: 42,
-                  child: Stack(
-                    children: [
-                      CircleAvatar(
-                        radius: 13,
-                        backgroundColor: theme.colors.first,
-                      ),
-                      Positioned(
-                        left: 16,
-                        top: 8,
-                        child: CircleAvatar(
-                          radius: 13,
-                          backgroundColor: theme.colors.last,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            const Divider(height: 1),
-            SwitchListTile(
-              title: const Text('Living background motion'),
-              subtitle: const Text(
-                'Show animated fields and reactive background effects.',
-              ),
-              value: widget.appState.chimeraFxEnabled,
-              onChanged: widget.appState.setChimeraFxEnabled,
-            ),
-            if (widget.appState.chimeraFxEnabled)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'FX intensity · ${(_chimeraFxIntensity * 100).round()}%',
-                    ),
-                    Slider(
-                      value: _chimeraFxIntensity,
-                      min: 0.2,
-                      max: 1,
-                      divisions: 8,
-                      label: '${(_chimeraFxIntensity * 100).round()}%',
-                      onChanged: (value) =>
-                          setState(() => _chimeraFxIntensity = value),
-                      onChangeEnd: widget.appState.setChimeraFxIntensity,
-                    ),
-                    Wrap(
-                      spacing: 8,
-                      children: [
-                        for (final preset in const [
-                          ('Calm', 0.3),
-                          ('Balanced', 0.7),
-                          ('Vivid', 1.0),
-                        ])
-                          ActionChip(
-                            label: Text(preset.$1),
-                            onPressed: () {
-                              setState(() => _chimeraFxIntensity = preset.$2);
-                              widget.appState.setChimeraFxIntensity(preset.$2);
-                            },
-                          ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            if (widget.appState.chimeraFxEnabled) const Divider(height: 1),
-            if (widget.appState.chimeraFxEnabled)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'VFX COMPOSITION',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 1.1,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Choose the source component composition for the selected visual theme.',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                    const SizedBox(height: 10),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        for (final v in const [
-                          ('full', 'Full', Icons.auto_awesome_rounded),
-                          ('lite', 'Lite', Icons.blur_on_rounded),
-                          ('trading', 'Trading', Icons.show_chart_rounded),
-                          (
-                            'cinematic',
-                            'Cinematic',
-                            Icons.movie_filter_rounded,
-                          ),
-                          ('holographic', 'Holographic', Icons.hub_rounded),
-                          ('minimal', 'Minimal', Icons.nights_stay_rounded),
-                        ])
-                          ChoiceChip(
-                            label: Text(v.$2),
-                            avatar: Icon(v.$3, size: 18),
-                            selected: widget.appState.chimeraFxVariant == v.$1,
-                            onSelected: (_) => setState(() {
-                              widget.appState.setChimeraFxVariant(v.$1);
-                            }),
-                          ),
-                      ],
-                    ),
-                  ],
                 ),
               ),
           ],
+        ),
+      ),
+      Card(
+        child: ListTile(
+          leading: const Icon(Icons.bookmark_outline),
+          title: const Text('Memory controls'),
+          subtitle: const Text(
+            'Review and remove the preferences Mind Nav can use.',
+          ),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => MemoryScreen(appState: widget.appState),
+            ),
+          ),
+        ),
+      ),
+      Card(
+        child: ListTile(
+          leading: const Icon(Icons.task_alt_outlined),
+          title: const Text('Commitments'),
+          subtitle: const Text(
+            'Review, complete, skip, or cancel the actions you choose.',
+          ),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => CommitmentsScreen(appState: widget.appState),
+            ),
+          ),
         ),
       ),
       Card(
@@ -2235,9 +1934,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  DropdownButtonFormField<OnDeviceModelChoice>(
+                    value: _selectedPrivateChoice,
+                    decoration: const InputDecoration(
+                      labelText: 'Private model',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: [
+                      for (final choice in mindRecipePrivateModelChoices)
+                        DropdownMenuItem(
+                          value: choice,
+                          child: Text(choice.name),
+                        ),
+                    ],
+                    onChanged: _modelActionInProgress
+                        ? null
+                        : (choice) {
+                            if (choice == null) return;
+                            setState(() {
+                              _selectedPrivateChoice = choice;
+                              _privateModelSelectionTouched = true;
+                            });
+                          },
+                  ),
+                  const SizedBox(height: 10),
                   Builder(
                     builder: (context) {
-                      final choice = mindRecipePrivateModelChoices.first;
+                      final choice = _selectedPrivateChoice;
                       final isActive =
                           choice.manifest.id ==
                               OnDeviceInference().activeModel.id &&
@@ -2354,7 +2077,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'One private model — 1.2 GB, stays on this device, verified before it can run. Download once, use everywhere.',
+                    'Choose Qwen or Gemma. Each download stays on this device and is verified before it can run.',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ],
@@ -2392,7 +2115,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     : _privateModel.status == OnDeviceStatus.downloading ||
                           _privateModel.status == OnDeviceStatus.verifying
                     ? 'Preparing private model — you can keep using the app.'
-                    : 'Tap Download Private model above to enable on-device guidance.',
+                    : 'Choose a model above, then download it for on-device guidance.',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             ),
@@ -2454,7 +2177,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             MaterialPageRoute(
               builder: (_) => Scaffold(
                 appBar: AppBar(title: const Text('Notifications')),
-                body: const NotificationScheduler(),
+                body: NotificationScheduler(appState: widget.appState),
               ),
             ),
           ),
@@ -2488,8 +2211,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
       ),
       OutlinedButton(
-        onPressed: widget.onPractitioner,
-        child: const Text('View practitioner prototype'),
+        onPressed: null,
+        child: const Text('Practitioner access is provisioned separately'),
       ),
       TextButton.icon(
         onPressed: widget.onSignOut,
@@ -2501,7 +2224,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: FutureBuilder<PackageInfo>(
           future: PackageInfo.fromPlatform(),
           builder: (context, snap) => Text(
-            'Mind Recipe ${snap.data?.version ?? '1.0.0'} (${snap.data?.buildNumber ?? '—'}) · by Context Field',
+            'MindRecipe ${snap.data?.version ?? '1.0.0'} (${snap.data?.buildNumber ?? '—'})',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: Theme.of(context).textTheme.bodySmall?.color
                   ?.withValues(alpha: 0.45),
@@ -2571,7 +2294,7 @@ class _WellnessBoundary extends StatelessWidget {
   const _WellnessBoundary();
   @override
   Widget build(BuildContext context) => const Text(
-    'Mind Recipe supports wellness and self-reflection. It is not therapy, medical care, diagnosis, or emergency response.',
+    'MindRecipe supports wellness and self-reflection. It is not therapy, medical care, diagnosis, or emergency response.',
     style: TextStyle(fontSize: 12, color: Colors.black54),
   );
 }

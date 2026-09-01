@@ -1,17 +1,21 @@
 import 'package:flutter/material.dart';
+
+import 'app_services.dart';
 import 'design_tokens.dart';
 
 /// Notification scheduler — discreet wellness reminders with quiet hours,
 /// snooze, pause controls, and user-selected times.
 
 class NotificationScheduler extends StatefulWidget {
-  const NotificationScheduler({super.key});
+  const NotificationScheduler({super.key, required this.appState});
+  final SecureAppState appState;
 
   @override
   State<NotificationScheduler> createState() => _NotificationSchedulerState();
 }
 
 class _NotificationSchedulerState extends State<NotificationScheduler> {
+  final _api = MindRecipeApiClient();
   // Schedule
   bool _enabled = false;
   TimeOfDay _morningTime = const TimeOfDay(hour: 9, minute: 0);
@@ -34,6 +38,7 @@ class _NotificationSchedulerState extends State<NotificationScheduler> {
 
   // Message style
   String _messageStyle = 'discreet';
+  bool _loading = true;
 
   static const _styles = {
     'discreet': 'Just checking in 🌿',
@@ -44,8 +49,81 @@ class _NotificationSchedulerState extends State<NotificationScheduler> {
 
   static const _days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
+  String get _token => widget.appState.session?.token ?? '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPreferences();
+  }
+
+  Future<void> _loadPreferences() async {
+    try {
+      final value = await _api.getNotificationPreferences(_token);
+      if (!mounted) return;
+      setState(() {
+        _enabled = value['enabled'] == true;
+        _morningTime = _parseTime(value['morning_time']?.toString(), _morningTime);
+        _middayTime = _parseTime(value['midday_time']?.toString(), _middayTime);
+        _eveningTime = _parseTime(value['evening_time']?.toString(), _eveningTime);
+        _quietStart = _parseTime(value['quiet_hours_start']?.toString(), _quietStart);
+        _quietEnd = _parseTime(value['quiet_hours_end']?.toString(), _quietEnd);
+        _quietHoursEnabled = value['quiet_hours_start'] != null && value['quiet_hours_end'] != null;
+        final active = (value['active_weekdays'] as List? ?? const [])
+            .map((item) => int.tryParse(item.toString()))
+            .whereType<int>()
+            .toSet();
+        for (var i = 0; i < _slots.length; i++) _slots[i] = active.contains(i + 1);
+        _messageStyle = value['message_style']?.toString() ?? _messageStyle;
+        _snoozeUntil = DateTime.tryParse(value['snooze_until']?.toString() ?? '');
+        _pauseUntil = DateTime.tryParse(value['pause_until']?.toString() ?? '');
+        _snoozed = _snoozeUntil?.isAfter(DateTime.now()) == true;
+        _paused = _pauseUntil?.isAfter(DateTime.now()) == true;
+      });
+    } catch (_) {
+      // The controls remain available while the device is offline.
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _savePreferences() async {
+    if (_token.isEmpty) return;
+    try {
+      await _api.saveNotificationPreferences(_token, {
+        'enabled': _enabled,
+        'quiet_hours_start': _quietHoursEnabled ? _timeValue(_quietStart) : null,
+        'quiet_hours_end': _quietHoursEnabled ? _timeValue(_quietEnd) : null,
+        'check_in_reminder': true,
+        'lesson_reminder': true,
+        'booking_reminder': true,
+        'snooze_minutes': 0,
+        'morning_time': _timeValue(_morningTime),
+        'midday_time': _timeValue(_middayTime),
+        'evening_time': _timeValue(_eveningTime),
+        'active_weekdays': [for (var i = 0; i < _slots.length; i++) if (_slots[i]) i + 1],
+        'message_style': _messageStyle,
+        if (_snoozeUntil != null) 'snooze_until': _snoozeUntil!.toUtc().toIso8601String(),
+        if (_pauseUntil != null) 'pause_until': _pauseUntil!.toUtc().toIso8601String(),
+      });
+    } catch (_) {
+      // The next interaction retries the member-scoped save.
+    }
+  }
+
+  TimeOfDay _parseTime(String? value, TimeOfDay fallback) {
+    final parts = value?.split(':') ?? const <String>[];
+    if (parts.length != 2) return fallback;
+    final hour = int.tryParse(parts[0]);
+    final minute = int.tryParse(parts[1]);
+    return hour == null || minute == null ? fallback : TimeOfDay(hour: hour, minute: minute);
+  }
+
+  String _timeValue(TimeOfDay value) => '${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
+
   @override
   Widget build(BuildContext context) {
+    if (_loading) return const Center(child: CircularProgressIndicator());
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -63,7 +141,7 @@ class _NotificationSchedulerState extends State<NotificationScheduler> {
             label: _enabled ? 'Notifications enabled' : 'Notifications disabled',
             child: SwitchListTile.adaptive(
               value: _enabled,
-              onChanged: (v) => setState(() => _enabled = v),
+              onChanged: (v) { setState(() => _enabled = v); _savePreferences(); },
               title: const Text('Enable wellness reminders', style: TextStyle(fontWeight: FontWeight.w600)),
               subtitle: Text(_enabled ? 'Active — ${_activeSlotsCount} reminders per week' : 'All reminders paused'),
               activeColor: MindRecipeTokens.primary,
@@ -74,11 +152,11 @@ class _NotificationSchedulerState extends State<NotificationScheduler> {
           if (_enabled) ...[
             // Time slots
             _buildTimePicker('Morning reminder', _morningTime,
-              (t) => setState(() => _morningTime = t)),
+              (t) { setState(() => _morningTime = t); _savePreferences(); }),
             _buildTimePicker('Midday check-in', _middayTime,
-              (t) => setState(() => _middayTime = t)),
+              (t) { setState(() => _middayTime = t); _savePreferences(); }),
             _buildTimePicker('Evening reflection', _eveningTime,
-              (t) => setState(() => _eveningTime = t)),
+              (t) { setState(() => _eveningTime = t); _savePreferences(); }),
             const SizedBox(height: 16),
 
             // Days of week
@@ -88,7 +166,7 @@ class _NotificationSchedulerState extends State<NotificationScheduler> {
               FilterChip(
                 label: Text(_days[i]),
                 selected: _slots[i],
-                onSelected: (v) => setState(() => _slots[i] = v),
+                onSelected: (v) { setState(() => _slots[i] = v); _savePreferences(); },
                 selectedColor: MindRecipeTokens.primary.withAlpha(40),
               ),
             )),
@@ -104,7 +182,7 @@ class _NotificationSchedulerState extends State<NotificationScheduler> {
                     children: [
                       SwitchListTile.adaptive(
                         value: _quietHoursEnabled,
-                        onChanged: (v) => setState(() => _quietHoursEnabled = v),
+                        onChanged: (v) { setState(() => _quietHoursEnabled = v); _savePreferences(); },
                         title: const Text('Quiet hours', style: TextStyle(fontWeight: FontWeight.w600)),
                         subtitle: const Text('No notifications during your rest window'),
                         activeColor: MindRecipeTokens.primary,
@@ -116,7 +194,7 @@ class _NotificationSchedulerState extends State<NotificationScheduler> {
                             subtitle: Text(_quietStart.format(context)),
                             onTap: () async {
                               final t = await showTimePicker(context: context, initialTime: _quietStart);
-                              if (t != null) setState(() => _quietStart = t);
+                              if (t != null) { setState(() => _quietStart = t); _savePreferences(); }
                             },
                           )),
                           Expanded(child: ListTile(
@@ -124,7 +202,7 @@ class _NotificationSchedulerState extends State<NotificationScheduler> {
                             subtitle: Text(_quietEnd.format(context)),
                             onTap: () async {
                               final t = await showTimePicker(context: context, initialTime: _quietEnd);
-                              if (t != null) setState(() => _quietEnd = t);
+                              if (t != null) { setState(() => _quietEnd = t); _savePreferences(); }
                             },
                           )),
                         ],
@@ -180,7 +258,7 @@ class _NotificationSchedulerState extends State<NotificationScheduler> {
               subtitle: Text(e.key),
               value: e.key,
               groupValue: _messageStyle,
-              onChanged: (v) => setState(() => _messageStyle = v ?? 'discreet'),
+              onChanged: (v) { setState(() => _messageStyle = v ?? 'discreet'); _savePreferences(); },
               activeColor: MindRecipeTokens.primary,
               dense: true,
             ))),
@@ -219,21 +297,33 @@ class _NotificationSchedulerState extends State<NotificationScheduler> {
 
   int get _activeSlotsCount => _slots.where((s) => s).length * 3;
 
-  void _snoozeOneHour() => setState(() {
-    _snoozed = true;
-    _snoozeUntil = DateTime.now().add(const Duration(hours: 1));
-    _paused = false; _pauseUntil = null;
-  });
+  void _snoozeOneHour() {
+    setState(() {
+      _snoozed = true;
+      _snoozeUntil = DateTime.now().add(const Duration(hours: 1));
+      _paused = false; _pauseUntil = null;
+    });
+    _savePreferences();
+  }
 
-  void _cancelSnooze() => setState(() { _snoozed = false; _snoozeUntil = null; });
+  void _cancelSnooze() {
+    setState(() { _snoozed = false; _snoozeUntil = null; });
+    _savePreferences();
+  }
 
-  void _pauseOneDay() => setState(() {
-    _paused = true;
-    _pauseUntil = DateTime.now().add(const Duration(hours: 24));
-    _snoozed = false; _snoozeUntil = null;
-  });
+  void _pauseOneDay() {
+    setState(() {
+      _paused = true;
+      _pauseUntil = DateTime.now().add(const Duration(hours: 24));
+      _snoozed = false; _snoozeUntil = null;
+    });
+    _savePreferences();
+  }
 
-  void _cancelPause() => setState(() { _paused = false; _pauseUntil = null; });
+  void _cancelPause() {
+    setState(() { _paused = false; _pauseUntil = null; });
+    _savePreferences();
+  }
 
   String _formatDateTime(DateTime dt) {
     final h = dt.hour % 12 == 0 ? 12 : dt.hour % 12;

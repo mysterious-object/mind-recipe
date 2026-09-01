@@ -94,7 +94,7 @@ class VoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamHandler
             )
             "startListening" -> {
                 if (listeningResult != null) {
-                    result.error("ALREADY_LISTENING", "Mind Recipe is already listening.", null)
+                    result.error("ALREADY_LISTENING", "MindRecipe is already listening.", null)
                     return
                 }
                 listeningResult = result

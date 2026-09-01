@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 import json
@@ -8,19 +9,19 @@ from typing import List, Optional, Tuple
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Response, status
 from fastapi.responses import StreamingResponse
 
-from .auth import auth_store, issue_token, verify_token
+from .auth import auth_store, issue_token, verify_token_identity
 from .wellness_assistant import managed_provider_available, respond, get_provider_status
 from .navigator_agent import agent
 from .config import settings
 from .models import (
     AiRequest, AiResponse, AuditEvent, AuthLogin, AuthRegister, AuthResetConfirm, AuthResetRequest, AuthToken, AuthUser,
-    CheckInInput, CheckInRecord, ConsentGrant, ConsentInput, Role,
+    CheckInInput, CheckInRecord, Commitment, CommitmentExecutionInput, CommitmentInput, CommitmentUpdate, ConsentGrant, ConsentInput, PracticeOutcome, PracticeRecommendation, PracticeRecommendationFeedback, Role,
     JournalEntry, JournalEntryInput, RecipePracticeItemInput, RecipePracticeItem, RecipePracticePracticeInput,
     CurriculumProgress, CurriculumProgressInput,
     TrackerEventInput, TrackerEvent, AppointmentInput, Appointment,
-    NotificationPreferenceInput, NotificationPreference, AccountExport,
+    NotificationPreferenceInput, NotificationPreference, AccountDeletionRequest, AccountExport,
     JourneySettings, JourneySettingsInput, RecipeProposal, RecipeProposalInput,
-    RecipeProposalDecision, MemoryCard, MemoryCardInput, MemberEventInput,
+    RecipeProposalDecision, MemoryCard, MemoryCardInput, MemoryProposal, MemoryProposalDecision, MemoryProposalInput, MemberEventInput,
 )
 from .sqlite_store import store
 
@@ -31,7 +32,7 @@ async def lifespan(_: FastAPI):
     yield
 
 
-app = FastAPI(title="Mind Recipe API", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="MindRecipe API", version="0.1.0", lifespan=lifespan)
 
 
 def actor(
@@ -40,7 +41,8 @@ def actor(
     x_mind_recipe_role: Role = Header(default=Role.member),
 ) -> Tuple[str, Role]:
     if authorization and authorization.lower().startswith("bearer "):
-        return verify_token(authorization[7:].strip()), Role.member
+        actor_id, role = verify_token_identity(authorization[7:].strip())
+        return actor_id, Role(role)
     if settings.development:
         return x_mind_recipe_user or "dev-member", x_mind_recipe_role
     raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="authenticated bearer identity required")
@@ -107,9 +109,39 @@ def assistant_status() -> dict[str, object]:
     }
 
 
+@app.get("/v1/providers/openrouter/models")
+async def openrouter_models(
+    x_mind_recipe_provider_key: Optional[str] = Header(default=None),
+) -> dict[str, object]:
+    """Return a small, current model catalog without retaining a BYOK key."""
+    try:
+        import httpx
+        headers = {"Accept": "application/json"}
+        if x_mind_recipe_provider_key:
+            headers["Authorization"] = f"Bearer {x_mind_recipe_provider_key}"
+        async with httpx.AsyncClient(timeout=httpx.Timeout(8.0)) as client:
+            response = await client.get("https://openrouter.ai/api/v1/models", headers=headers)
+            response.raise_for_status()
+            raw = response.json().get("data", [])
+        models = []
+        for item in raw:
+            if not isinstance(item, dict) or not item.get("id"):
+                continue
+            models.append({
+                "id": str(item["id"]),
+                "name": str(item.get("name") or item["id"]),
+                "context_length": int(item.get("context_length") or 0),
+                "reasoning": bool((item.get("supported_parameters") or []) and "reasoning" in item.get("supported_parameters", [])),
+            })
+        return {"available": True, "models": models[:500]}
+    except Exception:
+        # Do not disclose upstream detail or whether a supplied key exists.
+        return {"available": False, "models": []}
+
+
 def auth_response(account) -> AuthToken:
     return AuthToken(access_token=issue_token(account), user=AuthUser(
-        id=account.id, email=account.email, display_name=account.display_name))
+        id=account.id, email=account.email, display_name=account.display_name, role=Role(account.role)))
 
 
 @app.post("/v1/auth/register", response_model=AuthToken, status_code=status.HTTP_201_CREATED)
@@ -156,7 +188,51 @@ def me(identity: Tuple[str, Role] = Depends(actor)) -> AuthUser:
     account = auth_store.users_by_id.get(actor_id)
     if not account:
         raise HTTPException(status_code=404, detail="account not found")
-    return AuthUser(id=account.id, email=account.email, display_name=account.display_name, role=role)
+    return AuthUser(id=account.id, email=account.email, display_name=account.display_name, role=Role(account.role))
+
+
+@app.get("/v1/account/export")
+def export_account(identity: Tuple[str, Role] = Depends(actor)) -> dict[str, object]:
+    member_id, role = identity
+    if role != Role.member:
+        raise HTTPException(status_code=403, detail="member role required")
+    audit(member_id, "export", "account", member_id)
+    return store.export_member_data(member_id)
+
+
+@app.delete("/v1/account", status_code=status.HTTP_204_NO_CONTENT)
+def delete_account(
+    payload: AccountDeletionRequest,
+    identity: Tuple[str, Role] = Depends(actor),
+) -> Response:
+    member_id, role = identity
+    if role != Role.member:
+        raise HTTPException(status_code=403, detail="member role required")
+    audit(member_id, "delete_requested", "account", member_id)
+    store.delete_member_data(member_id)
+    auth_store.delete_account(member_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@app.get("/v1/notification-preferences", response_model=NotificationPreference)
+def get_notification_preference(identity: Tuple[str, Role] = Depends(actor)) -> NotificationPreference:
+    member_id, role = identity
+    if role != Role.member:
+        raise HTTPException(status_code=403, detail="member role required")
+    return NotificationPreference(**store.get_notification_preference(member_id))
+
+
+@app.put("/v1/notification-preferences", response_model=NotificationPreference)
+def put_notification_preference(
+    payload: NotificationPreferenceInput,
+    identity: Tuple[str, Role] = Depends(actor),
+) -> NotificationPreference:
+    member_id, role = identity
+    if role != Role.member:
+        raise HTTPException(status_code=403, detail="member role required")
+    result = store.save_notification_preference(member_id, payload.model_dump(mode="json"))
+    audit(member_id, "update", "notification_preferences", member_id)
+    return NotificationPreference(**result)
 
 
 @app.post("/v1/checkins", response_model=CheckInRecord, status_code=status.HTTP_201_CREATED)
@@ -164,6 +240,9 @@ def create_checkin(payload: CheckInInput, identity: Tuple[str, Role] = Depends(a
     actor_id, role = identity
     if role != Role.member:
         raise HTTPException(status_code=403, detail="only members can create check-ins")
+    existing = store.get_checkin_by_client_id(actor_id, payload.client_id)
+    if existing:
+        return CheckInRecord(**existing)
     record = CheckInRecord(**payload.model_dump(), member_id=actor_id, created_at=datetime.now(timezone.utc),
                            policy_version=settings.policy_version)
     store.add_checkin(record)
@@ -208,6 +287,21 @@ def practitioner_checkins(member_id: str, identity: Tuple[str, Role] = Depends(a
     return records
 
 
+@app.get("/v1/practitioner/members/{member_id}/summary")
+def practitioner_member_summary(
+    member_id: str,
+    identity: Tuple[str, Role] = Depends(actor),
+) -> dict[str, object]:
+    actor_id, role = identity
+    if role != Role.practitioner:
+        raise HTTPException(status_code=403, detail="practitioner role required")
+    summary = store.shared_member_summary(member_id, actor_id)
+    if summary is None:
+        raise HTTPException(status_code=404, detail="no active sharing consent")
+    audit(actor_id, "read_shared", "member_summary", member_id)
+    return summary
+
+
 @app.post("/v1/assistant/respond", response_model=AiResponse)
 async def assistant(
     payload: AiRequest,
@@ -225,10 +319,17 @@ async def assistant(
         assistant_context["curriculum_progress"] = progress
     assistant_context["journey"] = store.get_journey_settings(actor_id)
     assistant_context["pulse"] = store.pulse_summary(actor_id)
+    assistant_context["recipe_outcomes"] = store.get_practice_effectiveness(actor_id)[:5]
+    assistant_context["recipe_practice"] = store.get_personal_practice_recommendations(actor_id)[:3]
+    assistant_context["pending_commitments"] = store.list_commitments(actor_id)
     result = await respond(
         payload.model_copy(update={"context": assistant_context}),
         x_mind_recipe_provider_key,
     )
+    if result.safety_interrupted:
+        store.record_safety_event(
+            actor_id, "safety_interruption", result.policy_version, "resources_shown",
+        )
     audit(actor_id, "ai_process", "assistant_session", result.mode)
     return result
 
@@ -248,9 +349,43 @@ async def navigator_turn(
         context["member_id"] = actor_id
         context["journey"] = store.get_journey_settings(actor_id)
         context["pulse"] = store.pulse_summary(actor_id)
-        result = await respond(payload.model_copy(update={"context": context}), x_mind_recipe_provider_key)
+        context["recipe_outcomes"] = store.get_practice_effectiveness(actor_id)[:5]
+        context["recipe_practice"] = store.get_personal_practice_recommendations(actor_id)[:3]
+        context["pending_commitments"] = store.list_commitments(actor_id)
+        queue: asyncio.Queue[str | None] = asyncio.Queue()
+
+        async def on_delta(token: str) -> None:
+            await queue.put(token)
+
+        task = asyncio.create_task(
+            respond(
+                payload.model_copy(update={"context": context}),
+                x_mind_recipe_provider_key,
+                on_delta=on_delta,
+            )
+        )
+        while True:
+            if task.done() and queue.empty():
+                break
+            try:
+                token = await asyncio.wait_for(queue.get(), timeout=0.15)
+            except asyncio.TimeoutError:
+                continue
+            if token:
+                yield f"event: delta\ndata: {json.dumps({'text': token})}\n\n"
+        try:
+            result = await task
+        except Exception:
+            yield 'event: error\ndata: {"code":"provider_unavailable","message":"MindRecipe could not reach the selected AI provider."}\n\n'
+            audit(actor_id, "ai_stream", "navigator_turn", "provider_unavailable")
+            return
+        if result.safety_interrupted:
+            store.record_safety_event(
+                actor_id, "safety_interruption", result.policy_version, "resources_shown",
+            )
         safe = result.model_dump(mode="json")
-        yield f"event: delta\ndata: {json.dumps({'text': safe['message']})}\n\n"
+        if result.provider != "openrouter":
+            yield f"event: delta\ndata: {json.dumps({'text': safe['message']})}\n\n"
         yield f"event: done\ndata: {json.dumps(safe)}\n\n"
         audit(actor_id, "ai_stream", "navigator_turn", result.mode)
 
@@ -258,13 +393,19 @@ async def navigator_turn(
 
 # ── Trends & Patterns ──────────────────────────────────────────
 
-@app.get("/v1/trends/{member_id}")
-def get_trends(member_id: str) -> dict[str, object]:
+@app.get("/v1/trends")
+def get_trends(identity: Tuple[str, Role] = Depends(actor)) -> dict[str, object]:
+    member_id, role = identity
+    if role != Role.member:
+        raise HTTPException(status_code=403, detail="member role required")
     return store.get_trends(member_id)
 
 
-@app.get("/v1/patterns/{member_id}")
-def detect_patterns(member_id: str) -> list[dict[str, object]]:
+@app.get("/v1/patterns")
+def detect_patterns(identity: Tuple[str, Role] = Depends(actor)) -> list[dict[str, object]]:
+    member_id, role = identity
+    if role != Role.member:
+        raise HTTPException(status_code=403, detail="member role required")
     return store.detect_patterns(member_id)
 
 
@@ -315,7 +456,7 @@ def put_curriculum_progress(
 @app.get("/v1/journey", response_model=JourneySettings)
 def get_journey(identity: Tuple[str, Role] = Depends(actor)) -> JourneySettings:
     member_id, _ = identity
-    return JourneySettings(**store.get_journey_settings(member_id))
+    return JourneySettings(**store.recompute_journey_recommendation(member_id))
 
 
 @app.put("/v1/journey", response_model=JourneySettings)
@@ -383,7 +524,7 @@ def list_memory(identity: Tuple[str, Role] = Depends(actor)) -> List[MemoryCard]
 @app.post("/v1/memory", response_model=MemoryCard, status_code=status.HTTP_201_CREATED)
 def create_memory(payload: MemoryCardInput, identity: Tuple[str, Role] = Depends(actor)) -> MemoryCard:
     member_id, _ = identity
-    item = store.save_memory_card(member_id, payload.model_dump())
+    item = store.save_memory_card(member_id, payload.model_dump(mode="json"))
     audit(member_id, "create", "memory_card", item["id"])
     return MemoryCard(**item)
 
@@ -391,7 +532,7 @@ def create_memory(payload: MemoryCardInput, identity: Tuple[str, Role] = Depends
 @app.put("/v1/memory/{card_id}", response_model=MemoryCard)
 def update_memory(card_id: str, payload: MemoryCardInput, identity: Tuple[str, Role] = Depends(actor)) -> MemoryCard:
     member_id, _ = identity
-    item = store.save_memory_card(member_id, payload.model_dump(), card_id)
+    item = store.save_memory_card(member_id, payload.model_dump(mode="json"), card_id)
     if not item:
         raise HTTPException(status_code=404, detail="memory card not found")
     audit(member_id, "update", "memory_card", card_id)
@@ -405,6 +546,43 @@ def delete_memory(card_id: str, identity: Tuple[str, Role] = Depends(actor)) -> 
         raise HTTPException(status_code=404, detail="memory card not found")
     audit(member_id, "forget", "memory_card", card_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@app.get("/v1/memory/proposals", response_model=List[MemoryProposal])
+def list_memory_proposals(identity: Tuple[str, Role] = Depends(actor)) -> List[MemoryProposal]:
+    member_id, role = identity
+    if role != Role.member:
+        raise HTTPException(status_code=403, detail="member role required")
+    return [MemoryProposal(**item) for item in store.list_memory_proposals(member_id)]
+
+
+@app.post("/v1/memory/proposals", response_model=MemoryProposal, status_code=status.HTTP_201_CREATED)
+def create_memory_proposal(
+    payload: MemoryProposalInput,
+    identity: Tuple[str, Role] = Depends(actor),
+) -> MemoryProposal:
+    member_id, role = identity
+    if role != Role.member:
+        raise HTTPException(status_code=403, detail="member role required")
+    item = store.create_memory_proposal(member_id, payload.model_dump(mode="json"))
+    audit(member_id, "propose", "memory", item["id"])
+    return MemoryProposal(**item)
+
+
+@app.post("/v1/memory/proposals/{proposal_id}/decision", response_model=MemoryProposal)
+def decide_memory_proposal(
+    proposal_id: str,
+    payload: MemoryProposalDecision,
+    identity: Tuple[str, Role] = Depends(actor),
+) -> MemoryProposal:
+    member_id, role = identity
+    if role != Role.member:
+        raise HTTPException(status_code=403, detail="member role required")
+    item = store.decide_memory_proposal(member_id, proposal_id, payload.approved)
+    if item is None:
+        raise HTTPException(status_code=404, detail="pending memory proposal not found")
+    audit(member_id, "approve" if payload.approved else "dismiss", "memory_proposal", proposal_id)
+    return MemoryProposal(**item)
 
 
 @app.post("/v1/member-events")
@@ -468,11 +646,130 @@ def practice_recipe_practice_item(
         raise HTTPException(status_code=400, detail="tool id does not match route")
     item = store.record_recipe_practice_practice(
         member_id, item_id, payload.effectiveness, payload.context,
+        notes=payload.notes,
+        client_id=payload.client_id,
+        before_activation=payload.before_activation,
+        after_activation=payload.after_activation,
+        duration_minutes=payload.duration_minutes,
+        outcome_confidence=payload.outcome_confidence,
     )
     if not item:
         raise HTTPException(status_code=404, detail="recipe practice not found")
     audit(member_id, "practice", "recipe_practice_item", item_id)
     return RecipePracticeItem(**item)
+
+
+@app.get("/v1/recipes/practices/{item_id}/outcomes", response_model=List[PracticeOutcome])
+def list_practice_outcomes(
+    item_id: str,
+    identity: Tuple[str, Role] = Depends(actor),
+) -> List[PracticeOutcome]:
+    member_id, role = identity
+    if role != Role.member:
+        raise HTTPException(status_code=403, detail="member role required")
+    return [PracticeOutcome(**outcome) for outcome in store.get_practice_outcomes(member_id, item_id)]
+
+
+@app.get("/v1/effectiveness")
+def get_effectiveness(identity: Tuple[str, Role] = Depends(actor)) -> list[dict[str, object]]:
+    member_id, role = identity
+    if role != Role.member:
+        raise HTTPException(status_code=403, detail="member role required")
+    return store.get_practice_effectiveness(member_id)
+
+
+@app.get("/v1/recommendations/practices", response_model=List[PracticeRecommendation])
+def get_practice_recommendations(
+    identity: Tuple[str, Role] = Depends(actor),
+) -> List[PracticeRecommendation]:
+    member_id, role = identity
+    if role != Role.member:
+        raise HTTPException(status_code=403, detail="member role required")
+    return [PracticeRecommendation(**value) for value in store.get_personal_practice_recommendations(member_id)]
+
+
+@app.post("/v1/recommendations/practices/{recommendation_id}/feedback", status_code=status.HTTP_204_NO_CONTENT)
+def save_practice_recommendation_feedback(
+    recommendation_id: str,
+    payload: PracticeRecommendationFeedback,
+    identity: Tuple[str, Role] = Depends(actor),
+) -> Response:
+    member_id, role = identity
+    if role != Role.member:
+        raise HTTPException(status_code=403, detail="member role required")
+    store.save_practice_recommendation_feedback(member_id, recommendation_id, payload.decision)
+    audit(member_id, payload.decision, "practice_recommendation", recommendation_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@app.get("/v1/safety/events")
+def list_safety_events(
+    limit: int = Query(default=50, ge=1, le=100),
+    identity: Tuple[str, Role] = Depends(actor),
+) -> list[dict[str, object]]:
+    member_id, role = identity
+    if role != Role.member:
+        raise HTTPException(status_code=403, detail="member role required")
+    return store.get_safety_events(member_id, limit)
+
+
+@app.get("/v1/commitments", response_model=List[Commitment])
+def list_commitments(
+    include_closed: bool = False,
+    identity: Tuple[str, Role] = Depends(actor),
+) -> List[Commitment]:
+    member_id, role = identity
+    if role != Role.member:
+        raise HTTPException(status_code=403, detail="member role required")
+    return [Commitment(**value) for value in store.list_commitments(member_id, include_closed)]
+
+
+@app.post("/v1/commitments", response_model=Commitment, status_code=status.HTTP_201_CREATED)
+def create_commitment(
+    payload: CommitmentInput,
+    identity: Tuple[str, Role] = Depends(actor),
+) -> Commitment:
+    member_id, role = identity
+    if role != Role.member:
+        raise HTTPException(status_code=403, detail="member role required")
+    value = store.create_commitment(member_id, payload.model_dump(mode="json"))
+    audit(member_id, "create", "commitment", value["id"])
+    return Commitment(**value)
+
+
+@app.patch("/v1/commitments/{commitment_id}", response_model=Commitment)
+def update_commitment(
+    commitment_id: str,
+    payload: CommitmentUpdate,
+    identity: Tuple[str, Role] = Depends(actor),
+) -> Commitment:
+    member_id, role = identity
+    if role != Role.member:
+        raise HTTPException(status_code=403, detail="member role required")
+    value = store.update_commitment(member_id, commitment_id, payload.status.value, payload.notes)
+    if value is None:
+        raise HTTPException(status_code=409, detail="commitment cannot transition to that state")
+    audit(member_id, payload.status.value, "commitment", commitment_id)
+    return Commitment(**value)
+
+
+@app.post("/v1/commitments/{commitment_id}/execution", response_model=Commitment)
+def record_commitment_execution(
+    commitment_id: str,
+    payload: CommitmentExecutionInput,
+    identity: Tuple[str, Role] = Depends(actor),
+) -> Commitment:
+    member_id, role = identity
+    if role != Role.member:
+        raise HTTPException(status_code=403, detail="member role required")
+    value = store.record_commitment_execution(
+        member_id, commitment_id, payload.action, payload.status, payload.receipt,
+        payload.scheduled_for.isoformat() if payload.scheduled_for else None,
+    )
+    if value is None:
+        raise HTTPException(status_code=409, detail="confirm this commitment before connecting a device action")
+    audit(member_id, f"{payload.action}_{payload.status}", "commitment", commitment_id)
+    return Commitment(**value)
 
 
 @app.delete("/v1/recipes/practices/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -549,29 +846,44 @@ async def ai_create_recipe_practice_item(
     return {"success": True, "recipe_proposal": proposal}
 
 
-@app.get("/v1/audit/{actor_id}")
-def get_audit(actor_id: str, limit: int = 50) -> list[dict[str, object]]:
+@app.get("/v1/audit")
+def get_audit(
+    limit: int = Query(default=50, ge=1, le=100),
+    identity: Tuple[str, Role] = Depends(actor),
+) -> list[dict[str, object]]:
+    actor_id, _ = identity
     return store.get_audit_trail(actor_id, limit)
 
 
 # ── Practitioner consent listing ───────────────────────────────
 
-@app.get("/v1/consents/{member_id}")
-def list_consents(member_id: str) -> list[dict[str, object]]:
+@app.get("/v1/consents")
+def list_consents(identity: Tuple[str, Role] = Depends(actor)) -> list[dict[str, object]]:
+    member_id, role = identity
+    if role != Role.member:
+        raise HTTPException(status_code=403, detail="member role required")
     return store.get_active_consents(member_id)
 
 
 
 # ── FHIR Export Endpoints ──────────────────────────────────────
 
-@app.get("/v1/fhir/export/{member_id}")
-def export_fhir(member_id: str, format: str = "json") -> dict[str, object]:
+@app.get("/v1/fhir/export")
+def export_fhir(
+    format: str = "json",
+    identity: Tuple[str, Role] = Depends(actor),
+) -> dict[str, object]:
     """Export member data as FHIR R4 Bundle."""
+    member_id, role = identity
+    if role != Role.member:
+        raise HTTPException(status_code=403, detail="member role required")
     from .fhir_mapper import fhir
     
     checkins = store.get_member_checkins(member_id, days=365)
     trends = store.get_trends(member_id)
     consents = store.get_active_consents(member_id)
+    practice_outcomes = store.get_practice_outcomes(member_id)
+    commitments = store.list_commitments(member_id, include_closed=True)
     
     resources = []
     
@@ -591,6 +903,20 @@ def export_fhir(member_id: str, format: str = "json") -> dict[str, object]:
     if trends.get("total_checkins", 0) > 0:
         resources.append(fhir.observation(member_id, "checkin-count", trends["total_checkins"]))
         resources.append(fhir.observation(member_id, "avg-activation", trends.get("avg_activation", 0), "scale"))
+
+    # Member-reported practice outcomes are exported as wellness observations.
+    # They do not imply diagnosis, efficacy, or clinical treatment.
+    for outcome in practice_outcomes:
+        resources.append(fhir.observation(
+            member_id, "mind-recipe-practice-effectiveness", outcome.get("effectiveness"), "member rating (1-5)"
+        ))
+        if outcome.get("context"):
+            resources.append(fhir.observation(member_id, "mind-recipe-practice-context", outcome["context"]))
+
+    for commitment in commitments:
+        resources.append(fhir.observation(
+            member_id, "mind-recipe-commitment-status", commitment.get("status", "proposed")
+        ))
     
     # Consent resources
     for c in consents:
@@ -611,10 +937,13 @@ def export_fhir(member_id: str, format: str = "json") -> dict[str, object]:
     return {"resourceType": "Bundle", "type": "collection", "entry": [{"resource": r} for r in resources]}
 
 
-@app.get("/v1/fhir/export-csv/{member_id}")
-def export_fhir_csv(member_id: str) -> str:
+@app.get("/v1/fhir/export-csv")
+def export_fhir_csv(identity: Tuple[str, Role] = Depends(actor)) -> str:
     """Export check-ins as CSV for FHIR mapping."""
     from .fhir_mapper import fhir
+    member_id, role = identity
+    if role != Role.member:
+        raise HTTPException(status_code=403, detail="member role required")
     checkins = store.get_member_checkins(member_id, days=365)
     return fhir.export_csv(checkins)
 

@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 import os
 import time
-from typing import List, Optional
+from typing import Awaitable, Callable, List, Optional
 from uuid import UUID
 
 from .config import settings
@@ -51,7 +51,7 @@ CREATE TABLE IF NOT EXISTS conversation_memory (
 CREATE INDEX IF NOT EXISTS idx_conv_member ON conversation_memory(member_id, created_at);
 """
 
-SYSTEM_PROMPT = """You are Navigator, the nav-compass AI system in Mind Recipe. You are a bounded wellness companion: attentive, warm, and genuinely conversational, never a scripted test or therapy replacement.
+SYSTEM_PROMPT = """You are Navigator, the nav-compass AI system in MindRecipe. You are a bounded wellness companion: attentive, warm, and genuinely conversational, never a scripted test or therapy replacement.
 
 CORE PRINCIPLES:
 - Infer the intended meaning of short or ambiguous replies from the immediately preceding dialogue. Resolve words such as "that", "it", "yes", and "no" before answering.
@@ -172,7 +172,7 @@ def save_to_memory(member_id: str, role: str, content: str):
         pass
 
 
-DAILY_NAVIGATION_PROMPT = """You are Navigator, the bounded wellness reflection guide in Mind Recipe, conducting a daily navigation.
+DAILY_NAVIGATION_PROMPT = """You are Navigator, the bounded wellness reflection guide in MindRecipe, conducting a daily navigation.
 
 Follow this sequence naturally, one step at a time:
 1. Greeting and consent/context reminder
@@ -212,6 +212,7 @@ async def _call_openrouter(
     provider_key: str,
     temperature: float = 0.82,
     max_tokens: int = 360,
+    on_delta: Optional[Callable[[str], Awaitable[None]]] = None,
 ) -> str:
     import httpx
 
@@ -231,16 +232,67 @@ async def _call_openrouter(
     else:
         payload["reasoning"] = {"effort": "high", "exclude": True}
     async with httpx.AsyncClient(timeout=httpx.Timeout(25.0)) as client:
+        if on_delta is not None:
+            # A streaming route must emit provider tokens as they arrive. Keep
+            # the request compatible with providers that do not advertise the
+            # optional reasoning parameter; the normal route retries it below.
+            payload.pop("reasoning", None)
+            payload["stream"] = True
+            chunks: list[str] = []
+            async with client.stream(
+                "POST",
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {provider_key}",
+                    "Content-Type": "application/json",
+                    "HTTP-Referer": "https://mindrecipe.app",
+                    "X-Title": "MindRecipe",
+                },
+                json=payload,
+            ) as response:
+                response.raise_for_status()
+                async for line in response.aiter_lines():
+                    if not line.startswith("data:"):
+                        continue
+                    raw = line[5:].strip()
+                    if raw == "[DONE]":
+                        break
+                    try:
+                        delta = json.loads(raw)["choices"][0].get("delta", {}).get("content", "")
+                    except (KeyError, IndexError, TypeError, json.JSONDecodeError):
+                        delta = ""
+                    if isinstance(delta, str) and delta:
+                        chunks.append(delta)
+                        await on_delta(delta)
+            message = "".join(chunks).strip()
+            if not message:
+                raise ValueError("empty provider response")
+            return message
         response = await client.post(
             "https://openrouter.ai/api/v1/chat/completions",
             headers={
                 "Authorization": f"Bearer {provider_key}",
                 "Content-Type": "application/json",
                 "HTTP-Referer": "https://mindrecipe.app",
-                "X-Title": "Mind Recipe",
+                "X-Title": "MindRecipe",
             },
             json=payload,
         )
+        # Some otherwise valid OpenRouter models do not accept the optional
+        # reasoning control. Retry once as a normal chat request instead of
+        # treating that capability mismatch as a broken member connection.
+        if response.status_code >= 400 and "reasoning" in payload:
+            payload.pop("reasoning", None)
+            response = await client.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {provider_key}",
+                    "Content-Type": "application/json",
+                    "HTTP-Referer": "https://mindrecipe.app",
+                    "X-Title": "MindRecipe",
+                },
+                json=payload,
+            )
         response.raise_for_status()
         body = response.json()
         message = body["choices"][0]["message"]["content"]
@@ -340,9 +392,10 @@ async def _call_provider(
     provider_key: str,
     temperature: float = 0.82,
     max_tokens: int = 360,
+    on_delta: Optional[Callable[[str], Awaitable[None]]] = None,
 ) -> str:
     if provider == "openrouter":
-        return await _call_openrouter(messages, model, provider_key, temperature, max_tokens)
+        return await _call_openrouter(messages, model, provider_key, temperature, max_tokens, on_delta)
     elif provider == "anthropic":
         return await _call_anthropic(messages, model, provider_key, temperature, max_tokens)
     elif provider == "google":
@@ -376,7 +429,11 @@ def _get_api_key(provider: str, provided_key: Optional[str] = None) -> Optional[
     return os.getenv(env_key, "").strip() or None
 
 
-async def respond(request: AiRequest, provider_key: Optional[str]) -> AiResponse:
+async def respond(
+    request: AiRequest,
+    provider_key: Optional[str],
+    on_delta: Optional[Callable[[str], Awaitable[None]]] = None,
+) -> AiResponse:
     safety = evaluate(request.text)
     if safety.interrupt:
         return AiResponse(
@@ -518,11 +575,13 @@ async def respond(request: AiRequest, provider_key: Optional[str]) -> AiResponse
     ]
 
     try:
-        message = await _call_provider(request.provider, messages, model, provider_key)
+        message = await _call_provider(
+            request.provider, messages, model, provider_key, on_delta=on_delta,
+        )
     except Exception:
         return AiResponse(
             mode="provider_error",
-            message="Mind Recipe could not reach the selected AI provider.",
+            message="MindRecipe could not reach the selected AI provider.",
             safety_interrupted=False,
             policy_version=safety.policy_version,
             context_fields_used=used,

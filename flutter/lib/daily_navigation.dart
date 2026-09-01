@@ -25,9 +25,17 @@ enum NavStep {
 }
 
 class DailyNavigation extends StatefulWidget {
-  const DailyNavigation({super.key, required this.appState, required this.onComplete, required this.onSeePulse, this.syncSummary = ''});
+  const DailyNavigation({
+    super.key,
+    required this.appState,
+    required this.onComplete,
+    required this.onSeePulse,
+    this.onCheckInQueued,
+    this.syncSummary = '',
+  });
   final SecureAppState appState;
   final VoidCallback onComplete;
+  final Future<void> Function()? onCheckInQueued;
 
   /// Live activity summary shown on the greeting step (chat ↔ nav sync).
   final String syncSummary;
@@ -49,6 +57,7 @@ class _DailyNavigationState extends State<DailyNavigation> {
   String _chosenAction = '';
   bool _consentGiven = false;
   bool _cloudOptIn = true;
+  bool _completing = false;
 
   static const _emotions = [
     'Calm', 'Anxious', 'Energetic', 'Tired', 'Hopeful',
@@ -61,25 +70,39 @@ class _DailyNavigationState extends State<DailyNavigation> {
     'Stomach', 'Hips', 'Legs', 'Feet', 'Hands',
   ];
 
-  void _advance() {
+  Future<void> _advance() async {
     final order = NavStep.values;
     final idx = order.indexOf(_current);
     if (idx < order.length - 1) {
       setState(() => _current = order[idx + 1]);
     }
     if (_current == NavStep.complete) {
+      if (_completing) return;
+      _completing = true;
       // Persist the navigation — Pulse, greeting summaries, and AI grounding
       // all read this history.
-      unawaited(widget.appState.saveNavigationEntry({
-        'id': DateTime.now().millisecondsSinceEpoch.toString(),
-        't': DateTime.now().toIso8601String(),
+      final recordedAt = DateTime.now();
+      final entryId = 'daily-nav-${recordedAt.microsecondsSinceEpoch}';
+      await widget.appState.saveNavigationEntry({
+        'id': entryId,
+        't': recordedAt.toIso8601String(),
         'emotions': _selectedEmotions.isEmpty
             ? 'Not recorded'
             : _selectedEmotions.join(', '),
         'activation': _activationLevel,
         'body': _selectedBodyAreas.isEmpty ? '' : _selectedBodyAreas.join(', '),
         'journal': _journalController.text.trim(),
-      }));
+      });
+      await widget.appState.queueCheckIn({
+        'client_id': entryId,
+        'emotions': _selectedEmotions.toList()..sort(),
+        'activation': _activationLevel,
+        'body_areas': _selectedBodyAreas.toList()..sort(),
+        'journal': _journalController.text.trim(),
+        'zone_label': _zoneLabel,
+      });
+      final queued = widget.onCheckInQueued;
+      if (queued != null) unawaited(queued());
       widget.onComplete();
       // The modal never lingers: brief confirmation, then land on Pulse
       // where the new pulse point is visible.

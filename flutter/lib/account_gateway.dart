@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'app_services.dart';
 import 'three_background.dart';
 import 'three_brand_mark.dart';
+import 'visual_theme.dart';
 
 class AccountGateway extends StatefulWidget {
   const AccountGateway({super.key, required this.api, required this.appState});
@@ -52,7 +53,7 @@ class _AccountGatewayState extends State<AccountGateway> {
       return null;
     }
     if (creating && name.text.trim().length < 2) {
-      return 'Enter the name you want Mind Recipe to use.';
+      return 'Enter the name you want MindRecipe to use.';
     }
     if (!normalizedEmail.contains('@') || !normalizedEmail.contains('.')) {
       return 'Enter a valid email address.';
@@ -115,7 +116,7 @@ class _AccountGatewayState extends State<AccountGateway> {
     } catch (_) {
       if (mounted) {
         setState(
-          () => error = 'Mind Recipe could not reach the account service. Check your connection and try again.',
+          () => error = 'MindRecipe could not reach the account service. Check your connection and try again.',
         );
       }
     } finally {
@@ -154,7 +155,7 @@ class _AccountGatewayState extends State<AccountGateway> {
     } catch (_) {
       if (mounted) {
         setState(
-          () => error = 'Mind Recipe could not reach the account service. Check your connection and try again.',
+          () => error = 'MindRecipe could not reach the account service. Check your connection and try again.',
         );
       }
     } finally {
@@ -168,14 +169,14 @@ class _AccountGatewayState extends State<AccountGateway> {
       children: [
         Positioned.fill(
           child: ThreeBackground(
-            variant: widget.appState.chimeraFxVariant,
+            variant: visualThemeFor(widget.appState.visualThemeId).composition,
             progress: creating
                 ? .34
                 : resetting
                 ? .67
                 : .16,
-            intensity: widget.appState.chimeraFxIntensity,
-            theme: widget.appState.chimeraVfxTheme,
+            intensity: .78,
+            theme: visualThemeFor(widget.appState.visualThemeId).engineTheme,
           ),
         ),
         SafeArea(
@@ -204,11 +205,11 @@ class _AccountGatewayState extends State<AccountGateway> {
                         ),
                         const SizedBox(height: 18),
                         Text(
-                          'MIND RECIPE',
+                          'MindRecipe',
                           textAlign: TextAlign.center,
                           style: Theme.of(context).textTheme.labelLarge
                               ?.copyWith(
-                                letterSpacing: 3,
+                                letterSpacing: 0,
                                 fontWeight: FontWeight.w900,
                               ),
                         ),
@@ -320,7 +321,7 @@ class _AccountGatewayState extends State<AccountGateway> {
                                     () => acceptedTerms = value ?? false,
                                   ),
                             title: const Text(
-                              'I understand Mind Recipe is a wellness tool, not therapy or emergency care.',
+                              'I understand MindRecipe is a wellness tool, not therapy or emergency care.',
                             ),
                             subtitle: const Text(
                               'I agree to the Privacy Notice and Terms.',

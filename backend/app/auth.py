@@ -23,6 +23,7 @@ class UserAccount:
     email: str
     display_name: str
     password_hash: str
+    role: str = "member"
 
 
 class AccountStore:
@@ -51,20 +52,24 @@ class AccountStore:
                 connection.execute(
                     "CREATE TABLE IF NOT EXISTS accounts ("
                     "id TEXT PRIMARY KEY, email TEXT UNIQUE NOT NULL, "
-                    "display_name TEXT NOT NULL, password_hash TEXT NOT NULL)"
+                    "display_name TEXT NOT NULL, password_hash TEXT NOT NULL, role TEXT NOT NULL DEFAULT 'member')"
                 )
+                connection.execute("ALTER TABLE accounts ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'member'")
                 rows = connection.execute(
-                    "SELECT id, email, display_name, password_hash FROM accounts"
+                    "SELECT id, email, display_name, password_hash, role FROM accounts"
                 ).fetchall()
         else:
             with self._sqlite_connect() as connection:
                 connection.execute(
                     "CREATE TABLE IF NOT EXISTS accounts ("
                     "id TEXT PRIMARY KEY, email TEXT UNIQUE NOT NULL, "
-                    "display_name TEXT NOT NULL, password_hash TEXT NOT NULL)"
+                    "display_name TEXT NOT NULL, password_hash TEXT NOT NULL, role TEXT NOT NULL DEFAULT 'member')"
                 )
+                columns = {row[1] for row in connection.execute("PRAGMA table_info(accounts)").fetchall()}
+                if "role" not in columns:
+                    connection.execute("ALTER TABLE accounts ADD COLUMN role TEXT NOT NULL DEFAULT 'member'")
                 rows = connection.execute(
-                    "SELECT id, email, display_name, password_hash FROM accounts"
+                    "SELECT id, email, display_name, password_hash, role FROM accounts"
                 ).fetchall()
         for row in rows:
             account = UserAccount(*row)
@@ -94,18 +99,18 @@ class AccountStore:
         )
         self.users_by_email[normalized] = account
         self.users_by_id[account.id] = account
-        values = (account.id, account.email, account.display_name, account.password_hash)
+        values = (account.id, account.email, account.display_name, account.password_hash, account.role)
         if self.uses_postgres:
             import psycopg
             with psycopg.connect(self.database_url) as connection:
                 connection.execute(
-                    "INSERT INTO accounts (id, email, display_name, password_hash) VALUES (%s, %s, %s, %s)",
+                    "INSERT INTO accounts (id, email, display_name, password_hash, role) VALUES (%s, %s, %s, %s, %s)",
                     values,
                 )
         else:
             with self._sqlite_connect() as connection:
                 connection.execute(
-                    "INSERT INTO accounts (id, email, display_name, password_hash) VALUES (?, ?, ?, ?)",
+                    "INSERT INTO accounts (id, email, display_name, password_hash, role) VALUES (?, ?, ?, ?, ?)",
                     values,
                 )
         return account
@@ -130,6 +135,7 @@ class AccountStore:
             email=account.email,
             display_name=account.display_name,
             password_hash=_hash_password(new_password),
+            role=account.role,
         )
         self.users_by_email[normalized] = updated
         self.users_by_id[updated.id] = updated
@@ -146,6 +152,44 @@ class AccountStore:
                     "UPDATE accounts SET password_hash = ? WHERE id = ?", values
                 )
         return updated
+
+    def provision_role(self, account_id: str, role: str) -> UserAccount:
+        """Operator-only account provisioning hook; never exposed as a public API."""
+        if role not in {"member", "practitioner", "guardian"}:
+            raise ValueError("unsupported account role")
+        account = self.users_by_id.get(account_id)
+        if account is None:
+            raise KeyError(account_id)
+        updated = UserAccount(
+            id=account.id, email=account.email, display_name=account.display_name,
+            password_hash=account.password_hash, role=role,
+        )
+        self.users_by_id[account_id] = updated
+        self.users_by_email[updated.email] = updated
+        if self.uses_postgres:
+            import psycopg
+            with psycopg.connect(self.database_url) as connection:
+                connection.execute("UPDATE accounts SET role=%s WHERE id=%s", (role, account_id))
+        else:
+            with self._sqlite_connect() as connection:
+                connection.execute("UPDATE accounts SET role=? WHERE id=?", (role, account_id))
+        return updated
+
+    def delete_account(self, account_id: str) -> bool:
+        account = self.users_by_id.get(account_id)
+        if account is None:
+            return False
+        if self.uses_postgres:
+            import psycopg
+            with psycopg.connect(self.database_url) as connection:
+                connection.execute("DELETE FROM accounts WHERE id=%s", (account_id,))
+        else:
+            with self._sqlite_connect() as connection:
+                connection.execute("DELETE FROM accounts WHERE id=?", (account_id,))
+        self.users_by_id.pop(account_id, None)
+        self.users_by_email.pop(account.email, None)
+        self._reset_tokens.pop(account.email, None)
+        return True
 
     _reset_tokens: Dict[str, str] = {}
 
@@ -207,7 +251,7 @@ _development_secret = secrets.token_bytes(32)
 def issue_token(account: UserAccount) -> str:
     payload = _encode(json.dumps({
         "sub": account.id,
-        "role": "member",
+        "role": account.role,
         "exp": int(time.time()) + 12 * 60 * 60,
     }, separators=(",", ":")).encode())
     signature = _encode(hmac.new(_secret(), payload.encode(), hashlib.sha256).digest())
@@ -215,15 +259,20 @@ def issue_token(account: UserAccount) -> str:
 
 
 def verify_token(token: str) -> str:
+    return verify_token_identity(token)[0]
+
+
+def verify_token_identity(token: str) -> tuple[str, str]:
     try:
         payload, signature = token.split(".", 1)
         expected = _encode(hmac.new(_secret(), payload.encode(), hashlib.sha256).digest())
         if not hmac.compare_digest(signature, expected):
             raise ValueError
         body = json.loads(_decode(payload))
-        if body.get("role") != "member" or int(body.get("exp", 0)) <= int(time.time()):
+        role = str(body.get("role", ""))
+        if role not in {"member", "practitioner", "guardian"} or int(body.get("exp", 0)) <= int(time.time()):
             raise ValueError
-        return str(body["sub"])
+        return str(body["sub"]), role
     except (ValueError, KeyError, TypeError, json.JSONDecodeError):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid or expired session")
 

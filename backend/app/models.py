@@ -67,6 +67,9 @@ class ObservationInput(BaseModel):
 
 
 class CheckInInput(BaseModel):
+    # Device-generated identifier makes offline retries idempotent. It is not
+    # a user identifier and is never used for authorization.
+    client_id: Optional[str] = Field(default=None, min_length=8, max_length=120)
     emotions: List[str] = Field(default_factory=list, max_length=20)
     activation: int = Field(ge=-5, le=5)
     body_areas: List[str] = Field(default_factory=list, max_length=20)
@@ -148,6 +151,86 @@ class RecipePracticePracticeInput(BaseModel):
     effectiveness: int = Field(ge=1, le=5)
     context: Optional[str] = Field(default=None, max_length=200)
     notes: Optional[str] = Field(default=None, max_length=500)
+    # A device-generated id keeps an interrupted mobile retry from creating
+    # multiple outcome records for one attempt.
+    client_id: Optional[str] = Field(default=None, min_length=8, max_length=120)
+    before_activation: Optional[int] = Field(default=None, ge=-5, le=5)
+    after_activation: Optional[int] = Field(default=None, ge=-5, le=5)
+    duration_minutes: Optional[int] = Field(default=None, ge=1, le=180)
+    outcome_confidence: Optional[int] = Field(default=None, ge=1, le=5)
+
+
+class PracticeOutcome(BaseModel):
+    id: UUID = Field(default_factory=uuid4)
+    client_id: Optional[str] = None
+    member_id: str
+    practice_item_id: UUID
+    effectiveness: int = Field(ge=1, le=5)
+    context: Optional[str] = None
+    notes: Optional[str] = None
+    before_activation: Optional[int] = None
+    after_activation: Optional[int] = None
+    duration_minutes: Optional[int] = None
+    outcome_confidence: Optional[int] = None
+    occurred_at: datetime
+
+
+class PracticeRecommendation(BaseModel):
+    id: str
+    practice_item_id: UUID
+    practice_name: str
+    reason: str
+    attempts: int
+    average_effectiveness: float
+    average_activation_change: Optional[float] = None
+    context_examples: List[str] = Field(default_factory=list)
+    uncertainty: str = "This reflects your recorded experience, not a prediction or clinical finding."
+
+
+class PracticeRecommendationFeedback(BaseModel):
+    decision: str = Field(pattern="^(accepted|dismissed)$")
+
+
+class CommitmentStatus(str, Enum):
+    proposed = "proposed"
+    confirmed = "confirmed"
+    scheduled = "scheduled"
+    completed = "completed"
+    skipped = "skipped"
+    cancelled = "cancelled"
+
+
+class CommitmentInput(BaseModel):
+    client_id: Optional[str] = Field(default=None, min_length=8, max_length=120)
+    title: str = Field(min_length=1, max_length=240)
+    action_type: str = Field(default="reflection", min_length=1, max_length=80)
+    practice_item_id: Optional[UUID] = None
+    scheduled_for: Optional[datetime] = None
+    notes: Optional[str] = Field(default=None, max_length=1000)
+    source: str = Field(default="member", max_length=80)
+
+
+class Commitment(CommitmentInput):
+    id: UUID = Field(default_factory=uuid4)
+    member_id: str
+    status: CommitmentStatus = CommitmentStatus.proposed
+    created_at: datetime
+    updated_at: datetime
+    completed_at: Optional[datetime] = None
+    execution_status: str = "not_requested"
+    execution_receipt: Optional[str] = None
+
+
+class CommitmentUpdate(BaseModel):
+    status: CommitmentStatus
+    notes: Optional[str] = Field(default=None, max_length=1000)
+
+
+class CommitmentExecutionInput(BaseModel):
+    action: str = Field(pattern="^(reminder|calendar|alarm)$")
+    status: str = Field(pattern="^(requested|unavailable|failed)$")
+    receipt: Optional[str] = Field(default=None, max_length=240)
+    scheduled_for: Optional[datetime] = None
 
 
 class JourneyMode(str, Enum):
@@ -199,13 +282,35 @@ class MemoryCardInput(BaseModel):
     kind: str = Field(min_length=1, max_length=80)
     content: str = Field(min_length=1, max_length=1000)
     pinned: bool = False
+    expires_at: Optional[datetime] = None
 
 
 class MemoryCard(MemoryCardInput):
     id: str
     member_id: str
+    source: str = "member"
     created_at: datetime
     updated_at: datetime
+
+
+class MemoryProposalInput(BaseModel):
+    kind: str = Field(min_length=1, max_length=80)
+    content: str = Field(min_length=1, max_length=1000)
+    reason: str = Field(min_length=1, max_length=500)
+    expires_at: Optional[datetime] = None
+
+
+class MemoryProposal(MemoryProposalInput):
+    id: str
+    member_id: str
+    status: str = "proposed"
+    source: str = "assistant"
+    created_at: datetime
+    updated_at: datetime
+
+
+class MemoryProposalDecision(BaseModel):
+    approved: bool
 
 
 class MemberEventInput(BaseModel):
@@ -357,12 +462,19 @@ class Appointment(AppointmentInput):
 
 class NotificationPreferenceInput(BaseModel):
     enabled: bool = True
-    quiet_hours_start: Optional[str] = Field(default=None, pattern="^([01]\d|2[0-3]):[0-5]\d$")
-    quiet_hours_end: Optional[str] = Field(default=None, pattern="^([01]\d|2[0-3]):[0-5]\d$")
+    quiet_hours_start: Optional[str] = Field(default=None, pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
+    quiet_hours_end: Optional[str] = Field(default=None, pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
     check_in_reminder: bool = True
     lesson_reminder: bool = True
     booking_reminder: bool = True
     snooze_minutes: int = Field(default=0, ge=0, le=480)
+    morning_time: str = Field(default="09:00", pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
+    midday_time: str = Field(default="13:00", pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
+    evening_time: str = Field(default="19:00", pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
+    active_weekdays: List[int] = Field(default_factory=lambda: [1, 2, 3, 4, 5])
+    message_style: str = Field(default="discreet", pattern="^(discreet|gentle|encouraging|minimal)$")
+    snooze_until: Optional[datetime] = None
+    pause_until: Optional[datetime] = None
 
 
 class NotificationPreference(NotificationPreferenceInput):
@@ -390,6 +502,10 @@ class AccountExport(BaseModel):
     tracker_events: List[TrackerEvent] = Field(default_factory=list)
     consents: List[ConsentGrant] = Field(default_factory=list)
     appointments: List[Appointment] = Field(default_factory=list)
+
+
+class AccountDeletionRequest(BaseModel):
+    confirmation: str = Field(pattern="^DELETE$")
 
 
 class PrivacyMode(BaseModel):

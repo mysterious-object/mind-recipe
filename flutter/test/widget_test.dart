@@ -28,6 +28,7 @@ class FakeMindRecipeApi extends MindRecipeApiClient {
     required String text,
     required Map<String, dynamic> context,
     bool externalResearchOptIn = false,
+    String? model,
   }) async {
     return const AiReply(
       mode: 'cloud_ai',
@@ -58,7 +59,9 @@ void main() {
     bool skipOnboarding = true,
   }) async {
     await tester.pumpWidget(testApp());
+    await tester.pump(const Duration(milliseconds: 4300));
     await tester.pump();
+    await tester.ensureVisible(find.text('Create a new account'));
     await tester.tap(find.text('Create a new account'));
     await tester.pump();
     final fields = find.byType(TextField);
@@ -70,8 +73,9 @@ void main() {
     await tester.tap(find.byType(Checkbox), warnIfMissed: false);
     await tester.ensureVisible(find.text('Create account'));
     await tester.tap(find.text('Create account'));
-    await tester.pump();
+    await pumpFrames(tester, 20);
     if (skipOnboarding) {
+      await tester.ensureVisible(find.text('Skip'));
       await tester.tap(find.text('Skip'));
       await pumpFrames(tester);
     }
@@ -86,9 +90,11 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(testApp());
+    await tester.pump(const Duration(milliseconds: 4300));
     await tester.pump();
     expect(find.text('Welcome back, navigator'), findsOneWidget);
     expect(find.text('Sign in'), findsOneWidget);
+    await tester.ensureVisible(find.text('Create a new account'));
     await tester.tap(find.text('Create a new account'));
     await tester.pump();
     expect(find.text('Create your private space'), findsOneWidget);
@@ -124,6 +130,27 @@ void main() {
     );
     expect(registered.token, 'signed-token');
     expect(loggedIn.displayName, 'Navigator');
+  });
+
+  test('API client syncs an authenticated, idempotent check-in', () async {
+    final client = MockClient((request) async {
+      expect(request.url.path, '/v1/checkins');
+      expect(request.headers['authorization'], 'Bearer test-token');
+      final body = jsonDecode(request.body) as Map<String, dynamic>;
+      expect(body['client_id'], 'daily-nav-001');
+      expect(body['emotions'], ['Calm']);
+      expect(body['activation'], -1);
+      expect(body['body_areas'], ['Shoulders']);
+      return http.Response('{}', 201);
+    });
+    await MindRecipeApiClient(client: client).createCheckIn(
+      token: 'test-token',
+      clientId: 'daily-nav-001',
+      emotions: const ['Calm'],
+      activation: -1,
+      bodyAreas: const ['Shoulders'],
+      zoneLabel: 'Steady and present',
+    );
   });
 
   testWidgets('cinematic onboarding follows the account gateway', (

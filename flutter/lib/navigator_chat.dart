@@ -313,8 +313,8 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
             ChatMessage(
               role: ChatRole.assistant,
               text: current == null || current.isEmpty
-                  ? 'Your next module begins with the Guided Foundations path in Mind Recipe. Open the Mind Recipe tab to review it; nothing is locked, and you can choose a different starting point.'
-                  : 'Your saved journey currently points to $current. Open the Mind Recipe tab to continue it, review why it was recommended, or choose a different module.',
+                  ? 'Your next module begins with the Guided Foundations path in MindRecipe. Open the MindRecipe tab to review it; nothing is locked, and you can choose a different starting point.'
+                  : 'Your saved journey currently points to $current. Open the MindRecipe tab to continue it, review why it was recommended, or choose a different module.',
               localGenerated: true,
             ),
           );
@@ -617,47 +617,77 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
           .reversed
           .map((message) => {'role': message.role.name, 'text': message.text})
           .toList();
-      final reply = await widget.api.reflect(
+      final context = <String, dynamic>{
+        'member_id': widget.appState.session?.email ?? '',
+        'display_name': widget.appState.session?.displayName ?? '',
+        'conversation': recent,
+        'emotions': widget.state.emotions.toList(),
+        'activation': widget.state.activation,
+        'body_areas': widget.state.bodyAreas.toList(),
+        'context_tags': widget.state.contextTags.toList(),
+        'zone_label': widget.state.greenZone,
+        if (curriculum != null) 'curriculum_progress': curriculum,
+        'screen_context': {'destination': 'Navigator', 'mode': 'conversation'},
+        'device_capabilities': {
+          'confirmed_actions': const ['calendar', 'reminder', 'alarm'],
+          'requires_native_confirmation': true,
+        },
+      };
+      final placeholderIndex = widget.messages.length;
+      setState(
+        () => widget.messages.add(
+          ChatMessage(role: ChatRole.assistant, text: '', cloudGenerated: true),
+        ),
+      );
+      AiReply? reply;
+      await for (final event in widget.api.navigatorTurn(
         token: widget.appState.session?.token ?? '',
         providerKey: widget.appState.openRouterKey,
         text: text,
         externalResearchOptIn: widget.appState.publicResearchEnabled,
         model: widget.appState.selectedCloudModel,
-        context: {
-          'member_id': widget.appState.session?.email ?? '',
-          'display_name': widget.appState.session?.displayName ?? '',
-          'conversation': recent,
-          'emotions': widget.state.emotions.toList(),
-          'activation': widget.state.activation,
-          'body_areas': widget.state.bodyAreas.toList(),
-          'context_tags': widget.state.contextTags.toList(),
-          'zone_label': widget.state.greenZone,
-          if (curriculum != null) 'curriculum_progress': curriculum,
-          'screen_context': {
-            'destination': 'Navigator',
-            'mode': 'conversation',
-          },
-          'device_capabilities': {
-            'confirmed_actions': const [
-              'calendar',
-              'reminder',
-              'alarm',
-            ],
-            'requires_native_confirmation': true,
-          },
-        },
+        context: context,
+      )) {
+        if (!mounted) return;
+        if (event.type == 'delta') {
+          final token = event.payload['text']?.toString() ?? '';
+          if (token.isNotEmpty && placeholderIndex < widget.messages.length) {
+            setState(() {
+              final current = widget.messages[placeholderIndex];
+              widget.messages[placeholderIndex] = ChatMessage(
+                role: ChatRole.assistant,
+                text: current.text + token,
+                cloudGenerated: true,
+                model: widget.appState.selectedCloudModel,
+              );
+            });
+            _scrollToEnd();
+          }
+        } else if (event.type == 'done') {
+          reply = AiReply(
+            mode: event.payload['mode']?.toString() ?? 'provider_error',
+            message: event.payload['message']?.toString() ?? '',
+            provider: event.payload['provider']?.toString(),
+            model: event.payload['model']?.toString(),
+          );
+        }
+      }
+      reply ??= const AiReply(
+        mode: 'provider_error',
+        message: 'MindRecipe could not reach the selected AI provider.',
       );
       if (!mounted) return;
-      setState(
-        () => widget.messages.add(
-          ChatMessage(
-            role: reply.isCloudAi ? ChatRole.assistant : ChatRole.status,
-            text: reply.message,
-            model: reply.isCloudAi ? reply.model : null,
-            cloudGenerated: reply.isCloudAi,
-          ),
-        ),
-      );
+      setState(() {
+        if (placeholderIndex < widget.messages.length) {
+          final streamed = widget.messages[placeholderIndex].text;
+          widget.messages[placeholderIndex] = ChatMessage(
+            role: reply!.isCloudAi ? ChatRole.assistant : ChatRole.status,
+            text: streamed.isNotEmpty ? streamed : reply!.message,
+            model: reply!.isCloudAi ? reply!.model : null,
+            cloudGenerated: reply!.isCloudAi,
+          );
+        }
+      });
       if (reply.isCloudAi) {
         _lastMessageSide = 1.0; // AI sent
         unawaited(widget.appState.recordAiReflection());
@@ -1074,7 +1104,7 @@ class _PhoneActionCard extends StatelessWidget {
             ),
             const SizedBox(height: 2),
             Text(
-              'Mind Recipe can add this on your phone — it stays in your own Calendar, Reminders, or Clock app.',
+              'MindRecipe can add this on your phone — it stays in your own Calendar, Reminders, or Clock app.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 8),

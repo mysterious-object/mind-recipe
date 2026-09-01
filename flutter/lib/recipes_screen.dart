@@ -205,6 +205,8 @@ class _RecipesScreenState extends State<RecipesScreen> {
   String? _generateError;
   String _journeyMode = 'guided_foundations';
   List<Map<String, dynamic>> _proposals = const [];
+  String? _recommendedLessonId;
+  String _recommendationReason = '';
   late final LessonGenerator _generator = LessonGenerator(widget.appState);
 
   @override
@@ -226,6 +228,8 @@ class _RecipesScreenState extends State<RecipesScreen> {
         if (mounted) setState(() {
           _journeyMode = journey['mode']?.toString() ?? 'guided_foundations';
           _proposals = proposals;
+          _recommendedLessonId = journey['recommended_module_id']?.toString();
+          _recommendationReason = journey['recommendation_reason']?.toString() ?? '';
         });
         final remote = await widget.api.getCurriculumProgress(
           token: token,
@@ -336,6 +340,22 @@ class _RecipesScreenState extends State<RecipesScreen> {
       _current = next.isEmpty ? lesson.id : next.first.id;
     });
     await _persist(sync: true);
+    final token = widget.appState.session?.token;
+    if (token == null) return;
+    try {
+      final journey = await widget.api.getJourney(token);
+      final recommended = journey['recommended_module_id']?.toString();
+      if (!mounted) return;
+      setState(() {
+        _recommendedLessonId = recommended;
+        _recommendationReason = journey['recommendation_reason']?.toString() ?? '';
+        if (recommended != null && !_completed.contains(recommended)) {
+          _current = recommended;
+        }
+      });
+    } catch (_) {
+      // Completion remains useful offline; the recommendation refreshes later.
+    }
   }
 
   Future<void> _reviewProposal(Map<String, dynamic> proposal) async {
@@ -445,6 +465,27 @@ class _RecipesScreenState extends State<RecipesScreen> {
             subtitle: Text(proposal['purpose']?.toString() ?? 'Suggested from your journey.'),
             trailing: FilledButton(onPressed: () => _reviewProposal(proposal), child: const Text('Review')),
           ))),
+        ],
+        if (_recommendedLessonId != null && _recommendationReason.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Card(
+            color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: .55),
+            child: ListTile(
+              leading: const Icon(Icons.route_outlined),
+              title: Text(
+                'Suggested next: ${allLessons.firstWhere(
+                  (lesson) => lesson.id == _recommendedLessonId,
+                  orElse: () => next,
+                ).title}',
+              ),
+              subtitle: Text(_recommendationReason),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => _open(allLessons.firstWhere(
+                (lesson) => lesson.id == _recommendedLessonId,
+                orElse: () => next,
+              )),
+            ),
+          ),
         ],
         _JourneyCard(
           completed: _completed.length,

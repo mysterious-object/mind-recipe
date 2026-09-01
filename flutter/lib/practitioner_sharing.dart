@@ -25,22 +25,14 @@ class _PractitionerSharingState extends State<PractitionerSharing> {
 
   Future<void> _load() async {
     final api = MindRecipeApiClient();
-    final id = widget.appState.session?.email ?? 'dev-member';
+    final token = widget.appState.session?.token ?? '';
     try {
-      final consents = await api.fetchConsents(id);
-      final audit = await api.fetchAudit(id);
+      final consents = await api.fetchConsents(token);
+      final audit = await api.fetchAudit(token);
       if (mounted) setState(() { _consents = consents; _auditLog = audit; _loaded = true; });
     } catch (_) {
       if (mounted) setState(() => _loaded = true);
     }
-  }
-
-  Future<List<dynamic>> _fetchConsents(MindRecipeApiClient api, String id) async {
-    return api.fetchConsents(id);
-  }
-
-  Future<List<dynamic>> _fetchAudit(MindRecipeApiClient api, String id) async {
-    return api.fetchAudit(id);
   }
 
   Future<void> _grantConsent() async {
@@ -78,7 +70,10 @@ class _PractitionerSharingState extends State<PractitionerSharing> {
     if (result != null) {
       final api = MindRecipeApiClient();
       try {
-        await api.grantConsent(practitionerId: result['practitioner']!, memberId: 'dev-member');
+        await api.grantConsent(
+          token: widget.appState.session?.token ?? '',
+          practitionerId: result['practitioner']!,
+        );
         _load();
       } catch (_) {}
     }
@@ -112,7 +107,24 @@ class _PractitionerSharingState extends State<PractitionerSharing> {
             leading: const Icon(Icons.medical_services, color: MindRecipeTokens.primary),
             title: Text('Practitioner: ${c['recipient_practitioner_id'] ?? 'Unknown'}'),
             subtitle: Text('Categories: ${c['categories'] ?? 'none'} · Expires: ${_formatDate(c['expires_at']?.toString())}'),
-            trailing: TextButton(onPressed: () => _load(), child: const Text('Revoke')),
+            trailing: TextButton(
+              onPressed: () async {
+                try {
+                  await MindRecipeApiClient().revokeConsent(
+                    token: widget.appState.session?.token ?? '',
+                    grantId: c['id'].toString(),
+                  );
+                  await _load();
+                } catch (_) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Could not revoke access.')),
+                    );
+                  }
+                }
+              },
+              child: const Text('Revoke'),
+            ),
           ),
         ))),
       const SizedBox(height: 20),

@@ -6,7 +6,7 @@ import ChimeraFX from './chimera-fx-bundle.js';
 import * as THREE from '../three.module.min.js';
 
 const bridge = value => {
-  for (const name of ['BackgroundBridge', 'FamiliarBridge']) {
+  for (const name of ['BackgroundBridge', 'FamiliarBridge', 'IntroBridge']) {
     try { window[name]?.postMessage(value); } catch (_) {}
   }
 };
@@ -44,7 +44,7 @@ function backgroundPreset(value) {
 // visual systems are full renderer themes—not palette aliases. Each has its
 // own fog, post-processing, component colors, and preferred composition.
 const visualThemeSpecs = {
-  'mind-recipe-orbit': [0x00d9c0, 0x8b5cf6, 0xf5b942, 0x06151b, 'lite', .42, .46, .025],
+  'mindrecipe-core': [0x00d9c0, 0x8b5cf6, 0xf5b942, 0x06151b, 'full', .42, .46, .025],
   'midnight-signal': [0x147bff, 0x00edac, 0xa98cff, 0x020719, 'trading', .30, .32, .018],
   'neon-ronin': [0xee2c74, 0x7038ff, 0x4fdfff, 0x160414, 'holographic', .58, .35, .05],
   'abyssal-current': [0x0077ff, 0x00e3d2, 0x75ffd9, 0x000f25, 'cinematic', .32, .68, .018],
@@ -309,9 +309,10 @@ function apply(state = {}) {
   if (nextTheme !== activeTheme) {
     activeTheme = nextTheme;
     engine.setTheme(ChimeraFX.themes[activeTheme]);
-    // A theme change is a real visual-system change. Rebuild against its
-    // distinct source composition so it cannot look like a recolored clone.
-    replaceBackgroundPreset(backgroundPreset(themePreset(activeTheme)));
+    // The unified native theme descriptor already selected this source
+    // composition. Rebuild with it instead of replacing it with a generic
+    // palette default.
+    replaceBackgroundPreset(requestedPreset);
   }
   const growth = Math.max(0, Math.min(1, Number(lastState.growth ?? lastState.progress ?? 0)));
   const complexity = Math.max(0, Math.min(1, Number(lastState.complexity ?? growth)));
@@ -353,6 +354,13 @@ function start() {
 
 window.setBackgroundState = apply;
 window.setFamiliarState = apply;
+window.setIntroVariant = variant => apply({
+  seed: Number(variant || 0) + 17,
+  growth: .08,
+  complexity: .12,
+  activation: .45,
+  theme: 'mindrecipe-core',
+});
 window.setBackgroundPaused = paused => paused ? engine?._pause() : engine?._resume();
 window.setFamiliarPaused = paused => paused ? engine?._pause() : engine?._resume();
 

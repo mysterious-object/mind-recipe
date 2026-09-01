@@ -155,7 +155,7 @@ public class MindRecipeMobileAutomationPlugin: NSObject, FlutterPlugin {
     }
 
     private func titleEncoded(_ payload: [String: Any]) -> String {
-        let t = (payload["title"] as? String) ?? "Mind Recipe"
+        let t = (payload["title"] as? String) ?? "MindRecipe"
         return t.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "Mind%20Recipe"
     }
 
@@ -248,7 +248,7 @@ public class MindRecipeMobileAutomationPlugin: NSObject, FlutterPlugin {
 
     private func handleSetAlarm(call: FlutterMethodCall, result: @escaping FlutterResult) {
         let args = call.arguments as? [String: Any] ?? [:]
-        let label = args["label"] as? String ?? "Mind Recipe"
+        let label = args["label"] as? String ?? "MindRecipe"
         // Best effort: Shortcuts "Create Alarm" — user must have that shortcut installed.
         let encoded = label.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "Mind%20Recipe"
         let candidates = [

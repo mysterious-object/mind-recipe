@@ -27,6 +27,7 @@ class _WellnessRecipePracticeState extends State<WellnessRecipePractice> {
   bool _showAddForm = false;
   bool _loading = true;
   bool _saving = false;
+  List<Map<String, dynamic>> _recommendations = const [];
 
   static const _categories = [
     'All',
@@ -57,12 +58,17 @@ class _WellnessRecipePracticeState extends State<WellnessRecipePractice> {
 
   Future<void> _loadTools() async {
     try {
-      final records = await _api.fetchRecipePractice(token: _token);
+      final results = await Future.wait<dynamic>([
+        _api.fetchRecipePractice(token: _token),
+        _api.getPracticeRecommendations(_token).catchError((_) => <Map<String, dynamic>>[]),
+      ]);
+      final records = results[0] as List<Map<String, dynamic>>;
       if (!mounted) return;
       setState(() {
         _tools
           ..clear()
           ..addAll(records.map(ToolEntry.fromJson));
+        _recommendations = (results[1] as List).cast<Map<String, dynamic>>();
       });
     } catch (error) {
       if (mounted) _showError(error);
@@ -85,6 +91,7 @@ class _WellnessRecipePracticeState extends State<WellnessRecipePractice> {
     return Column(
       children: [
         _buildAddButton(),
+        if (_recommendations.isNotEmpty) _buildPersonalSuggestion(_recommendations.first),
         if (_showAddForm) _buildAddForm(),
         _buildCategoryFilter(),
         Expanded(
@@ -110,6 +117,66 @@ class _WellnessRecipePracticeState extends State<WellnessRecipePractice> {
       ),
     ),
   );
+
+  Widget _buildPersonalSuggestion(Map<String, dynamic> recommendation) => Padding(
+    padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
+    child: Card(
+      color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: .55),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Based on your recorded experience', style: TextStyle(fontWeight: FontWeight.w800)),
+            const SizedBox(height: 4),
+            Text(recommendation['practice_name']?.toString() ?? 'Saved practice', style: MindRecipeTokens.title(context)),
+            const SizedBox(height: 4),
+            Text(recommendation['reason']?.toString() ?? ''),
+            const SizedBox(height: 4),
+            Text(
+              recommendation['uncertainty']?.toString() ?? '',
+              style: MindRecipeTokens.bodySmall(context),
+            ),
+            const SizedBox(height: 8),
+            Wrap(spacing: 8, children: [
+              FilledButton(
+                onPressed: () => _respondToRecommendation(recommendation, 'accepted'),
+                child: const Text('Keep this suggestion'),
+              ),
+              TextButton(
+                onPressed: () => _respondToRecommendation(recommendation, 'dismissed'),
+                child: const Text('Not now'),
+              ),
+            ]),
+          ],
+        ),
+      ),
+    ),
+  );
+
+  Future<void> _respondToRecommendation(
+    Map<String, dynamic> recommendation,
+    String decision,
+  ) async {
+    try {
+      await _api.savePracticeRecommendationFeedback(
+        _token,
+        recommendation['id'].toString(),
+        decision,
+      );
+      if (!mounted) return;
+      setState(() => _recommendations = _recommendations
+          .where((item) => item['id'] != recommendation['id'])
+          .toList());
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(decision == 'accepted'
+            ? 'Suggestion kept. You can use it whenever it feels useful.'
+            : 'Okay. This suggestion will stay out of the way.'),
+      ));
+    } catch (error) {
+      if (mounted) _showError(error);
+    }
+  }
 
   Widget _buildCategoryFilter() => SizedBox(
     height: 48,
@@ -360,8 +427,10 @@ class _WellnessRecipePracticeState extends State<WellnessRecipePractice> {
       itemCount: tools.length,
       itemBuilder: (context, i) => _ToolCard(
         tool: tools[i],
-        onPractice: (rating, practiceContext) =>
-            unawaited(_recordPractice(tools[i], rating, practiceContext)),
+        onPractice: (rating, practiceContext, beforeActivation, afterActivation, outcomeConfidence) =>
+            unawaited(_recordPractice(
+              tools[i], rating, practiceContext, beforeActivation, afterActivation, outcomeConfidence,
+            )),
         onToggleFavorite: () => unawaited(_toggleFavorite(tools[i])),
         onDelete: () => unawaited(_deleteTool(tools[i])),
       ),
@@ -372,6 +441,9 @@ class _WellnessRecipePracticeState extends State<WellnessRecipePractice> {
     ToolEntry tool,
     int rating,
     String practiceContext,
+    int? beforeActivation,
+    int? afterActivation,
+    int? outcomeConfidence,
   ) async {
     try {
       final record = await _api.recordRecipePracticePractice(
@@ -379,9 +451,14 @@ class _WellnessRecipePracticeState extends State<WellnessRecipePractice> {
         itemId: tool.id,
         effectiveness: rating,
         context: practiceContext,
+        beforeActivation: beforeActivation,
+        afterActivation: afterActivation,
+        outcomeConfidence: outcomeConfidence,
       );
       if (!mounted) return;
       setState(() => tool.updateFromJson(record));
+      await _loadTools();
+      if (!mounted) return;
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('Practice recorded.')));
     } catch (error) {
@@ -498,7 +575,13 @@ class _ToolCard extends StatefulWidget {
     required this.onDelete,
   });
   final ToolEntry tool;
-  final void Function(int rating, String context) onPractice;
+  final void Function(
+    int rating,
+    String context,
+    int? beforeActivation,
+    int? afterActivation,
+    int? outcomeConfidence,
+  ) onPractice;
   final VoidCallback onToggleFavorite;
   final VoidCallback onDelete;
 
@@ -509,6 +592,9 @@ class _ToolCard extends StatefulWidget {
 class _ToolCardState extends State<_ToolCard> {
   bool _showPractice = false;
   int _rating = 3;
+  int? _beforeActivation;
+  int? _afterActivation;
+  int? _outcomeConfidence;
   final _practiceContext = TextEditingController();
 
   @override
@@ -685,12 +771,38 @@ class _ToolCardState extends State<_ToolCard> {
             ),
           ),
           const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(child: _valuePicker(
+                label: 'Before (optional)', value: _beforeActivation,
+                values: const [-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5],
+                onChanged: (value) => setState(() => _beforeActivation = value),
+              )),
+              const SizedBox(width: 8),
+              Expanded(child: _valuePicker(
+                label: 'After (optional)', value: _afterActivation,
+                values: const [-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5],
+                onChanged: (value) => setState(() => _afterActivation = value),
+              )),
+            ],
+          ),
+          const SizedBox(height: 8),
+          _valuePicker(
+            label: 'How sure are you? (optional)', value: _outcomeConfidence,
+            values: const [1, 2, 3, 4, 5],
+            onChanged: (value) => setState(() => _outcomeConfidence = value),
+          ),
+          const SizedBox(height: 8),
           FilledButton(
             onPressed: () {
-              widget.onPractice(_rating, _practiceContext.text.trim());
+              widget.onPractice(_rating, _practiceContext.text.trim(),
+                  _beforeActivation, _afterActivation, _outcomeConfidence);
               setState(() {
                 _showPractice = false;
                 _rating = 3;
+                _beforeActivation = null;
+                _afterActivation = null;
+                _outcomeConfidence = null;
                 _practiceContext.clear();
               });
             },
@@ -700,6 +812,22 @@ class _ToolCardState extends State<_ToolCard> {
       ),
     );
   }
+
+  Widget _valuePicker({
+    required String label,
+    required int? value,
+    required List<int> values,
+    required ValueChanged<int?> onChanged,
+  }) => DropdownButtonFormField<int>(
+    value: value,
+    isExpanded: true,
+    decoration: InputDecoration(labelText: label, border: const OutlineInputBorder()),
+    items: values.map((entry) => DropdownMenuItem(
+      value: entry,
+      child: Text(entry.toString()),
+    )).toList(),
+    onChanged: onChanged,
+  );
 
   IconData _sourceIcon(String source) => switch (source) {
     'practitioner-recommended' => Icons.medical_services,

@@ -56,7 +56,7 @@ class VoicePlugin: NSObject, FlutterPlugin, FlutterStreamHandler, SFSpeechRecogn
     }
 
     private func startListening(language: String, result: @escaping FlutterResult) {
-        guard listeningResult == nil else { result(FlutterError(code: "ALREADY_LISTENING", message: "Mind Recipe is already listening.", details: nil)); return }
+        guard listeningResult == nil else { result(FlutterError(code: "ALREADY_LISTENING", message: "MindRecipe is already listening.", details: nil)); return }
         let requestMicrophone: () -> Void = { [weak self] in
             AVAudioSession.sharedInstance().requestRecordPermission { granted in
                 DispatchQueue.main.async {

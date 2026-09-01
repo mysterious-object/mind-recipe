@@ -7,6 +7,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 
 import 'app_services.dart';
 import 'check_in_state.dart';
+import 'visual_theme.dart';
 
 /// Converts the explicit Daily Nav check-in into the compact Pulse values
 /// stored by the app. Pulse itself never asks the member to check in again.
@@ -85,11 +86,7 @@ class MoodState {
 /// Pulse is the visual memory of the member's journey. Daily Nav owns mood
 /// input and regulation activities; this screen observes and explains change.
 class PulseScreen extends StatefulWidget {
-  const PulseScreen({
-    super.key,
-    required this.checkIn,
-    required this.appState,
-  });
+  const PulseScreen({super.key, required this.checkIn, required this.appState});
 
   final CheckInState checkIn;
   final SecureAppState appState;
@@ -114,7 +111,8 @@ class _PulseScreenState extends State<PulseScreen> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _lastVfxTheme = widget.appState.chimeraVfxTheme;
+    widget.appState.addListener(_onActivityChanged);
+    _lastVfxTheme = visualThemeFor(widget.appState.visualThemeId).engineTheme;
     _familiar = _FamiliarState.initial(
       widget.appState.session?.email ?? 'local-member',
     );
@@ -126,14 +124,21 @@ class _PulseScreenState extends State<PulseScreen> with WidgetsBindingObserver {
   void dispose() {
     _rendererDeadline?.cancel();
     WidgetsBinding.instance.removeObserver(this);
+    widget.appState.removeListener(_onActivityChanged);
     _controller?.runJavaScript('window.setFamiliarPaused(true)');
     super.dispose();
+  }
+
+  void _onActivityChanged() {
+    // Keep an already-open Pulse screen in sync when a module, Recipe,
+    // navigation, or Mind Nav interaction changes its underlying activity.
+    if (!_loading) unawaited(_load());
   }
 
   @override
   void didUpdateWidget(covariant PulseScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    final nextTheme = widget.appState.chimeraVfxTheme;
+    final nextTheme = visualThemeFor(widget.appState.visualThemeId).engineTheme;
     if (nextTheme == _lastVfxTheme) return;
     _lastVfxTheme = nextTheme;
     unawaited(_sendState());
@@ -248,11 +253,17 @@ class _PulseScreenState extends State<PulseScreen> with WidgetsBindingObserver {
               ) /
               recent.length;
     final sustainedProgress = (completed / 15).clamp(0.0, 1.0);
+    final recordedPractices =
+        (_pulseSummary['practice_count'] as num?)?.toInt() ?? 0;
+    final recordedEvents =
+        (_pulseSummary['recent_events'] as List?)?.length ?? 0;
     final continuity =
         ((widget.appState.lifetimeAiReflections * 2 +
                     widget.appState.lifetimeNavigatorTurns +
-                    widget.appState.lifetimeNavigationSessions * 3) /
-                80)
+                    widget.appState.lifetimeNavigationSessions * 3 +
+                    recordedPractices * 3 +
+                    recordedEvents) /
+                100)
             .clamp(0.0, 1.0);
     return _FamiliarState(
       seed: _stableSeed(widget.appState.session?.email ?? 'local-member'),
@@ -283,7 +294,7 @@ class _PulseScreenState extends State<PulseScreen> with WidgetsBindingObserver {
     final reduceMotion = mounted && MediaQuery.disableAnimationsOf(context);
     final payload = _familiar.toJson()
       ..['reduceMotion'] = reduceMotion
-      ..['theme'] = widget.appState.chimeraVfxTheme;
+      ..['theme'] = visualThemeFor(widget.appState.visualThemeId).engineTheme;
     await _controller!.runJavaScript(
       'window.setFamiliarState(${jsonEncode(payload)})',
     );
@@ -307,6 +318,12 @@ class _PulseScreenState extends State<PulseScreen> with WidgetsBindingObserver {
       );
     }
     if (_familiar.continuity > .08) parts.add('recent Navigator continuity');
+    final practices = (_pulseSummary['practice_count'] as num?)?.toInt() ?? 0;
+    if (practices > 0) {
+      parts.add(
+        '$practices recorded practice ${practices == 1 ? 'outcome' : 'outcomes'}',
+      );
+    }
     if (_pulses.length > 1) parts.add('your recent Pulse trend');
     return 'This form reflects ${parts.join(', ')}. Mood changes its temporary energy; only sustained progress changes its lasting form.';
   }
@@ -366,9 +383,7 @@ class _PulseScreenState extends State<PulseScreen> with WidgetsBindingObserver {
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
                 : _useFallback
-                ? const Center(
-                    child: Icon(Icons.auto_awesome, size: 72),
-                  )
+                ? const Center(child: Icon(Icons.auto_awesome, size: 72))
                 : Stack(
                     fit: StackFit.expand,
                     children: [
@@ -451,6 +466,7 @@ class _FamiliarState {
   Map<String, dynamic> toJson() => {
     'seed': seed,
     'hue': hue + (valence * 18).round(),
+    'valence': valence,
     'activation': activation,
     'growth': growth,
     'complexity': complexity,
@@ -483,6 +499,12 @@ class _ProgressSignals extends StatelessWidget {
             const SizedBox(height: 12),
             _Signal(label: 'Module integration', value: familiar.growth),
             _Signal(label: 'Navigator continuity', value: familiar.continuity),
+            if ((summary['practice_count'] as num? ?? 0) > 0)
+              Text(
+                'Recorded practice experience: ${summary['recipe_effectiveness'] ?? '—'}/5'
+                '${summary['average_activation_change'] == null ? '' : ' · average activation change ${summary['average_activation_change']}'}',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
             const Divider(height: 24),
             _SignalSources(summary: summary),
             if (pulses.length > 1) ...[
@@ -513,12 +535,14 @@ class _SignalSources extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final events = (summary['recent_events'] as List?)
+    final events =
+        (summary['recent_events'] as List?)
             ?.whereType<Map>()
             .map((event) => event.cast<String, dynamic>())
             .toList() ??
         const <Map<String, dynamic>>[];
-    final sources = (summary['data_sources'] as List?)
+    final sources =
+        (summary['data_sources'] as List?)
             ?.map((source) => source.toString())
             .toList() ??
         const <String>[];
@@ -552,8 +576,7 @@ class _SignalSources extends StatelessWidget {
         ),
         const SizedBox(height: 5),
         Text(
-          summary['uncertainty']?.toString() ??
-              'Pulse is context, not a diagnosis or a judgment about a good or bad day.',
+          summary['uncertainty']?.toString() ?? 'Pulse is context, not a diagnosis or a judgment about a good or bad day.',
           style: Theme.of(context).textTheme.bodySmall,
         ),
       ],

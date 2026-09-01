@@ -77,6 +77,8 @@ class OnDeviceModelManifest {
     required this.sha256,
     required this.sizeBytes,
     required this.license,
+    required this.promptFormat,
+    this.licenseUrl,
   });
 
   final String id;
@@ -85,7 +87,11 @@ class OnDeviceModelManifest {
   final String sha256;
   final int sizeBytes;
   final String license;
+  final PrivatePromptFormat promptFormat;
+  final Uri? licenseUrl;
 }
+
+enum PrivatePromptFormat { qwenChatMl, gemmaTurns }
 
 /// A member-facing description of the private model. Keeping this separate
 /// from the download manifest lets the setup screen explain the trade-offs
@@ -119,18 +125,38 @@ final mindRecipePrivateModel = OnDeviceModelManifest(
   sha256: 'd2387ca2dbfee2ffabce7120d3770dadca0b293052bc2f0e138fdc940d9bc7b5',
   sizeBytes: 1282439264,
   license: 'Apache-2.0',
+  promptFormat: PrivatePromptFormat.qwenChatMl,
+);
+
+final mindRecipeGemmaModel = OnDeviceModelManifest(
+  id: 'mindrecipe-private-gemma-2-2b-it-q4km',
+  version: '376e68d-gemma-2-2b-it-q4km',
+  downloadUri: Uri.parse(
+    'https://huggingface.co/unsloth/gemma-2-it-GGUF/resolve/376e68d898472a1d44856c7d7de68c7fa65b1e65/unsloth/gemma-2-2b-it.q4_k_m.gguf',
+  ),
+  sha256: '57bf98ab6b26e40f1d69f36cb1202af8b0c1b4e6b50ec2631d576f76cdaac9d6',
+  sizeBytes: 1708582464,
+  license: 'Gemma terms',
+  licenseUrl: Uri.parse('https://ai.google.dev/gemma/terms'),
+  promptFormat: PrivatePromptFormat.gemmaTurns,
 );
 
 /// Every choice is an explicitly pinned, checksum-verified download.
-/// Single private model – renamed from Balanced per feedback (compact/fast removed).
 final mindRecipePrivateModelChoices = <OnDeviceModelChoice>[
   OnDeviceModelChoice(
     manifest: mindRecipePrivateModel,
-    name: 'Private',
+    name: 'Qwen 3 1.7B',
     quality: 'Private on-device guidance',
     bestFor: 'All conversations; stays on this device.',
     memoryNote: '1.2 GB download · keep ~2.5 GB free (runs on 3 GB+ devices)',
     recommended: true,
+  ),
+  OnDeviceModelChoice(
+    manifest: mindRecipeGemmaModel,
+    name: 'Gemma 2 2B',
+    quality: 'Private on-device guidance',
+    bestFor: 'A deeper private conversation when your device has room.',
+    memoryNote: '1.71 GB download · device capability check required',
   ),
 ];
 
@@ -200,6 +226,7 @@ class OnDeviceInference implements LocalInference {
     if (_activeManifest.id != manifest.id) {
       _disposeEngine();
       _activeManifest = manifest;
+      await _persistActiveSelection();
     }
     _set(const LocalInferenceSnapshot(OnDeviceStatus.checking));
     final result = await refreshStatus();
@@ -223,15 +250,40 @@ class OnDeviceInference implements LocalInference {
                       _downloadBytesPerSecond)
                   .ceil(),
         );
-  // 1.2 GB Q4_K_M + q8_0 KV fits in ~2.5 GB; 3 GB devices can run it.
-  int get _minimumMemoryMiB => 3072;
-
   Future<File> _modelFile([OnDeviceModelManifest? manifest]) async {
     final target = manifest ?? _activeManifest;
     final base = await getApplicationSupportDirectory();
     final directory = Directory('${base.path}/private-models');
     if (!await directory.exists()) await directory.create(recursive: true);
     return File('${directory.path}/${target.id}.gguf');
+  }
+
+  bool _activeSelectionLoaded = false;
+
+  Future<File> _activeModelMarker() async {
+    final base = await getApplicationSupportDirectory();
+    return File('${base.path}/private-models/active-model.txt');
+  }
+
+  Future<void> _restoreActiveSelection() async {
+    if (_activeSelectionLoaded) return;
+    _activeSelectionLoaded = true;
+    final marker = await _activeModelMarker();
+    if (!await marker.exists()) return;
+    final id = (await marker.readAsString()).trim();
+    for (final choice in mindRecipePrivateModelChoices) {
+      if (choice.manifest.id == id) {
+        _activeManifest = choice.manifest;
+        return;
+      }
+    }
+  }
+
+  Future<void> _persistActiveSelection() async {
+    await (await _activeModelMarker()).writeAsString(
+      _activeManifest.id,
+      flush: true,
+    );
   }
 
   Future<File> _verificationReceipt(File model) async =>
@@ -242,12 +294,13 @@ class OnDeviceInference implements LocalInference {
 
   @override
   Future<LocalInferenceSnapshot> refreshStatus() async {
+    await _restoreActiveSelection();
     if (_refreshing) return _snapshot;
     // Do not clobber an active download/verify — the UI timer polls this
     // every 500ms and would otherwise reset `downloading` → `notInstalled`
     // while the .partial file is still being written (tab switch bug).
     if (_snapshot.status == OnDeviceStatus.downloading ||
-        _snapshot.status == OnDeviceStatus.verifying) {
+        (_snapshot.status == OnDeviceStatus.verifying && _refreshing)) {
       return _snapshot;
     }
     _refreshing = true;
@@ -288,18 +341,6 @@ class OnDeviceInference implements LocalInference {
         );
         _set(snapshot);
         return snapshot;
-      }
-      final device = await MindRecipeDeviceHarness().capabilities();
-      if (device.totalMemoryMiB != null &&
-          device.totalMemoryMiB! < _minimumMemoryMiB) {
-        _disposeEngine();
-        return _set(
-          LocalInferenceSnapshot(
-            OnDeviceStatus.error,
-            detail:
-                'This device has ${device.totalMemoryMiB} MB of memory. Private reasoning needs at least $_minimumMemoryMiB MB; cloud guidance remains available if you choose it.',
-          ),
-        );
       }
       _set(const LocalInferenceSnapshot(OnDeviceStatus.verifying));
       await _inferLog('verifying ${file.path}');
@@ -345,6 +386,7 @@ class OnDeviceInference implements LocalInference {
     if (model != null && model.id != _activeManifest.id) {
       _disposeEngine();
       _activeManifest = model;
+      await _persistActiveSelection();
     }
     if (await isModelDownloaded(_activeManifest)) {
       await activateModel(_activeManifest);
@@ -608,19 +650,14 @@ class OnDeviceInference implements LocalInference {
       return null;
     }
     if (_engine == null) {
-      await _inferLog(
-        'infer fallback mock for "$userMessage" history=${history.length}',
+      await _inferLog('infer ABORT: engine unavailable despite ready status');
+      _set(
+        const LocalInferenceSnapshot(
+          OnDeviceStatus.error,
+          detail: 'The private model could not start on this device.',
+        ),
       );
-      // Simulate thoughtful pause — reasoning should not feel instant and dumb
-      await Future.delayed(const Duration(milliseconds: 800));
-      final mock = _fallbackResponse(userMessage, history);
-      if (onToken != null) {
-        for (final part in mock.split(' ')) {
-          onToken('$part ');
-          await Future.delayed(const Duration(milliseconds: 28));
-        }
-      }
-      return mock;
+      return null;
     }
     try {
       await _engine!.clear();
@@ -631,7 +668,11 @@ class OnDeviceInference implements LocalInference {
         // to the first token instead of the full completion.
         if (onToken != null && token.isNotEmpty) onToken(token);
       });
-      final prompt = _buildPrompt(userMessage, history: history);
+      final prompt = _buildPrompt(
+        userMessage,
+        history: history,
+        format: _activeManifest.promptFormat,
+      );
       await _inferLog('infer prompt length=${prompt.length}');
       final promptId = await _engine!.sendPrompt(prompt);
       await _engine!
@@ -705,6 +746,7 @@ class OnDeviceInference implements LocalInference {
         .firstWhere((choice) => remaining.contains(choice.manifest.id))
         .manifest;
     _activeManifest = fallback;
+    await _persistActiveSelection();
     _set(const LocalInferenceSnapshot(OnDeviceStatus.checking));
     await refreshStatus();
   }
@@ -969,12 +1011,11 @@ class OnDeviceInference implements LocalInference {
         _disposeEngine();
       }
     }
-    await _inferLog(
-      'all native attempts failed lastError=$lastError — using lightweight fallback so offline works',
+    await _inferLog('all native attempts failed lastError=$lastError');
+    throw StateError(
+      'The downloaded private model could not start on this device. '
+      'Try reinstalling it or use cloud guidance if you choose it.',
     );
-    // Lightweight fallback: do not throw the GPU/CPU ladder error that blocked Navigator.
-    // refreshStatus will still mark ready, and infer() will serve a Dart fallback response.
-    return;
   }
 
   /// Strips internal exception noise (repeated LlamaException prefixes,
@@ -1179,7 +1220,11 @@ class OnDeviceInference implements LocalInference {
   String _buildPrompt(
     String userMessage, {
     List<LocalConversationTurn> history = const [],
+    required PrivatePromptFormat format,
   }) {
+    if (format == PrivatePromptFormat.gemmaTurns) {
+      return _buildGemmaPrompt(userMessage, history);
+    }
     final prompt = StringBuffer('''<|im_start|>system
 You are Mind Recipe, a private on-device personal assistant and wellness companion. Resolve short follow-ups from the recent conversation. Identify the member's actual intent, the most relevant prior detail or commitment, and the useful outcome before answering. For complex requests, privately compare options, check assumptions, and plan the response; never reveal that private reasoning. Correct yourself immediately when the member says you misunderstood. Move the thread forward instead of restarting, paraphrasing, or repeating a generic exercise. Ground claims in member-owned facts and label uncertainty. Be warm, specific, capable, and concise (usually 35 to 120 words). Use at most one specific question only when information is truly missing. Never diagnose, prescribe, assess safety, or claim clinical certainty. If urgent danger is mentioned, encourage local emergency help or 988 in the United States. Never mention internal tools.
 
@@ -1220,6 +1265,36 @@ Example: If the member says their manager dismissed their work in front of the t
         '${_shouldDeliberate(userMessage) ? '/think' : '/no_think'}<|im_end|>',
       )
       ..writeln('<|im_start|>assistant');
+    return prompt.toString();
+  }
+
+  String _buildGemmaPrompt(
+    String userMessage,
+    List<LocalConversationTurn> history,
+  ) {
+    const system =
+        '''You are MindRecipe, a private on-device personal assistant and wellness companion. Understand the member's actual request before responding. Be warm, specific, capable, and concise. Build on recent details, corrections, goals, and unfinished commitments. Do not repeat generic advice or paraphrase the member. Offer one useful next step only when it helps. Never diagnose, prescribe, or claim clinical certainty.''';
+    final prompt = StringBuffer(
+      '<bos><start_of_turn>user\n$system<end_of_turn>\n<start_of_turn>model\nUnderstood.<end_of_turn>\n',
+    );
+    final recent = history.length > 4
+        ? history.sublist(history.length - 4)
+        : history;
+    for (final turn in recent) {
+      var clean = _cleanPromptText(turn.text);
+      if (clean.length > 220) clean = '${clean.substring(0, 220)}…';
+      if (clean.isEmpty) continue;
+      prompt
+        ..write(
+          '<start_of_turn>${turn.role == 'assistant' ? 'model' : 'user'}\n',
+        )
+        ..write(clean)
+        ..write('<end_of_turn>\n');
+    }
+    prompt
+      ..write('<start_of_turn>user\n')
+      ..write(_cleanPromptText(userMessage))
+      ..write('<end_of_turn>\n<start_of_turn>model\n');
     return prompt.toString();
   }
 }

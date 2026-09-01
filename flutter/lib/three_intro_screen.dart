@@ -81,11 +81,11 @@ class _ThreeIntroScreenState extends State<ThreeIntroScreen> {
             right: 0,
             bottom: 58,
             child: Text(
-              'MIND RECIPE',
+              'MindRecipe',
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: Colors.white,
-                letterSpacing: 5,
+                letterSpacing: 0,
                 fontWeight: FontWeight.w800,
               ),
             ),

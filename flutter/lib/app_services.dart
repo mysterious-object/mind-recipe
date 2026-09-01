@@ -4,6 +4,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
+import 'visual_theme.dart';
+
 const mindRecipeApiBase = String.fromEnvironment(
   'MIND_RECIPE_API_BASE',
   defaultValue: 'https://staging-api.mindrecipe.142.93.201.156.sslip.io',
@@ -149,6 +151,29 @@ class MindRecipeApiClient {
     }
   }
 
+  Future<List<Map<String, dynamic>>> openRouterModels({
+    required String providerKey,
+  }) async {
+    final response = await _client
+        .get(
+          Uri.parse('$mindRecipeApiBase/v1/providers/openrouter/models'),
+          headers: {
+            if (providerKey.isNotEmpty)
+              'x-mind-recipe-provider-key': providerKey,
+          },
+        )
+        .timeout(const Duration(seconds: 10));
+    if (response.statusCode != 200) return const [];
+    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+    if (decoded['available'] != true || decoded['models'] is! List) {
+      return const [];
+    }
+    return (decoded['models'] as List)
+        .whereType<Map>()
+        .map((value) => value.cast<String, dynamic>())
+        .toList();
+  }
+
   Future<AiReply> reflect({
     required String token,
     required String providerKey,
@@ -189,41 +214,139 @@ class MindRecipeApiClient {
     );
   }
 
-  Future<Map<String, dynamic>> getTrends(String memberId) async {
+  Stream<NavigatorStreamEvent> navigatorTurn({
+    required String token,
+    required String providerKey,
+    required String text,
+    required Map<String, dynamic> context,
+    required String model,
+    bool externalResearchOptIn = false,
+  }) async* {
+    final request =
+        http.Request('POST', Uri.parse('$mindRecipeApiBase/v1/navigator/turn'))
+          ..headers.addAll({
+            'content-type': 'application/json',
+            'accept': 'text/event-stream',
+            if (token.isNotEmpty) 'authorization': 'Bearer $token',
+            if (providerKey.isNotEmpty)
+              'x-mind-recipe-provider-key': providerKey,
+          })
+          ..body = jsonEncode({
+            'text': text,
+            'provider': 'openrouter',
+            'privacy_mode': 'cloud_byok',
+            'cloud_opt_in': true,
+            'external_research_opt_in': externalResearchOptIn,
+            'model': model,
+            'context': context,
+          });
     final response = await _client
-        .get(Uri.parse('$mindRecipeApiBase/v1/trends/$memberId'))
+        .send(request)
+        .timeout(const Duration(seconds: 20));
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw const ApiException('Navigator is temporarily unavailable.');
+    }
+    var event = '';
+    var data = '';
+    await for (final line
+        in response.stream
+            .transform(utf8.decoder)
+            .transform(const LineSplitter())) {
+      if (line.startsWith('event:')) {
+        event = line.substring(6).trim();
+      } else if (line.startsWith('data:')) {
+        data = line.substring(5).trim();
+      } else if (line.isEmpty && event.isNotEmpty) {
+        Map<String, dynamic> payload = const {};
+        try {
+          final decoded = jsonDecode(data);
+          if (decoded is Map<String, dynamic>) payload = decoded;
+        } catch (_) {}
+        yield NavigatorStreamEvent(event, payload);
+        event = '';
+        data = '';
+      }
+    }
+  }
+
+  Future<void> createCheckIn({
+    required String token,
+    required String clientId,
+    required List<String> emotions,
+    required int activation,
+    required List<String> bodyAreas,
+    String? journal,
+    String? zoneLabel,
+  }) async {
+    final response = await _client
+        .post(
+          Uri.parse('$mindRecipeApiBase/v1/checkins'),
+          headers: _memberHeaders(token, json: true),
+          body: jsonEncode({
+            'client_id': clientId,
+            'emotions': emotions,
+            'activation': activation,
+            'body_areas': bodyAreas,
+            if (journal != null && journal.trim().isNotEmpty)
+              'journal': journal,
+            if (zoneLabel != null && zoneLabel.trim().isNotEmpty)
+              'zone_label': zoneLabel,
+            'observations': const [],
+          }),
+        )
+        .timeout(const Duration(seconds: 12));
+    if (response.statusCode != 201) {
+      throw const ApiException('Could not sync this navigation yet.');
+    }
+  }
+
+  Future<Map<String, dynamic>> getTrends({required String token}) async {
+    final response = await _client
+        .get(
+          Uri.parse('$mindRecipeApiBase/v1/trends'),
+          headers: _memberHeaders(token),
+        )
         .timeout(const Duration(seconds: 5));
     if (response.statusCode != 200) return {};
     return jsonDecode(response.body) as Map<String, dynamic>;
   }
 
-  Future<List<dynamic>> detectPatterns(String memberId) async {
+  Future<List<dynamic>> detectPatterns({required String token}) async {
     final response = await _client
-        .get(Uri.parse('$mindRecipeApiBase/v1/patterns/$memberId'))
+        .get(
+          Uri.parse('$mindRecipeApiBase/v1/patterns'),
+          headers: _memberHeaders(token),
+        )
         .timeout(const Duration(seconds: 5));
     if (response.statusCode != 200) return [];
     return jsonDecode(response.body) as List<dynamic>;
   }
 
-  Future<List<dynamic>> fetchConsents(String id) async {
+  Future<List<dynamic>> fetchConsents(String token) async {
     final r = await _client
-        .get(Uri.parse('$mindRecipeApiBase/v1/consents/$id'))
+        .get(
+          Uri.parse('$mindRecipeApiBase/v1/consents'),
+          headers: _memberHeaders(token),
+        )
         .timeout(const Duration(seconds: 5));
     if (r.statusCode != 200) return [];
     return (jsonDecode(r.body) as List<dynamic>);
   }
 
-  Future<List<dynamic>> fetchAudit(String id) async {
+  Future<List<dynamic>> fetchAudit(String token) async {
     final r = await _client
-        .get(Uri.parse('$mindRecipeApiBase/v1/audit/$id?limit=20'))
+        .get(
+          Uri.parse('$mindRecipeApiBase/v1/audit?limit=20'),
+          headers: _memberHeaders(token),
+        )
         .timeout(const Duration(seconds: 5));
     if (r.statusCode != 200) return [];
     return (jsonDecode(r.body) as List<dynamic>);
   }
 
   Future<void> grantConsent({
+    required String token,
     required String practitionerId,
-    required String memberId,
   }) async {
     final now = DateTime.now().toUtc().toIso8601String();
     final exp = DateTime.now()
@@ -233,7 +356,7 @@ class MindRecipeApiClient {
     await _client
         .post(
           Uri.parse('$mindRecipeApiBase/v1/consents'),
-          headers: {'content-type': 'application/json'},
+          headers: _memberHeaders(token, json: true),
           body: jsonEncode({
             'recipient_practitioner_id': practitionerId,
             'categories': ['checkins', 'trends'],
@@ -243,6 +366,21 @@ class MindRecipeApiClient {
           }),
         )
         .timeout(const Duration(seconds: 5));
+  }
+
+  Future<void> revokeConsent({
+    required String token,
+    required String grantId,
+  }) async {
+    final response = await _client
+        .delete(
+          Uri.parse('$mindRecipeApiBase/v1/consents/$grantId'),
+          headers: _memberHeaders(token),
+        )
+        .timeout(const Duration(seconds: 8));
+    if (response.statusCode != 204) {
+      throw const ApiException('Could not revoke that sharing permission.');
+    }
   }
 
   Future<List<Map<String, dynamic>>> fetchRecipePractice({
@@ -332,6 +470,9 @@ class MindRecipeApiClient {
     required String itemId,
     required int effectiveness,
     required String context,
+    int? beforeActivation,
+    int? afterActivation,
+    int? outcomeConfidence,
   }) async {
     final response = await _client
         .post(
@@ -339,8 +480,14 @@ class MindRecipeApiClient {
           headers: _memberHeaders(token, json: true),
           body: jsonEncode({
             'tool_id': itemId,
+            'client_id':
+                'practice-${itemId}-${DateTime.now().microsecondsSinceEpoch}',
             'effectiveness': effectiveness,
             if (context.isNotEmpty) 'context': context,
+            if (beforeActivation != null) 'before_activation': beforeActivation,
+            if (afterActivation != null) 'after_activation': afterActivation,
+            if (outcomeConfidence != null)
+              'outcome_confidence': outcomeConfidence,
           }),
         )
         .timeout(const Duration(seconds: 8));
@@ -420,49 +567,252 @@ class MindRecipeApiClient {
     return decoded;
   }
 
-  Future<Map<String, dynamic>> getJourney(String token) async => _getMember('/v1/journey', token);
+  Future<Map<String, dynamic>> getJourney(String token) async =>
+      _getMember('/v1/journey', token);
 
-  Future<Map<String, dynamic>> saveJourney(String token, Map<String, dynamic> value) =>
-      _sendMember('PUT', '/v1/journey', token, value);
+  Future<Map<String, dynamic>> saveJourney(
+    String token,
+    Map<String, dynamic> value,
+  ) => _sendMember('PUT', '/v1/journey', token, value);
 
   Future<List<Map<String, dynamic>>> getRecipeProposals(String token) async {
-    final response = await _client.get(Uri.parse('$mindRecipeApiBase/v1/recipes/proposals'), headers: _memberHeaders(token)).timeout(const Duration(seconds: 8));
-    if (response.statusCode != 200) throw const ApiException('Could not load Recipe proposals.');
+    final response = await _client
+        .get(
+          Uri.parse('$mindRecipeApiBase/v1/recipes/proposals'),
+          headers: _memberHeaders(token),
+        )
+        .timeout(const Duration(seconds: 8));
+    if (response.statusCode != 200)
+      throw const ApiException('Could not load Recipe proposals.');
     return (jsonDecode(response.body) as List).cast<Map<String, dynamic>>();
   }
 
-  Future<Map<String, dynamic>> decideRecipeProposal(String token, String id, {required bool approved}) =>
-      _sendMember('POST', '/v1/recipes/proposals/$id/decision', token, {'approved': approved});
+  Future<Map<String, dynamic>> decideRecipeProposal(
+    String token,
+    String id, {
+    required bool approved,
+  }) => _sendMember('POST', '/v1/recipes/proposals/$id/decision', token, {
+    'approved': approved,
+  });
 
   Future<List<Map<String, dynamic>>> getMemory(String token) async {
-    final response = await _client.get(Uri.parse('$mindRecipeApiBase/v1/memory'), headers: _memberHeaders(token)).timeout(const Duration(seconds: 8));
-    if (response.statusCode != 200) throw const ApiException('Could not load Navigator memory.');
+    final response = await _client
+        .get(
+          Uri.parse('$mindRecipeApiBase/v1/memory'),
+          headers: _memberHeaders(token),
+        )
+        .timeout(const Duration(seconds: 8));
+    if (response.statusCode != 200)
+      throw const ApiException('Could not load Navigator memory.');
     return (jsonDecode(response.body) as List).cast<Map<String, dynamic>>();
   }
 
-  Future<Map<String, dynamic>> createMemory(String token, Map<String, dynamic> value) =>
-      _sendMember('POST', '/v1/memory', token, value);
+  Future<Map<String, dynamic>> createMemory(
+    String token,
+    Map<String, dynamic> value,
+  ) => _sendMember('POST', '/v1/memory', token, value);
 
-  Future<void> ingestMemberEvents(String token, List<Map<String, dynamic>> events) async {
+  Future<void> deleteMemory(String token, String id) async {
+    final response = await _client
+        .delete(
+          Uri.parse('$mindRecipeApiBase/v1/memory/$id'),
+          headers: _memberHeaders(token),
+        )
+        .timeout(const Duration(seconds: 8));
+    if (response.statusCode != 204) {
+      throw const ApiException('Could not remove that memory.');
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getMemoryProposals(String token) async {
+    final response = await _client
+        .get(
+          Uri.parse('$mindRecipeApiBase/v1/memory/proposals'),
+          headers: _memberHeaders(token),
+        )
+        .timeout(const Duration(seconds: 8));
+    if (response.statusCode != 200) {
+      throw const ApiException('Could not load memory proposals.');
+    }
+    return (jsonDecode(response.body) as List).cast<Map<String, dynamic>>();
+  }
+
+  Future<void> decideMemoryProposal(
+    String token,
+    String id,
+    bool approved,
+  ) async {
+    final response = await _client
+        .post(
+          Uri.parse('$mindRecipeApiBase/v1/memory/proposals/$id/decision'),
+          headers: _memberHeaders(token, json: true),
+          body: jsonEncode({'approved': approved}),
+        )
+        .timeout(const Duration(seconds: 8));
+    if (response.statusCode != 200) {
+      throw const ApiException('Could not save that memory decision.');
+    }
+  }
+
+  Future<void> ingestMemberEvents(
+    String token,
+    List<Map<String, dynamic>> events,
+  ) async {
     await _sendMember('POST', '/v1/member-events', token, events);
   }
 
-  Future<Map<String, dynamic>> getPulse(String token) => _getMember('/v1/pulse/today', token);
+  Future<Map<String, dynamic>> getPulse(String token) =>
+      _getMember('/v1/pulse/today', token);
+
+  Future<List<Map<String, dynamic>>> getEffectiveness(String token) async {
+    final response = await _client
+        .get(
+          Uri.parse('$mindRecipeApiBase/v1/effectiveness'),
+          headers: _memberHeaders(token),
+        )
+        .timeout(const Duration(seconds: 8));
+    if (response.statusCode != 200) {
+      throw const ApiException('Could not load your practice insights.');
+    }
+    return (jsonDecode(response.body) as List).cast<Map<String, dynamic>>();
+  }
+
+  Future<List<Map<String, dynamic>>> getPracticeRecommendations(
+    String token,
+  ) async {
+    final response = await _client
+        .get(
+          Uri.parse('$mindRecipeApiBase/v1/recommendations/practices'),
+          headers: _memberHeaders(token),
+        )
+        .timeout(const Duration(seconds: 8));
+    if (response.statusCode != 200) {
+      throw const ApiException('Could not load your practice suggestions.');
+    }
+    return (jsonDecode(response.body) as List).cast<Map<String, dynamic>>();
+  }
+
+  Future<void> savePracticeRecommendationFeedback(
+    String token,
+    String id,
+    String decision,
+  ) async {
+    final response = await _client
+        .post(
+          Uri.parse(
+            '$mindRecipeApiBase/v1/recommendations/practices/$id/feedback',
+          ),
+          headers: _memberHeaders(token, json: true),
+          body: jsonEncode({'decision': decision}),
+        )
+        .timeout(const Duration(seconds: 8));
+    if (response.statusCode != 204) {
+      throw const ApiException('Could not save that preference.');
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getCommitments(
+    String token, {
+    bool includeClosed = false,
+  }) async {
+    final response = await _client
+        .get(
+          Uri.parse(
+            '$mindRecipeApiBase/v1/commitments?include_closed=$includeClosed',
+          ),
+          headers: _memberHeaders(token),
+        )
+        .timeout(const Duration(seconds: 8));
+    if (response.statusCode != 200) {
+      throw const ApiException('Could not load your commitments.');
+    }
+    return (jsonDecode(response.body) as List).cast<Map<String, dynamic>>();
+  }
+
+  Future<Map<String, dynamic>> createCommitment(
+    String token,
+    Map<String, dynamic> value,
+  ) => _sendMember('POST', '/v1/commitments', token, value);
+
+  Future<Map<String, dynamic>> updateCommitment(
+    String token,
+    String id,
+    String status, {
+    String? notes,
+  }) => _sendMember('PATCH', '/v1/commitments/$id', token, {
+    'status': status,
+    if (notes != null && notes.trim().isNotEmpty) 'notes': notes.trim(),
+  });
+
+  Future<Map<String, dynamic>> recordCommitmentExecution(
+    String token,
+    String id, {
+    required String action,
+    required String status,
+    String? receipt,
+    DateTime? scheduledFor,
+  }) => _sendMember('POST', '/v1/commitments/$id/execution', token, {
+    'action': action,
+    'status': status,
+    if (receipt != null && receipt.isNotEmpty) 'receipt': receipt,
+    if (scheduledFor != null)
+      'scheduled_for': scheduledFor.toUtc().toIso8601String(),
+  });
+
+  Future<Map<String, dynamic>> getNotificationPreferences(String token) =>
+      _getMember('/v1/notification-preferences', token);
+
+  Future<Map<String, dynamic>> saveNotificationPreferences(
+    String token,
+    Map<String, dynamic> value,
+  ) => _sendMember('PUT', '/v1/notification-preferences', token, value);
+
+  Future<Map<String, dynamic>> exportAccount(String token) =>
+      _getMember('/v1/account/export', token);
+
+  Future<void> deleteAccount(String token) async {
+    final response = await _client
+        .delete(
+          Uri.parse('$mindRecipeApiBase/v1/account'),
+          headers: _memberHeaders(token, json: true),
+          body: jsonEncode({'confirmation': 'DELETE'}),
+        )
+        .timeout(const Duration(seconds: 12));
+    if (response.statusCode != 204) {
+      throw const ApiException('Could not delete the account.');
+    }
+  }
 
   Future<Map<String, dynamic>> _getMember(String path, String token) async {
-    final response = await _client.get(Uri.parse('$mindRecipeApiBase$path'), headers: _memberHeaders(token)).timeout(const Duration(seconds: 8));
-    if (response.statusCode < 200 || response.statusCode >= 300) throw const ApiException('Navigator is temporarily unavailable.');
+    final response = await _client
+        .get(
+          Uri.parse('$mindRecipeApiBase$path'),
+          headers: _memberHeaders(token),
+        )
+        .timeout(const Duration(seconds: 8));
+    if (response.statusCode < 200 || response.statusCode >= 300)
+      throw const ApiException('Navigator is temporarily unavailable.');
     return jsonDecode(response.body) as Map<String, dynamic>;
   }
 
-  Future<Map<String, dynamic>> _sendMember(String method, String path, String token, Object body) async {
+  Future<Map<String, dynamic>> _sendMember(
+    String method,
+    String path,
+    String token,
+    Object body,
+  ) async {
     final request = http.Request(method, Uri.parse('$mindRecipeApiBase$path'))
       ..headers.addAll(_memberHeaders(token, json: true))
       ..body = jsonEncode(body);
-    final streamed = await _client.send(request).timeout(const Duration(seconds: 10));
+    final streamed = await _client
+        .send(request)
+        .timeout(const Duration(seconds: 10));
     final response = await http.Response.fromStream(streamed);
-    if (response.statusCode < 200 || response.statusCode >= 300) throw const ApiException('Navigator could not save that change.');
-    return response.body.isEmpty ? <String, dynamic>{} : jsonDecode(response.body) as Map<String, dynamic>;
+    if (response.statusCode < 200 || response.statusCode >= 300)
+      throw const ApiException('Navigator could not save that change.');
+    return response.body.isEmpty
+        ? <String, dynamic>{}
+        : jsonDecode(response.body) as Map<String, dynamic>;
   }
 }
 
@@ -478,6 +828,12 @@ class AiReply {
   final String? provider;
   final String? model;
   bool get isCloudAi => mode == 'cloud_ai';
+}
+
+class NavigatorStreamEvent {
+  const NavigatorStreamEvent(this.type, this.payload);
+  final String type;
+  final Map<String, dynamic> payload;
 }
 
 class ApiException implements Exception {
@@ -498,13 +854,16 @@ class SecureAppState extends ChangeNotifier {
   static const _publicResearchEnabledKey =
       'mind_recipe_public_research_enabled';
   static const _appearanceModeKey = 'mind_recipe_appearance_mode';
-  static const _chimeraThemeKey = 'mind_recipe_chimera_theme';
-  static const _chimeraVfxThemeKey = 'mind_recipe_chimera_vfx_theme';
-  static const _chimeraFxEnabledKey = 'mind_recipe_chimera_fx_enabled';
-  static const _chimeraFxIntensityKey = 'mind_recipe_chimera_fx_intensity';
-  static const _chimeraFxVariantKey = 'mind_recipe_chimera_fx_variant';
+  static const _visualThemeKey = 'mind_recipe_visual_theme';
+  static const _legacyChimeraThemeKey = 'mind_recipe_chimera_theme';
+  static const _legacyChimeraVfxThemeKey = 'mind_recipe_chimera_vfx_theme';
+  static const _legacyChimeraFxEnabledKey = 'mind_recipe_chimera_fx_enabled';
+  static const _legacyChimeraFxIntensityKey =
+      'mind_recipe_chimera_fx_intensity';
+  static const _legacyChimeraFxVariantKey = 'mind_recipe_chimera_fx_variant';
   static const _curriculumProgressKey = 'mind_recipe_curriculum_progress';
   static const _cloudModelKey = 'mind_recipe_cloud_model';
+  static const _pendingCheckinsKey = 'mind_recipe_pending_checkins';
 
   AccountSession? session;
   String openRouterKey = '';
@@ -512,15 +871,11 @@ class SecureAppState extends ChangeNotifier {
   bool managedAiAvailable = false;
   bool cloudAiEnabled = true;
   bool publicResearchEnabled = false;
-  String selectedCloudModel = 'anthropic/claude-sonnet-5';
+  String selectedCloudModel = 'openrouter/auto';
   String appearanceMode = 'system';
-  // Native palette selection. This intentionally remains independent from
-  // the WebGL visual theme so all twelve app palettes remain available.
-  String chimeraTheme = 'chimera-native';
-  String chimeraVfxTheme = 'mind-recipe-orbit';
-  bool chimeraFxEnabled = true;
-  double chimeraFxIntensity = 0.7;
-  String chimeraFxVariant = 'full';
+
+  /// The only member-selectable visual setting.
+  String visualThemeId = 'mindrecipe-core';
   String _activityDate = '';
   int _navigationSessions = 0;
   int _messagesSent = 0;
@@ -560,11 +915,9 @@ class SecureAppState extends ChangeNotifier {
         _storage.read(key: _cloudAiEnabledKey),
         _storage.read(key: _publicResearchEnabledKey),
         _storage.read(key: _appearanceModeKey),
-        _storage.read(key: _chimeraThemeKey),
-        _storage.read(key: _chimeraVfxThemeKey),
-        _storage.read(key: _chimeraFxEnabledKey),
-        _storage.read(key: _chimeraFxIntensityKey),
-        _storage.read(key: _chimeraFxVariantKey),
+        _storage.read(key: _visualThemeKey),
+        _storage.read(key: _legacyChimeraThemeKey),
+        _storage.read(key: _legacyChimeraVfxThemeKey),
         _storage.read(key: _cloudModelKey),
       ]);
       if ((values[0] ?? '').isNotEmpty) {
@@ -581,9 +934,13 @@ class SecureAppState extends ChangeNotifier {
         _navigationSessions = activity['navigation_sessions'] as int? ?? 0;
         _messagesSent = activity['messages_sent'] as int? ?? 0;
         _aiReflections = activity['ai_reflections'] as int? ?? 0;
-        _lifetimeNavigationSessions = activity['lifetime_navigation_sessions'] as int? ?? _navigationSessions;
-        _lifetimeNavigatorTurns = activity['lifetime_navigator_turns'] as int? ?? _messagesSent;
-        _lifetimeAiReflections = activity['lifetime_ai_reflections'] as int? ?? _aiReflections;
+        _lifetimeNavigationSessions =
+            activity['lifetime_navigation_sessions'] as int? ??
+            _navigationSessions;
+        _lifetimeNavigatorTurns =
+            activity['lifetime_navigator_turns'] as int? ?? _messagesSent;
+        _lifetimeAiReflections =
+            activity['lifetime_ai_reflections'] as int? ?? _aiReflections;
         _lastAssistantActivityAt = DateTime.tryParse(
           activity['last_activity_at']?.toString() ?? '',
         );
@@ -593,32 +950,20 @@ class SecureAppState extends ChangeNotifier {
       appearanceMode = const {'system', 'light', 'dark'}.contains(values[7])
           ? values[7]!
           : 'system';
-      final storedChimeraTheme = values[8];
-      chimeraTheme =
-          const {
-            'chimera-native',
-            'cyberpunk-neon',
-            'organic-bioluminescent',
-            'quantum-void',
-            'holographic-matrix',
-            'oceanic-cyan',
-            'solar-ember',
-            'deep-ocean',
-            'aurora-spectrum',
-            'crimson-pulse',
-            'monochrome-glass',
-            'ultraviolet-bloom',
-          }.contains(storedChimeraTheme)
-          ? storedChimeraTheme!
-          : 'chimera-native';
-      chimeraVfxTheme = _visualTheme(values[9]);
-      chimeraFxEnabled = values[10] != 'false';
-      chimeraFxIntensity =
-          double.tryParse(values[11] ?? '')?.clamp(0.2, 1.0).toDouble() ?? 0.7;
-      chimeraFxVariant = _sourceBackgroundPreset(values[12]);
-      selectedCloudModel = (values[13] ?? '').trim().isEmpty
-          ? 'anthropic/claude-sonnet-5'
-          : values[13]!.trim();
+      visualThemeId = migrateVisualTheme(values[8] ?? values[10] ?? values[9]);
+      selectedCloudModel = (values[11] ?? '').trim().isEmpty
+          ? 'openrouter/auto'
+          : values[11]!.trim();
+      await _storage.write(key: _visualThemeKey, value: visualThemeId);
+      for (final key in const [
+        _legacyChimeraThemeKey,
+        _legacyChimeraVfxThemeKey,
+        _legacyChimeraFxEnabledKey,
+        _legacyChimeraFxIntensityKey,
+        _legacyChimeraFxVariantKey,
+      ]) {
+        await _storage.delete(key: key);
+      }
     } catch (_) {
       // Secure storage can be unavailable in some test harnesses. The app stays fail-closed.
     }
@@ -762,6 +1107,71 @@ class SecureAppState extends ChangeNotifier {
     } catch (_) {}
   }
 
+  /// Queues an authenticated Daily Navigation for retry. The device-generated
+  /// client id lets the server safely accept a retry after an interrupted
+  /// network response without creating a duplicate check-in.
+  Future<void> queueCheckIn(Map<String, dynamic> checkIn) async {
+    if (session == null || session!.token.isEmpty) return;
+    try {
+      final raw = await _storage.read(key: _pendingCheckinsKey);
+      final queued = raw == null || raw.isEmpty
+          ? <Map<String, dynamic>>[]
+          : (jsonDecode(raw) as List<dynamic>)
+                .map((value) => Map<String, dynamic>.from(value as Map))
+                .toList();
+      final clientId = checkIn['client_id']?.toString();
+      queued.removeWhere(
+        (value) => clientId != null && value['client_id'] == clientId,
+      );
+      queued.add(Map<String, dynamic>.from(checkIn));
+      await _storage.write(key: _pendingCheckinsKey, value: jsonEncode(queued));
+    } catch (_) {
+      // The local navigation remains available even if secure storage is
+      // temporarily unavailable; a later navigation can still be synced.
+    }
+  }
+
+  Future<void> flushPendingCheckIns(MindRecipeApiClient api) async {
+    final activeSession = session;
+    if (activeSession == null || activeSession.token.isEmpty) return;
+    try {
+      final raw = await _storage.read(key: _pendingCheckinsKey);
+      if (raw == null || raw.isEmpty) return;
+      final queued = (jsonDecode(raw) as List<dynamic>)
+          .map((value) => Map<String, dynamic>.from(value as Map))
+          .toList();
+      var synced = 0;
+      for (final item in queued) {
+        try {
+          await api.createCheckIn(
+            token: activeSession.token,
+            clientId: item['client_id']?.toString() ?? '',
+            emotions: (item['emotions'] as List? ?? const [])
+                .map((value) => value.toString())
+                .toList(),
+            activation: item['activation'] as int? ?? 0,
+            bodyAreas: (item['body_areas'] as List? ?? const [])
+                .map((value) => value.toString())
+                .toList(),
+            journal: item['journal']?.toString(),
+            zoneLabel: item['zone_label']?.toString(),
+          );
+          synced++;
+        } catch (_) {
+          break;
+        }
+      }
+      if (synced == 0) return;
+      await _storage.write(
+        key: _pendingCheckinsKey,
+        value: jsonEncode(queued.skip(synced).toList()),
+      );
+    } catch (_) {
+      // Retain the outbox and retry after the next authenticated app launch
+      // or Daily Navigation completion.
+    }
+  }
+
   /// One-line summary of the most recent navigation, for AI grounding.
   Future<String> lastNavigationSummary() async {
     final all = await loadNavigationHistory();
@@ -820,7 +1230,10 @@ class SecureAppState extends ChangeNotifier {
     }
   }
 
-  Future<void> saveThread(String title, List<Map<String, String>> messages) async {
+  Future<void> saveThread(
+    String title,
+    List<Map<String, String>> messages,
+  ) async {
     try {
       final all = await loadSavedThreads();
       all.insert(0, {
@@ -917,113 +1330,11 @@ class SecureAppState extends ChangeNotifier {
     await _storage.write(key: _appearanceModeKey, value: value);
   }
 
-  Future<void> setChimeraTheme(String value) async {
-    if (!const {
-      'chimera-native',
-      'cyberpunk-neon',
-      'organic-bioluminescent',
-      'quantum-void',
-      'holographic-matrix',
-      'oceanic-cyan',
-      'solar-ember',
-      'deep-ocean',
-      'aurora-spectrum',
-      'crimson-pulse',
-      'monochrome-glass',
-      'ultraviolet-bloom',
-    }.contains(value)) {
-      return;
-    }
-    chimeraTheme = value;
+  Future<void> setVisualTheme(String value) async {
+    final migrated = migrateVisualTheme(value);
+    visualThemeId = migrated;
     notifyListeners();
-    await _storage.write(key: _chimeraThemeKey, value: value);
-  }
-
-  Future<void> setChimeraVfxTheme(String value) async {
-    if (!_visualThemes.contains(value)) return;
-    chimeraVfxTheme = value;
-    notifyListeners();
-    await _storage.write(key: _chimeraVfxThemeKey, value: value);
-  }
-
-  static const _visualThemes = {
-    'chimera-native',
-    'cyberpunk-neon',
-    'organic-bioluminescent',
-    'quantum-void',
-    'holographic-matrix',
-    'midnight-signal',
-    'neon-ronin',
-    'abyssal-current',
-    'solar-flare',
-    'void-walker',
-    'crystal-matrix',
-    'aurora',
-    'obsidian-forge',
-    'orchid-vapor',
-    'tidal-glass',
-    'mind-recipe-orbit',
-  };
-
-  static String _visualTheme(String? value) =>
-      _visualThemes.contains(value) ? value! : 'mind-recipe-orbit';
-
-  Future<void> setChimeraFxEnabled(bool value) async {
-    chimeraFxEnabled = value;
-    notifyListeners();
-    await _storage.write(key: _chimeraFxEnabledKey, value: '$value');
-  }
-
-  Future<void> setChimeraFxIntensity(double value) async {
-    chimeraFxIntensity = value.clamp(0.2, 1.0).toDouble();
-    notifyListeners();
-    await _storage.write(
-      key: _chimeraFxIntensityKey,
-      value: chimeraFxIntensity.toString(),
-    );
-  }
-
-  Future<void> setChimeraFxVariant(String value) async {
-    if (!const {
-      'full',
-      'lite',
-      'trading',
-      'cinematic',
-      'holographic',
-      'minimal',
-    }.contains(value)) {
-      return;
-    }
-    chimeraFxVariant = value;
-    notifyListeners();
-    await _storage.write(key: _chimeraFxVariantKey, value: value);
-  }
-
-  static String _sourceBackgroundPreset(String? value) {
-    const source = {
-      'full',
-      'lite',
-      'trading',
-      'cinematic',
-      'holographic',
-      'minimal',
-    };
-    if (source.contains(value)) return value!;
-    const legacy = {
-      'field': 'full',
-      'nebula': 'lite',
-      'rivers': 'trading',
-      'tendrils': 'holographic',
-      'orbs': 'cinematic',
-      'lattice': 'trading',
-      'void': 'minimal',
-      'prism': 'holographic',
-      'aurora': 'cinematic',
-      'ember': 'trading',
-      'ocean': 'full',
-      'twilight': 'minimal',
-    };
-    return legacy[value] ?? 'full';
+    await _storage.write(key: _visualThemeKey, value: migrated);
   }
 
   Future<void> signOut() async {

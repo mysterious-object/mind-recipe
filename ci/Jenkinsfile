@@ -1,4 +1,4 @@
-// Mind Recipe CI — mirrors the GitHub Actions workflows exactly
+// MindRecipe CI — mirrors the GitHub Actions workflows exactly
 // (.github/workflows/android-apk.yml + ios-ipa.yml), so builds are identical
 // whether they run in Actions (billing permitting) or here on Jenkins.
 //
@@ -59,9 +59,9 @@ pipeline {
           sh '''
             chmod +x ci/upload_drive.sh
             ci/upload_drive.sh flutter/build/app/outputs/flutter-apk/app-release.apk \
-              Mind-Recipe-1.0.0-2089-Android.apk "$MIND_RECIPE_DRIVE_FOLDER"
+              MindRecipe-1.0.0-2107-Android.apk "$MIND_RECIPE_DRIVE_FOLDER"
             ci/upload_drive.sh flutter/build/ios/ipa/mind-recipe-ios-unsigned.ipa \
-              Mind-Recipe-1.0.0-2089-iOS-unsigned.ipa "$MIND_RECIPE_DRIVE_FOLDER" \
+              MindRecipe-1.0.0-2107-iOS-unsigned.ipa "$MIND_RECIPE_DRIVE_FOLDER" \
               victoria@contextfield.co
           '''
         }
@@ -78,7 +78,7 @@ pipeline {
       echo 'Jenkins build finished; artifacts are archived only after both platform builds succeed.'
     }
     success {
-      echo "Mind Recipe build #${env.BUILD_NUMBER} — artifacts archived in Jenkins."
+      echo "MindRecipe build #${env.BUILD_NUMBER} — artifacts archived in Jenkins."
     }
     failure {
       echo 'Mind Recipe build failed — check the stage that failed.'

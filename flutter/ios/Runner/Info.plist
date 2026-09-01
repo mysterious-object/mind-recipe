@@ -3,17 +3,17 @@
 <plist version="1.0">
 <dict>
 	<key>NSCalendarsFullAccessUsageDescription</key>
-	<string>Mind Recipe can add events you approve to your calendar.</string>
+	<string>MindRecipe can add events you approve to your calendar.</string>
 	<key>NSCalendarsWriteOnlyAccessUsageDescription</key>
-	<string>Mind Recipe can add events you approve to your calendar.</string>
+	<string>MindRecipe can add events you approve to your calendar.</string>
 	<key>NSRemindersFullAccessUsageDescription</key>
-	<string>Mind Recipe can add reminders you approve.</string>
+	<string>MindRecipe can add reminders you approve.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Mind Recipe</string>
+	<string>MindRecipe</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -33,9 +33,9 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Mind Recipe uses the microphone only when you choose to speak a response.</string>
+	<string>MindRecipe uses the microphone only when you choose to speak a response.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>Mind Recipe converts the response you choose to speak into text for your conversation.</string>
+	<string>MindRecipe converts the response you choose to speak into text for your conversation.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

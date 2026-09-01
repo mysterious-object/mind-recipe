@@ -149,10 +149,16 @@ class _CinematicOnboardingState extends State<CinematicOnboarding>
                     AnimatedSwitcher(
                       duration: const Duration(milliseconds: 900),
                       child: !_brandDone
-                          ? _BrandText(key: ValueKey(_timeline.value < 0.34 ? 'cf' : 'nc'))
+                          ? _BrandText(
+                              key: ValueKey(
+                                _timeline.value < 0.34 ? 'cf' : 'nc',
+                              ),
+                            )
                           : Padding(
                               key: ValueKey('scene-$_scene'),
-                              padding: const EdgeInsets.symmetric(horizontal: 28),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 28,
+                              ),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
@@ -174,8 +180,9 @@ class _CinematicOnboardingState extends State<CinematicOnboarding>
                                         .textTheme
                                         .displaySmall
                                         ?.copyWith(
-                                            fontWeight: FontWeight.w800,
-                                            height: 0.98),
+                                          fontWeight: FontWeight.w800,
+                                          height: 0.98,
+                                        ),
                                   ),
                                   const SizedBox(height: 18),
                                   Text(
@@ -184,22 +191,25 @@ class _CinematicOnboardingState extends State<CinematicOnboarding>
                                         .textTheme
                                         .titleMedium
                                         ?.copyWith(
-                                            color: Colors.white70,
-                                            height: 1.45),
+                                          color: Colors.white70,
+                                          height: 1.45,
+                                        ),
                                   ),
                                   const SizedBox(height: 20),
                                   Container(
                                     padding: const EdgeInsets.symmetric(
-                                        horizontal: 14, vertical: 11),
+                                      horizontal: 14,
+                                      vertical: 11,
+                                    ),
                                     decoration: BoxDecoration(
-                                      color: Colors.white
-                                          .withValues(alpha: 0.055),
+                                      color: Colors.white.withValues(
+                                        alpha: 0.055,
+                                      ),
                                       border: Border.all(
                                         color: MindRecipeFxPalette.primary
                                             .withValues(alpha: 0.22),
                                       ),
-                                      borderRadius:
-                                          BorderRadius.circular(16),
+                                      borderRadius: BorderRadius.circular(16),
                                     ),
                                     child: Row(
                                       children: [
@@ -217,7 +227,8 @@ class _CinematicOnboardingState extends State<CinematicOnboarding>
                                                 .textTheme
                                                 .bodyMedium
                                                 ?.copyWith(
-                                                    color: Colors.white70),
+                                                  color: Colors.white70,
+                                                ),
                                           ),
                                         ),
                                       ],
@@ -261,7 +272,7 @@ class _CinematicOnboardingState extends State<CinematicOnboarding>
                     FilledButton.icon(
                       onPressed: next,
                       icon: const Icon(Icons.navigation_rounded),
-                      label: const Text('Enter Mind Recipe'),
+                      label: const Text('Enter MindRecipe'),
                     ),
                   ],
                 ),
@@ -291,9 +302,7 @@ class _BrandOrbPainter extends CustomPainter {
     if (size.isEmpty) return;
     final center = size.center(Offset.zero);
     final radius = size.shortestSide * 0.30;
-    final breathe = breathing
-        ? 1 + math.sin(t * math.pi * 2) * 0.05
-        : 1.0;
+    final breathe = breathing ? 1 + math.sin(t * math.pi * 2) * 0.05 : 1.0;
 
     // ContextField wave-orb reveal: waves sweep in during t 0..0.3.
     final waveReveal = (t / 0.30).clamp(0.0, 1.0);
@@ -362,10 +371,12 @@ class _BrandOrbPainter extends CustomPainter {
         center,
         radius * 1.55 * pulse,
         Paint()
-          ..shader = RadialGradient(colors: [
-            const Color(0x3300e5cc),
-            const Color(0x0000e5cc),
-          ]).createShader(Rect.fromCircle(center: center, radius: radius * 1.55 * pulse)),
+          ..shader =
+              RadialGradient(
+                colors: [const Color(0x3300e5cc), const Color(0x0000e5cc)],
+              ).createShader(
+                Rect.fromCircle(center: center, radius: radius * 1.55 * pulse),
+              ),
       );
     }
   }
@@ -392,7 +403,8 @@ class _BrandOrbPainter extends CustomPainter {
         final f = i / steps;
         if (f > reveal) break;
         final x = center.dx - radius * 0.92 + f * radius * 1.84;
-        final arc = math.sin(f * math.pi) *
+        final arc =
+            math.sin(f * math.pi) *
             radius *
             (0.55 + offsetFrac.abs() * 0.5) *
             (offsetFrac < 0 ? -1 : 1) *
@@ -437,42 +449,40 @@ class _BrandText extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Column(
-        children: [
-          Text(
-            'ContextField',
-            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.5,
-                  color: Colors.white,
-                ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'A S S U M E   C O M P L E X I T Y .',
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  color: MindRecipeFxPalette.livingGreen,
-                  letterSpacing: 2.2,
-                ),
-          ),
-          const SizedBox(height: 22),
-          Text(
-            'Nav Compass',
-            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.5,
-                  color: Colors.white,
-                ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'O R I E N T .   C H O O S E .   M O V E   F O R W A R D .',
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  color: MindRecipeFxPalette.primary,
-                  letterSpacing: 2.2,
-                ),
-          ),
-        ],
-      );
+    children: [
+      Text(
+        'ContextField',
+        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.5,
+          color: Colors.white,
+        ),
+      ),
+      const SizedBox(height: 6),
+      Text(
+        'A S S U M E   C O M P L E X I T Y .',
+        style: Theme.of(context).textTheme.labelMedium?.copyWith(
+          color: MindRecipeFxPalette.livingGreen,
+          letterSpacing: 2.2,
+        ),
+      ),
+      const SizedBox(height: 22),
+      Text(
+        'Nav Compass',
+        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.5,
+          color: Colors.white,
+        ),
+      ),
+      const SizedBox(height: 6),
+      Text(
+        'O R I E N T .   C H O O S E .   M O V E   F O R W A R D .',
+        style: Theme.of(context).textTheme.labelMedium
+            ?.copyWith(color: MindRecipeFxPalette.primary, letterSpacing: 2.2),
+      ),
+    ],
+  );
 }
 
 class _SceneView extends StatelessWidget {
@@ -677,7 +687,7 @@ class _LivingAssistantCardState extends State<LivingAssistantCard> {
     final scheme = Theme.of(context).colorScheme;
     return Semantics(
       liveRegion: true,
-      label: thinking ? 'Mind Recipe is preparing a reflection' : widget.message,
+      label: thinking ? 'MindRecipe is preparing a reflection' : widget.message,
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
