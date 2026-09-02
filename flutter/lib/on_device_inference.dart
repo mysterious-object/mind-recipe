@@ -36,6 +36,7 @@ enum OnDeviceStatus {
   notInstalled,
   downloading,
   verifying,
+  initializing,
   ready,
   error,
 }
@@ -304,7 +305,9 @@ class OnDeviceInference implements LocalInference {
     // `verifying` back to `downloading` and lose the verify state.
     if (_snapshot.status == OnDeviceStatus.downloading ||
         _downloadActive ||
-        (_snapshot.status == OnDeviceStatus.verifying && _refreshing)) {
+        ((_snapshot.status == OnDeviceStatus.verifying ||
+                _snapshot.status == OnDeviceStatus.initializing) &&
+            _refreshing)) {
       return _snapshot;
     }
     _refreshing = true;
@@ -364,6 +367,13 @@ class OnDeviceInference implements LocalInference {
         );
       }
       await _inferLog('verify ok, loading engine');
+      _set(
+        LocalInferenceSnapshot(
+          OnDeviceStatus.initializing,
+          detail:
+              'Preparing ${_activeManifest.id.contains('gemma') ? 'Gemma' : 'Qwen'} for this device…',
+        ),
+      );
       if (_engine == null) await _loadEngine(file);
       await _inferLog('engine loaded, ready');
       return _set(const LocalInferenceSnapshot(OnDeviceStatus.ready));
@@ -1023,7 +1033,7 @@ class OnDeviceInference implements LocalInference {
         await _inferLog(
           'loading engine [$label] for ${file.path} (${await file.length()} bytes)',
         );
-        await parent.init().timeout(const Duration(seconds: 150));
+        await parent.init().timeout(const Duration(seconds: 55));
         _engine = parent;
         await _inferLog('engine ready [$label]');
         return;

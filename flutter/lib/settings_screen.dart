@@ -191,6 +191,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final downloading =
         status == OnDeviceStatus.downloading ||
         status == OnDeviceStatus.verifying ||
+        status == OnDeviceStatus.initializing ||
         status == OnDeviceStatus.checking;
     final detail = ready
         ? 'Ready for private, on-device guidance. Nothing from this route is sent to a cloud provider.'

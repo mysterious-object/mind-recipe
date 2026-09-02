@@ -105,7 +105,7 @@ class _MindRecipeAppState extends State<MindRecipeApp> {
       theme: ThemeData(
         colorScheme: scheme,
         useMaterial3: true,
-        scaffoldBackgroundColor: MindRecipeTokens.surfaceWhite,
+        scaffoldBackgroundColor: Colors.transparent,
       ),
       darkTheme: ThemeData(
         colorScheme:
@@ -119,7 +119,7 @@ class _MindRecipeAppState extends State<MindRecipeApp> {
               surface: MindRecipeTokens.surfaceBlack,
             ),
         useMaterial3: true,
-        scaffoldBackgroundColor: MindRecipeTokens.voidBlack,
+        scaffoldBackgroundColor: Colors.transparent,
       ),
       themeMode: themeMode,
       home: !_introComplete
@@ -523,6 +523,8 @@ class _MemberHomeState extends State<MemberHome> {
             ? pageController.page ?? index.toDouble()
             : index.toDouble();
         return Scaffold(
+          backgroundColor: visualThemeFor(widget.appState.visualThemeId)
+              .background,
           appBar: AppBar(
             title: MindRecipePageTitle(
               title: labels[index],
@@ -805,7 +807,8 @@ class _PrivateModelDownloadBannerState
           if (cur.status != OnDeviceStatus.error) _errorDismissed = false;
         });
       } else if (cur.status == OnDeviceStatus.downloading ||
-          cur.status == OnDeviceStatus.verifying) {
+          cur.status == OnDeviceStatus.verifying ||
+          cur.status == OnDeviceStatus.initializing) {
         // Still need to tick for progress bar animation
         setState(() => _snap = cur);
       } else if (cur.status == OnDeviceStatus.notInstalled ||
@@ -834,8 +837,9 @@ class _PrivateModelDownloadBannerState
   Widget build(BuildContext context) {
     final isDownloading = _snap.status == OnDeviceStatus.downloading;
     final isVerifying = _snap.status == OnDeviceStatus.verifying;
+    final isInitializing = _snap.status == OnDeviceStatus.initializing;
     final isError = _snap.status == OnDeviceStatus.error;
-    if (!isDownloading && !isVerifying && !isError)
+    if (!isDownloading && !isVerifying && !isInitializing && !isError)
       return const SizedBox.shrink();
     if (isError && _errorDismissed) return const SizedBox.shrink();
     if (isError) {
@@ -916,7 +920,10 @@ class _PrivateModelDownloadBannerState
                     child: Text(
                       isDownloading
                           ? 'Downloading private model $percent% — stays active when switching tabs'
-                          : 'Verifying download and starting private AI…',
+                          : isVerifying
+                          ? 'Checking the downloaded model’s integrity…'
+                          : _snap.detail ??
+                                'Preparing private AI for this device…',
                       style: const TextStyle(
                         fontWeight: FontWeight.w700,
                         fontSize: 13.5,
@@ -1554,7 +1561,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final current = OnDeviceInference().snapshot;
       if (_modelActionInProgress ||
           current.status == OnDeviceStatus.downloading ||
-          current.status == OnDeviceStatus.verifying) {
+          current.status == OnDeviceStatus.verifying ||
+          current.status == OnDeviceStatus.initializing) {
         setState(() => _privateModel = current);
         return;
       }
@@ -1562,7 +1570,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       // singleton — calling refreshStatus would risk resetting `downloading`
       // → `notInstalled` while .partial is still growing (tab-switch bug).
       if (_privateModel.status == OnDeviceStatus.downloading ||
-          _privateModel.status == OnDeviceStatus.verifying) {
+          _privateModel.status == OnDeviceStatus.verifying ||
+          _privateModel.status == OnDeviceStatus.initializing) {
         if (mounted) setState(() {});
         return;
       }
@@ -2085,7 +2094,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             if (_modelActionInProgress ||
                 _privateModel.status == OnDeviceStatus.downloading ||
-                _privateModel.status == OnDeviceStatus.verifying)
+                _privateModel.status == OnDeviceStatus.verifying ||
+                _privateModel.status == OnDeviceStatus.initializing)
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
                 child: Column(
@@ -2113,7 +2123,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 _privateModel.isReady
                     ? 'Private model ready — stays on this device.'
                     : _privateModel.status == OnDeviceStatus.downloading ||
-                          _privateModel.status == OnDeviceStatus.verifying
+                          _privateModel.status == OnDeviceStatus.verifying ||
+                          _privateModel.status == OnDeviceStatus.initializing
                     ? 'Preparing private model — you can keep using the app.'
                     : 'Choose a model above, then download it for on-device guidance.',
                 style: Theme.of(context).textTheme.bodySmall,

@@ -244,6 +244,29 @@ class MindRecipeApiClient {
     final response = await _client
         .send(request)
         .timeout(const Duration(seconds: 20));
+    if (response.statusCode == 404 || response.statusCode == 405) {
+      // Staged installs can briefly lead the API during a coordinated mobile
+      // rollout. Preserve working cloud chat through the established endpoint
+      // instead of turning every message into a generic provider failure.
+      await response.stream.drain<void>();
+      yield const NavigatorStreamEvent('accepted', {'route': 'cloud_legacy'});
+      final legacy = await reflect(
+        token: token,
+        providerKey: providerKey,
+        text: text,
+        context: context,
+        externalResearchOptIn: externalResearchOptIn,
+        model: model,
+      );
+      yield NavigatorStreamEvent('delta', {'token': legacy.message});
+      yield NavigatorStreamEvent('done', {
+        'mode': legacy.mode,
+        'message': legacy.message,
+        if (legacy.provider != null) 'provider': legacy.provider,
+        if (legacy.model != null) 'model': legacy.model,
+      });
+      return;
+    }
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw const ApiException('Navigator is temporarily unavailable.');
     }
