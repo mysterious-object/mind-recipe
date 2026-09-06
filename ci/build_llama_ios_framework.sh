@@ -98,4 +98,7 @@ mkdir -p "$APP_BUNDLE/Frameworks"
 rm -rf "$APP_BUNDLE/Frameworks/llama.framework"
 cp -R "$FRAMEWORK_DIR" "$APP_BUNDLE/Frameworks/llama.framework"
 xcrun vtool -show-build "$APP_BUNDLE/Frameworks/llama.framework/llama" >/dev/null
-xcrun nm -gU "$APP_BUNDLE/Frameworks/llama.framework/llama" | grep -q '_llama_model_load_from_file'
+# Consume the complete nm stream. With `pipefail`, grep -q closes the pipe as
+# soon as it matches and makes LLVM report a false broken-pipe build failure.
+xcrun nm -gU "$APP_BUNDLE/Frameworks/llama.framework/llama" \
+  | grep '_llama_model_load_from_file' >/dev/null

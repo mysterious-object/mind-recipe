@@ -54,7 +54,7 @@ jobs:
         run: |
           test -d build/ios/iphoneos/Runner.app
           test -x build/ios/iphoneos/Runner.app/Frameworks/llama.framework/llama
-          xcrun nm -gU build/ios/iphoneos/Runner.app/Frameworks/llama.framework/llama | grep -q _llama_model_load_from_file
+          xcrun nm -gU build/ios/iphoneos/Runner.app/Frameworks/llama.framework/llama | grep _llama_model_load_from_file >/dev/null
           ls -lh build/ios/iphoneos/Runner.app/Frameworks/llama.framework/llama
         working-directory: flutter
 
