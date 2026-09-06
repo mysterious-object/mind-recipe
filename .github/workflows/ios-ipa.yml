@@ -37,8 +37,18 @@ jobs:
 
       - name: Build and embed pinned private-AI runtime
         run: |
+          set -o pipefail
           chmod +x ci/build_llama_ios_framework.sh
-          ci/build_llama_ios_framework.sh flutter/build/ios/iphoneos/Runner.app
+          ci/build_llama_ios_framework.sh flutter/build/ios/iphoneos/Runner.app 2>&1 | tee flutter/build/ios/llama-framework-build.log
+
+      - name: Preserve native-runtime diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mindrecipe-ios-native-runtime-log
+          path: flutter/build/ios/llama-framework-build.log
+          if-no-files-found: warn
+          retention-days: 3
 
       - name: Verify Runner.app exists
         run: |
