@@ -26,7 +26,9 @@ pipeline {
 
   stages {
     stage('Build and analyze on macOS') {
-      agent { label 'mac-builder' }
+      // The Jenkins Mac node is registered under the shared `flutter` label.
+      // Tart supplies the pinned macOS/Xcode build environment inside it.
+      agent { label 'flutter' }
       steps {
         deleteDir()
         checkout scm
