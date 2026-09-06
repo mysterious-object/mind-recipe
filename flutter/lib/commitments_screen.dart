@@ -53,7 +53,10 @@ class _CommitmentsScreenState extends State<CommitmentsScreen> {
           onSubmitted: (value) => Navigator.pop(context, value.trim()),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
           FilledButton(
             onPressed: () => Navigator.pop(context, controller.text.trim()),
             child: const Text('Add'),
@@ -94,25 +97,35 @@ class _CommitmentsScreenState extends State<CommitmentsScreen> {
     if (date == null || !mounted) return;
     final time = await showTimePicker(
       context: context,
-      initialTime: TimeOfDay.fromDateTime(DateTime.now().add(const Duration(hours: 1))),
+      initialTime: TimeOfDay.fromDateTime(
+        DateTime.now().add(const Duration(hours: 1)),
+      ),
     );
     if (time == null) return;
-    final scheduledFor = DateTime(date.year, date.month, date.day, time.hour, time.minute);
+    final scheduledFor = DateTime(
+      date.year,
+      date.month,
+      date.day,
+      time.hour,
+      time.minute,
+    );
     if (!scheduledFor.isAfter(DateTime.now())) {
       _message('Choose a future time for the reminder.');
       return;
     }
     final result = await MindRecipeMobileAutomation().setReminder(
-      title: item['title']?.toString() ?? 'Mind Recipe commitment',
+      title: item['title']?.toString() ?? 'MindRecipe commitment',
       dueDate: scheduledFor,
-      notes: 'Requested from Mind Recipe. Confirm any system sheet before leaving it.',
+      notes: 'Requested from MindRecipe. Confirm any system sheet before leaving it.',
     );
     try {
       await _api.recordCommitmentExecution(
         _token,
         item['id'].toString(),
         action: 'reminder',
-        status: result.success ? 'requested' : (result.isUnavailable ? 'unavailable' : 'failed'),
+        status: result.success
+            ? 'requested'
+            : (result.isUnavailable ? 'unavailable' : 'failed'),
         receipt: result.nativeCode,
         scheduledFor: result.success ? scheduledFor : null,
       );
@@ -123,8 +136,9 @@ class _CommitmentsScreenState extends State<CommitmentsScreen> {
     }
   }
 
-  void _message(String message) => ScaffoldMessenger.of(context)
-      .showSnackBar(SnackBar(content: Text(message)));
+  void _message(String message) =>
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -152,34 +166,53 @@ class _CommitmentsScreenState extends State<CommitmentsScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(item['title']?.toString() ?? '', style: MindRecipeTokens.title(context)),
+                        Text(
+                          item['title']?.toString() ?? '',
+                          style: MindRecipeTokens.title(context),
+                        ),
                         const SizedBox(height: 4),
-                        Text('Status: $status', style: MindRecipeTokens.bodySmall(context)),
+                        Text(
+                          'Status: $status',
+                          style: MindRecipeTokens.bodySmall(context),
+                        ),
                         if (item['execution_status']?.toString() == 'requested')
                           Text(
                             'Device reminder requested${item['scheduled_for'] == null ? '' : ' for ${item['scheduled_for']}'}',
                             style: MindRecipeTokens.bodySmall(context),
                           ),
                         const SizedBox(height: 8),
-                        Wrap(spacing: 8, children: [
-                          if (status == 'proposed') OutlinedButton(
-                            onPressed: () => _change(item, 'confirmed'), child: const Text('Confirm'),
-                          ),
-                          if (status == 'confirmed' || status == 'scheduled') FilledButton(
-                            onPressed: () => _change(item, 'completed'), child: const Text('Complete'),
-                          ),
-                          if (status == 'confirmed' || status == 'scheduled') OutlinedButton.icon(
-                            onPressed: () => _scheduleReminder(item),
-                            icon: const Icon(Icons.notifications_active_outlined),
-                            label: const Text('Set device reminder'),
-                          ),
-                          if (status == 'confirmed' || status == 'scheduled') TextButton(
-                            onPressed: () => _change(item, 'skipped'), child: const Text('Skip'),
-                          ),
-                          TextButton(
-                            onPressed: () => _change(item, 'cancelled'), child: const Text('Cancel'),
-                          ),
-                        ]),
+                        Wrap(
+                          spacing: 8,
+                          children: [
+                            if (status == 'proposed')
+                              OutlinedButton(
+                                onPressed: () => _change(item, 'confirmed'),
+                                child: const Text('Confirm'),
+                              ),
+                            if (status == 'confirmed' || status == 'scheduled')
+                              FilledButton(
+                                onPressed: () => _change(item, 'completed'),
+                                child: const Text('Complete'),
+                              ),
+                            if (status == 'confirmed' || status == 'scheduled')
+                              OutlinedButton.icon(
+                                onPressed: () => _scheduleReminder(item),
+                                icon: const Icon(
+                                  Icons.notifications_active_outlined,
+                                ),
+                                label: const Text('Set device reminder'),
+                              ),
+                            if (status == 'confirmed' || status == 'scheduled')
+                              TextButton(
+                                onPressed: () => _change(item, 'skipped'),
+                                child: const Text('Skip'),
+                              ),
+                            TextButton(
+                              onPressed: () => _change(item, 'cancelled'),
+                              child: const Text('Cancel'),
+                            ),
+                          ],
+                        ),
                       ],
                     ),
                   ),

@@ -6,7 +6,7 @@
  * Maximum bloom, ethereal fog, sparse but powerful.
  */
 
-import * as THREE from 'three';
+import * as THREE from '../../three.module.min.js';
 
 export const VoidWalker = {
   name: 'void-walker',

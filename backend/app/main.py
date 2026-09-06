@@ -865,6 +865,16 @@ def list_consents(identity: Tuple[str, Role] = Depends(actor)) -> list[dict[str,
     return store.get_active_consents(member_id)
 
 
+@app.get("/v1/consents/{legacy_member_id}")
+def reject_member_addressed_consent_lookup(
+    legacy_member_id: str,
+    identity: Tuple[str, Role] = Depends(actor),
+) -> None:
+    """Consent data is never addressable by a caller-supplied member id."""
+    del legacy_member_id, identity
+    raise HTTPException(status_code=404, detail="consent not found")
+
+
 
 # ── FHIR Export Endpoints ──────────────────────────────────────
 

@@ -128,7 +128,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               SwitchListTile(
                 title: const Text('Usage analytics'),
                 subtitle: const Text(
-                  'Help improve Mind Recipe (no personal data)',
+                  'Help improve MindRecipe (no personal data)',
                 ),
                 value: false,
                 onChanged: (v) {},
@@ -163,7 +163,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Mind Recipe by Context Field',
+                  'MindRecipe by Context Field',
                   style: MindRecipeTokens.title(context),
                   textAlign: TextAlign.center,
                 ),
@@ -351,7 +351,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       leading: Icon(Icons.mic_none_rounded),
       title: Text('Natural turn-taking'),
       subtitle: Text(
-        'Mind Recipe reads its reply, then reopens the microphone. Tap the microphone while it is speaking to interrupt and answer immediately.',
+        'MindRecipe reads its reply, then reopens the microphone. Tap the microphone while it is speaking to interrupt and answer immediately.',
       ),
     ),
   );

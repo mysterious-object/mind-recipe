@@ -1,4 +1,4 @@
-/// Private, on-device inference for Mind Recipe.
+/// Private, on-device inference for MindRecipe.
 ///
 /// A model is never treated as installed until its full SHA-256 digest matches
 /// the pinned manifest and the local engine has successfully loaded it.
@@ -445,163 +445,172 @@ class OnDeviceInference implements LocalInference {
       // append mode — that doubles the file and fails verification forever.
       if (resumeOffset < _activeManifest.sizeBytes) {
         while (true) {
-        attempt++;
-        HttpClient? client;
-        IOSink? sink;
-        var transient = false;
-        var transientNote = '';
-        try {
-          client = HttpClient()..autoUncompress = false;
-          client.connectionTimeout = const Duration(seconds: 30);
-          client.idleTimeout = const Duration(seconds: 60);
-          final request = await client.getUrl(_activeManifest.downloadUri);
-          request.followRedirects = true;
-          request.maxRedirects = 8;
-          request.headers.set(
-            'User-Agent',
-            'MindRecipe/1.0 (Flutter; +https://mindrecipe.app)',
-          );
-          request.headers.set('Accept', '*/*');
-          final resuming = received > 0 && received < _activeManifest.sizeBytes;
-          if (resuming) {
-            request.headers.set('Range', 'bytes=$received-');
-          }
-          final response = await request.close().timeout(
-            const Duration(minutes: 2),
-          );
-          if (response.statusCode == HttpStatus.requestedRangeNotSatisfiable) {
-            final onDisk = await temporary.exists()
-                ? await temporary.length()
-                : 0;
-            if (onDisk >= _activeManifest.sizeBytes) {
-              await _inferLog(
-                'range not satisfiable at $received but file complete ($onDisk) – verifying',
-              );
-              break;
+          attempt++;
+          HttpClient? client;
+          IOSink? sink;
+          var transient = false;
+          var transientNote = '';
+          try {
+            client = HttpClient()..autoUncompress = false;
+            client.connectionTimeout = const Duration(seconds: 30);
+            client.idleTimeout = const Duration(seconds: 60);
+            final request = await client.getUrl(_activeManifest.downloadUri);
+            request.followRedirects = true;
+            request.maxRedirects = 8;
+            request.headers.set(
+              'User-Agent',
+              'MindRecipe/1.0 (Flutter; +https://mindrecipe.app)',
+            );
+            request.headers.set('Accept', '*/*');
+            final resuming =
+                received > 0 && received < _activeManifest.sizeBytes;
+            if (resuming) {
+              request.headers.set('Range', 'bytes=$received-');
             }
-            // Server disagrees with our partial – start clean.
-            await _inferLog(
-              'range not satisfiable with short file – restarting',
+            final response = await request.close().timeout(
+              const Duration(minutes: 2),
             );
-            if (await temporary.exists()) await temporary.delete();
-            received = 0;
-            _downloadProgress = 0;
-            _downloadedBytes = 0;
-            transient = true;
-            transientNote = 'range reset';
-          } else if (response.statusCode != HttpStatus.ok &&
-              response.statusCode != HttpStatus.partialContent) {
-            throw HttpException(
-              'Model download returned ${response.statusCode}.',
-            );
-          } else {
-            if (resuming && response.statusCode == HttpStatus.ok) {
-              await _inferLog('server ignored Range – restarting from 0');
+            if (response.statusCode ==
+                HttpStatus.requestedRangeNotSatisfiable) {
+              final onDisk = await temporary.exists()
+                  ? await temporary.length()
+                  : 0;
+              if (onDisk >= _activeManifest.sizeBytes) {
+                await _inferLog(
+                  'range not satisfiable at $received but file complete ($onDisk) – verifying',
+                );
+                break;
+              }
+              // Server disagrees with our partial – start clean.
+              await _inferLog(
+                'range not satisfiable with short file – restarting',
+              );
               if (await temporary.exists()) await temporary.delete();
               received = 0;
               _downloadProgress = 0;
               _downloadedBytes = 0;
-            }
-            final contentLen = response.contentLength;
-            final expected = contentLen > 0
-                ? (received > 0 ? received + contentLen : contentLen)
-                : _activeManifest.sizeBytes;
-            if (expected > _activeManifest.sizeBytes + 1024) {
-              await _inferLog(
-                'warn: server expected $expected > manifest ${_activeManifest.sizeBytes} – clamping',
+              transient = true;
+              transientNote = 'range reset';
+            } else if (response.statusCode != HttpStatus.ok &&
+                response.statusCode != HttpStatus.partialContent) {
+              throw HttpException(
+                'Model download returned ${response.statusCode}.',
               );
-            }
-            var lastSampleBytes = received;
-            var lastSampleAt = DateTime.now();
-            sink = temporary.openWrite(
-              mode: received > 0 ? FileMode.append : FileMode.write,
-            );
-            try {
-              await for (final bytes in response.timeout(
-                const Duration(minutes: 2),
-                onTimeout: (s) => s.close(),
-              )) {
-                received += bytes.length;
-                sink.add(bytes);
-                _downloadProgress = (received / expected).clamp(0.0, 1.0);
-                _downloadedBytes = received;
-                final now = DateTime.now();
-                final elapsedMs = now.difference(lastSampleAt).inMilliseconds;
-                if (elapsedMs >= 750) {
-                  _downloadBytesPerSecond =
-                      ((received - lastSampleBytes) * 1000 / elapsedMs).round();
-                  lastSampleBytes = received;
-                  lastSampleAt = now;
-                }
+            } else {
+              if (resuming && response.statusCode == HttpStatus.ok) {
+                await _inferLog('server ignored Range – restarting from 0');
+                if (await temporary.exists()) await temporary.delete();
+                received = 0;
+                _downloadProgress = 0;
+                _downloadedBytes = 0;
               }
-            } on TimeoutException {
-              throw TimeoutException('stream stalled 2 min at $received bytes');
-            }
-            await sink.flush();
-            await sink.close();
-            sink = null;
-            final downloadedLen = await temporary.length();
-            await _inferLog(
-              'attempt $attempt finished $downloadedLen bytes (received $received, expect ${_activeManifest.sizeBytes})',
-            );
-            // Truncated body – socket closed early, classic backgrounding
-            // interruption. Route through the transient handler to resume.
-            if (received < _activeManifest.sizeBytes ||
-                downloadedLen < _activeManifest.sizeBytes) {
-              throw SocketException(
-                'connection closed early at $received/$downloadedLen',
+              final contentLen = response.contentLength;
+              final expected = contentLen > 0
+                  ? (received > 0 ? received + contentLen : contentLen)
+                  : _activeManifest.sizeBytes;
+              if (expected > _activeManifest.sizeBytes + 1024) {
+                await _inferLog(
+                  'warn: server expected $expected > manifest ${_activeManifest.sizeBytes} – clamping',
+                );
+              }
+              var lastSampleBytes = received;
+              var lastSampleAt = DateTime.now();
+              sink = temporary.openWrite(
+                mode: received > 0 ? FileMode.append : FileMode.write,
               );
-            }
-          }
-          client.close(force: true);
-          client = null;
-          break; // full download on disk – proceed to verification
-        } on TimeoutException catch (error) {
-          transient = true;
-          transientNote = '$error';
-        } on SocketException catch (error) {
-          transient = true;
-          transientNote = '${error.message ?? error}';
-        } on HttpException catch (error) {
-          // Permanent status-code failures surface immediately; mid-stream
-          // connection resets are transient.
-          if (error.message.startsWith('Model download returned')) rethrow;
-          transient = true;
-          transientNote = error.message;
-        } finally {
-          if (sink != null) {
-            try {
+              try {
+                await for (final bytes in response.timeout(
+                  const Duration(minutes: 2),
+                  onTimeout: (s) => s.close(),
+                )) {
+                  received += bytes.length;
+                  sink.add(bytes);
+                  _downloadProgress = (received / expected).clamp(0.0, 1.0);
+                  _downloadedBytes = received;
+                  final now = DateTime.now();
+                  final elapsedMs = now.difference(lastSampleAt).inMilliseconds;
+                  if (elapsedMs >= 750) {
+                    _downloadBytesPerSecond =
+                        ((received - lastSampleBytes) * 1000 / elapsedMs)
+                            .round();
+                    lastSampleBytes = received;
+                    lastSampleAt = now;
+                  }
+                }
+              } on TimeoutException {
+                throw TimeoutException(
+                  'stream stalled 2 min at $received bytes',
+                );
+              }
               await sink.flush();
-            } catch (_) {}
-            try {
               await sink.close();
+              sink = null;
+              final downloadedLen = await temporary.length();
+              await _inferLog(
+                'attempt $attempt finished $downloadedLen bytes (received $received, expect ${_activeManifest.sizeBytes})',
+              );
+              // Truncated body – socket closed early, classic backgrounding
+              // interruption. Route through the transient handler to resume.
+              if (received < _activeManifest.sizeBytes ||
+                  downloadedLen < _activeManifest.sizeBytes) {
+                throw SocketException(
+                  'connection closed early at $received/$downloadedLen',
+                );
+              }
+            }
+            client.close(force: true);
+            client = null;
+            break; // full download on disk – proceed to verification
+          } on TimeoutException catch (error) {
+            transient = true;
+            transientNote = '$error';
+          } on SocketException catch (error) {
+            transient = true;
+            transientNote = '${error.message ?? error}';
+          } on HttpException catch (error) {
+            // Permanent status-code failures surface immediately; mid-stream
+            // connection resets are transient.
+            if (error.message.startsWith('Model download returned')) rethrow;
+            transient = true;
+            transientNote = error.message;
+          } finally {
+            if (sink != null) {
+              try {
+                await sink.flush();
+              } catch (_) {}
+              try {
+                await sink.close();
+              } catch (_) {}
+            }
+            try {
+              client?.close(force: true);
             } catch (_) {}
           }
-          try {
-            client?.close(force: true);
-          } catch (_) {}
-        }
-        if (!transient) break;
-        if (attempt >= maxDownloadAttempts) {
-          throw TimeoutException(
-            'Download lost connection $attempt times (last: $transientNote). '
-            'Progress is kept at ${_downloadedBytes ~/ (1024 * 1024)} MB – press Retry to resume.',
+          if (!transient) break;
+          if (attempt >= maxDownloadAttempts) {
+            throw TimeoutException(
+              'Download lost connection $attempt times (last: $transientNote). '
+              'Progress is kept at ${_downloadedBytes ~/ (1024 * 1024)} MB – press Retry to resume.',
+            );
+          }
+          final delayMs = (1200 * attempt).clamp(1200, 6000);
+          await _inferLog(
+            'download interrupted ($transientNote) – auto-resume from $received in ${delayMs}ms (attempt $attempt/$maxDownloadAttempts)',
           );
-        }
-        final delayMs = (1200 * attempt).clamp(1200, 6000);
-        await _inferLog(
-          'download interrupted ($transientNote) – auto-resume from $received in ${delayMs}ms (attempt $attempt/$maxDownloadAttempts)',
-        );
-        await Future.delayed(Duration(milliseconds: delayMs));
+          await Future.delayed(Duration(milliseconds: delayMs));
         }
       } else {
-        await _inferLog('complete partial already on disk (${resumeOffset} bytes) — verifying');
+        await _inferLog(
+          'complete partial already on disk (${resumeOffset} bytes) — verifying',
+        );
       }
       // Defensive: a prior append-corruption could have left a >size file;
       // truncate to the manifest size so verification can pass.
       final preVerifyLen = await temporary.length();
       if (preVerifyLen > _activeManifest.sizeBytes) {
-        await _inferLog('truncating over-size partial $preVerifyLen → ${_activeManifest.sizeBytes}');
+        await _inferLog(
+          'truncating over-size partial $preVerifyLen → ${_activeManifest.sizeBytes}',
+        );
         final raf = await temporary.open(mode: FileMode.write);
         await raf.truncate(_activeManifest.sizeBytes);
         await raf.close();
@@ -628,9 +637,14 @@ class OnDeviceInference implements LocalInference {
       await _writeVerificationReceipt(destination, _activeManifest);
       // Do not call refreshStatus while still marked verifying: that guard
       // intentionally protects active checks and previously left success stuck.
+      // The download itself is complete once the verified file and receipt
+      // have been promoted. Clear this guard before asking refreshStatus to
+      // initialize the engine; otherwise refreshStatus returns the transient
+      // `checking` snapshot immediately and every fresh install is reported as
+      // failed even though the model on disk is valid.
+      _downloadActive = false;
       _set(const LocalInferenceSnapshot(OnDeviceStatus.checking));
       final ready = await refreshStatus();
-      _downloadActive = false;
       if (!ready.isReady) {
         throw StateError(
           ready.detail ?? 'The private model could not be started.',
@@ -812,10 +826,13 @@ class OnDeviceInference implements LocalInference {
     // The bundled Android runtime exposes libllama.so. The package defaults to
     // an optional multimodal library which is not part of this text-only app.
     if (Platform.isAndroid) Llama.libraryPath = 'libllama.so';
-    // iOS native symbols are linked into the app process. Explicitly reset a
-    // path left by another platform/test isolate so DynamicLibrary.process()
-    // is used on iPhone and iPad.
-    if (Platform.isIOS) Llama.libraryPath = null;
+    // The unsigned IPA embeds the exact pinned llama.cpp ABI as a framework.
+    // Resolve it from Runner.app so the isolate opens the packaged library
+    // directly instead of assuming symbols were linked into the app process.
+    if (Platform.isIOS) {
+      final appBundle = File(Platform.resolvedExecutable).parent.path;
+      Llama.libraryPath = '$appBundle/Frameworks/llama.framework/llama';
+    }
     // Determine base context size based on device memory
     var nCtx = 4096;
     try {
@@ -1147,13 +1164,13 @@ class OnDeviceInference implements LocalInference {
 
   String _fallbackResponse(String raw, List<LocalConversationTurn> history) {
     // Extract real member utterance when NavigatorAgent wraps it — otherwise the
-    // fallback echoes "Member message: ... Selected Mind Recipe support: ..." which
+    // fallback echoes "Member message: ... Selected MindRecipe support: ..." which
     // looks like broken code. The member only typed the part after "Member message:".
     var clean = raw;
     final memberIdx = clean.indexOf('Member message:');
     if (memberIdx != -1) {
       clean = clean.substring(memberIdx + 'Member message:'.length);
-      final supportIdx = clean.indexOf('Selected Mind Recipe support:');
+      final supportIdx = clean.indexOf('Selected MindRecipe support:');
       if (supportIdx != -1) clean = clean.substring(0, supportIdx);
       final guidanceIdx = clean.indexOf('Tool guidance:');
       if (guidanceIdx != -1) clean = clean.substring(0, guidanceIdx);
@@ -1215,7 +1232,7 @@ class OnDeviceInference implements LocalInference {
     if (lower.contains('appointment') ||
         lower.contains('remind') ||
         lower.contains('calendar')) {
-      return 'I can help turn that into a clear action. Tell me the date, time, and title if any are missing; Mind Recipe will show the complete proposal for you to review before your phone confirms it.';
+      return 'I can help turn that into a clear action. Tell me the date, time, and title if any are missing; MindRecipe will show the complete proposal for you to review before your phone confirms it.';
     }
     if (lower.contains('help me decide') || lower.contains('should i')) {
       return 'Let’s make the decision concrete. I’ll compare what each option gives you, what it costs, and which choice is easiest to reverse. What are the two options—and is your priority relief now, progress later, or protecting a relationship?';
@@ -1258,7 +1275,7 @@ class OnDeviceInference implements LocalInference {
       return _buildGemmaPrompt(userMessage, history);
     }
     final prompt = StringBuffer('''<|im_start|>system
-You are Mind Recipe, a private on-device personal assistant and wellness companion. Resolve short follow-ups from the recent conversation. Identify the member's actual intent, the most relevant prior detail or commitment, and the useful outcome before answering. For complex requests, privately compare options, check assumptions, and plan the response; never reveal that private reasoning. Correct yourself immediately when the member says you misunderstood. Move the thread forward instead of restarting, paraphrasing, or repeating a generic exercise. Ground claims in member-owned facts and label uncertainty. Be warm, specific, capable, and concise (usually 35 to 120 words). Use at most one specific question only when information is truly missing. Never diagnose, prescribe, assess safety, or claim clinical certainty. If urgent danger is mentioned, encourage local emergency help or 988 in the United States. Never mention internal tools.
+You are MindRecipe, a private on-device personal assistant and wellness companion. Resolve short follow-ups from the recent conversation. Identify the member's actual intent, the most relevant prior detail or commitment, and the useful outcome before answering. For complex requests, privately compare options, check assumptions, and plan the response; never reveal that private reasoning. Correct yourself immediately when the member says you misunderstood. Move the thread forward instead of restarting, paraphrasing, or repeating a generic exercise. Ground claims in member-owned facts and label uncertainty. Be warm, specific, capable, and concise (usually 35 to 120 words). Use at most one specific question only when information is truly missing. Never diagnose, prescribe, assess safety, or claim clinical certainty. If urgent danger is mentioned, encourage local emergency help or 988 in the United States. Never mention internal tools.
 
 Routing rule:
 - Practical requests (reminders, alarms, calendar, phone features) get brief, concrete assistant help — the app shows an action card to approve. Emotional or reflective messages get therapeutic pacing: presence, one grounded observation, no task-list energy.

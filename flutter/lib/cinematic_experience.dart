@@ -127,118 +127,121 @@ class _CinematicOnboardingState extends State<CinematicOnboarding>
                 ),
               ),
               Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    // The orb greeter — ContextField waves, then Nav Compass,
-                    // settling into the breathing Pulse orb.
-                    AnimatedBuilder(
-                      animation: _timeline,
-                      builder: (context, _) => SizedBox.square(
-                        dimension: 264,
-                        child: CustomPaint(
-                          painter: _BrandOrbPainter(
-                            t: _timeline.value,
-                            breathing: _brandDone,
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      // The orb greeter — ContextField waves, then Nav Compass,
+                      // settling into the breathing Pulse orb.
+                      AnimatedBuilder(
+                        animation: _timeline,
+                        builder: (context, _) => SizedBox.square(
+                          dimension: 264,
+                          child: CustomPaint(
+                            painter: _BrandOrbPainter(
+                              t: _timeline.value,
+                              breathing: _brandDone,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 30),
-                    // Animated fading brand + scene text — no slides.
-                    AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 900),
-                      child: !_brandDone
-                          ? _BrandText(
-                              key: ValueKey(
-                                _timeline.value < 0.34 ? 'cf' : 'nc',
-                              ),
-                            )
-                          : Padding(
-                              key: ValueKey('scene-$_scene'),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 28,
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    scene.$1,
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .labelLarge
-                                        ?.copyWith(
-                                          color: MindRecipeFxPalette.primary,
-                                          letterSpacing: 2.4,
-                                          fontWeight: FontWeight.w800,
-                                        ),
-                                  ),
-                                  const SizedBox(height: 12),
-                                  Text(
-                                    scene.$2,
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .displaySmall
-                                        ?.copyWith(
-                                          fontWeight: FontWeight.w800,
-                                          height: 0.98,
-                                        ),
-                                  ),
-                                  const SizedBox(height: 18),
-                                  Text(
-                                    scene.$3,
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .titleMedium
-                                        ?.copyWith(
-                                          color: Colors.white70,
-                                          height: 1.45,
-                                        ),
-                                  ),
-                                  const SizedBox(height: 20),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 14,
-                                      vertical: 11,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white.withValues(
-                                        alpha: 0.055,
-                                      ),
-                                      border: Border.all(
-                                        color: MindRecipeFxPalette.primary
-                                            .withValues(alpha: 0.22),
-                                      ),
-                                      borderRadius: BorderRadius.circular(16),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        const Icon(
-                                          Icons.auto_awesome_rounded,
-                                          color:
-                                              MindRecipeFxPalette.livingGreen,
-                                          size: 18,
-                                        ),
-                                        const SizedBox(width: 9),
-                                        Expanded(
-                                          child: Text(
-                                            scene.$4,
-                                            style: Theme.of(context)
-                                                .textTheme
-                                                .bodyMedium
-                                                ?.copyWith(
-                                                  color: Colors.white70,
-                                                ),
+                      const SizedBox(height: 30),
+                      // Animated fading brand + scene text — no slides.
+                      AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 900),
+                        child: !_brandDone
+                            ? _BrandText(
+                                key: ValueKey(
+                                  _timeline.value < 0.34 ? 'cf' : 'nc',
+                                ),
+                              )
+                            : Padding(
+                                key: ValueKey('scene-$_scene'),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 28,
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      scene.$1,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .labelLarge
+                                          ?.copyWith(
+                                            color: MindRecipeFxPalette.primary,
+                                            letterSpacing: 2.4,
+                                            fontWeight: FontWeight.w800,
                                           ),
-                                        ),
-                                      ],
                                     ),
-                                  ),
-                                ],
+                                    const SizedBox(height: 12),
+                                    Text(
+                                      scene.$2,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .displaySmall
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.w800,
+                                            height: 0.98,
+                                          ),
+                                    ),
+                                    const SizedBox(height: 18),
+                                    Text(
+                                      scene.$3,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleMedium
+                                          ?.copyWith(
+                                            color: Colors.white70,
+                                            height: 1.45,
+                                          ),
+                                    ),
+                                    const SizedBox(height: 20),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 14,
+                                        vertical: 11,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withValues(
+                                          alpha: 0.055,
+                                        ),
+                                        border: Border.all(
+                                          color: MindRecipeFxPalette.primary
+                                              .withValues(alpha: 0.22),
+                                        ),
+                                        borderRadius: BorderRadius.circular(16),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          const Icon(
+                                            Icons.auto_awesome_rounded,
+                                            color:
+                                                MindRecipeFxPalette.livingGreen,
+                                            size: 18,
+                                          ),
+                                          const SizedBox(width: 9),
+                                          Expanded(
+                                            child: Text(
+                                              scene.$4,
+                                              style: Theme.of(context)
+                                                  .textTheme
+                                                  .bodyMedium
+                                                  ?.copyWith(
+                                                    color: Colors.white70,
+                                                  ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
-                            ),
-                    ),
-                  ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
               Padding(

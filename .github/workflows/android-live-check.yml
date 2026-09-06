@@ -1,4 +1,4 @@
-name: Mind Recipe Android live-check APK
+name: MindRecipe Android live-check APK
 
 on:
   push:

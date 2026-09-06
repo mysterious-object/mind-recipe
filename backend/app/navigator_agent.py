@@ -1,4 +1,4 @@
-"""Bounded autonomous planning for Mind Recipe.
+"""Bounded autonomous planning for MindRecipe.
 
 This module is deliberately independent from external agent frameworks. It can
 select approved, read-only wellness tools, run a short quality loop, research
@@ -37,8 +37,8 @@ class NavigatorAgent:
     tools = (
         ToolSpec("conversation", "Listen first and respond to the member's chosen goal."),
         ToolSpec("check_in", "Organize a voluntary daily reflection."),
-        ToolSpec("recipe_practice", "Find a relevant Mind Recipe practice."),
-        ToolSpec("lesson", "Retrieve a Mind Recipe lesson."),
+        ToolSpec("recipe_practice", "Find a relevant MindRecipe practice."),
+        ToolSpec("lesson", "Retrieve a MindRecipe lesson."),
         ToolSpec("progress", "Explain member-owned wellness trends."),
         ToolSpec("booking", "Open the labelled booking destination."),
         ToolSpec(

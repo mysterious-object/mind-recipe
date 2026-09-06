@@ -6,7 +6,7 @@
  * Maximum bloom, vivid particle colors, high intensity.
  */
 
-import * as THREE from 'three';
+import * as THREE from '../../three.module.min.js';
 
 export const SolarFlare = {
   name: 'solar-flare',

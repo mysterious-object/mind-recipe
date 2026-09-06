@@ -650,7 +650,10 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
       )) {
         if (!mounted) return;
         if (event.type == 'delta') {
-          final token = event.payload['text']?.toString() ?? '';
+          final token =
+              event.payload['token']?.toString() ??
+              event.payload['text']?.toString() ??
+              '';
           if (token.isNotEmpty && placeholderIndex < widget.messages.length) {
             setState(() {
               final current = widget.messages[placeholderIndex];
@@ -677,12 +680,14 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
         message: 'MindRecipe could not reach the selected AI provider.',
       );
       if (!mounted) return;
+      var completedMessage = reply.message;
       setState(() {
         if (placeholderIndex < widget.messages.length) {
           final streamed = widget.messages[placeholderIndex].text;
+          completedMessage = streamed.isNotEmpty ? streamed : reply!.message;
           widget.messages[placeholderIndex] = ChatMessage(
             role: reply!.isCloudAi ? ChatRole.assistant : ChatRole.status,
-            text: streamed.isNotEmpty ? streamed : reply!.message,
+            text: completedMessage,
             model: reply!.isCloudAi ? reply!.model : null,
             cloudGenerated: reply!.isCloudAi,
           );
@@ -696,7 +701,7 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
           // Release the composer before the response turn opens so the member
           // can stop listening or type immediately if they prefer.
           setState(() => sending = false);
-          await _speakAndResume(reply.message);
+          await _speakAndResume(completedMessage);
           return;
         }
       }
@@ -949,6 +954,18 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
                 runSpacing: 6,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
+                  if (widget.onStartDailyNav != null)
+                    OutlinedButton.icon(
+                      onPressed: widget.onStartDailyNav,
+                      icon: const Icon(Icons.route_rounded, size: 16),
+                      label: const Text(
+                        'Begin daily navigation',
+                        style: TextStyle(fontSize: 12),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ),
                   OutlinedButton.icon(
                     onPressed: widget.messages.isEmpty
                         ? null
@@ -1046,7 +1063,7 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
 
 enum ChatRole { assistant, member, status }
 
-/// Consent-gated phone action card — Mind Recipe's on-device phone-harness
+/// Consent-gated phone action card — MindRecipe's on-device phone-harness
 /// surface inside free chat. Nothing executes until the member taps Allow.
 class _PhoneActionCard extends StatelessWidget {
   const _PhoneActionCard({

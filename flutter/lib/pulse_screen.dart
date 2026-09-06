@@ -583,7 +583,7 @@ class _SignalSources extends StatelessWidget {
         const SizedBox(height: 8),
         Text(
           sources.isEmpty
-              ? 'Current source: your on-device Mind Recipe activity'
+              ? 'Current source: your on-device MindRecipe activity'
               : 'Sources: ${sources.join(', ')}',
           style: Theme.of(context).textTheme.bodySmall,
         ),

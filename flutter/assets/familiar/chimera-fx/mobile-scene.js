@@ -1,7 +1,6 @@
-// Native bridge for the locally bundled Chimera FX engine.
-// This file is bundled for mobile WebViews so the engine and all five official
-// Source visual themes load as one local script, with no module-resolution or
-// network dependency.
+// Native bridge for MindRecipe's locally bundled Three.js/WebGL engine.
+// Every renderer module and visual theme is packaged with the app; this scene
+// never resolves a module or asset over the network.
 import ChimeraFX from './chimera-fx-bundle.js';
 import * as THREE from '../three.module.min.js';
 
@@ -14,9 +13,10 @@ const bridge = value => {
 const sceneKind = document.body?.dataset.sceneMode || window.MIND_RECIPE_SCENE_MODE || 'pulse';
 const host = document.getElementById('stage') || document.body;
 let engine = null;
-let activeTheme = 'chimera-native';
+let activeTheme = 'mindrecipe-core';
 let activePreset = 'lite';
 let requestedPreset = 'lite';
+let activeSeed = 17;
 let lastState = {};
 
 // This is the source Chimera FX background catalog.  Keep the identifiers in
@@ -26,7 +26,7 @@ const backgroundPresetIds = new Set([
   'full', 'lite', 'trading', 'cinematic', 'holographic', 'minimal',
 ]);
 
-// Existing installations saved one of the temporary Mind Recipe scene names.
+// Existing installations saved one of the temporary MindRecipe scene names.
 // Migrate those choices into the actual source presets without discarding a
 // person's visual preference.
 const legacyPresetMap = {
@@ -40,36 +40,23 @@ function backgroundPreset(value) {
   return legacyPresetMap[value] || 'full';
 }
 
-// The source package supplies the first five named themes. These additional
-// visual systems are full renderer themes—not palette aliases. Each has its
-// own fog, post-processing, component colors, and preferred composition.
-const visualThemeSpecs = {
-  'mindrecipe-core': [0x00d9c0, 0x8b5cf6, 0xf5b942, 0x06151b, 'full', .42, .46, .025],
-  'midnight-signal': [0x147bff, 0x00edac, 0xa98cff, 0x020719, 'trading', .30, .32, .018],
-  'neon-ronin': [0xee2c74, 0x7038ff, 0x4fdfff, 0x160414, 'holographic', .58, .35, .05],
-  'abyssal-current': [0x0077ff, 0x00e3d2, 0x75ffd9, 0x000f25, 'cinematic', .32, .68, .018],
-  'solar-flare': [0xff9d00, 0xffcf5c, 0xff4d23, 0x1a0c02, 'cinematic', .62, .28, .04],
-  'void-walker': [0x4630b5, 0x9d72ff, 0xc5b3ff, 0x05020f, 'minimal', .24, .72, .015],
-  'crystal-matrix': [0x75f7ff, 0xe9feff, 0x5ba8c9, 0x07151b, 'lite', .28, .55, .012],
-  'aurora': [0x23edab, 0x9a56ff, 0xff74b8, 0x07111d, 'full', .48, .50, .026],
-  'obsidian-forge': [0xef6736, 0xffb04b, 0x873b2f, 0x140909, 'cinematic', .38, .24, .065],
-  'orchid-vapor': [0xdb54e8, 0x7ee9ff, 0xc5a0ff, 0x160b20, 'holographic', .52, .64, .03],
-  'tidal-glass': [0x00c6dc, 0xe3ffff, 0x45dcb4, 0x031d25, 'trading', .30, .58, .015],
-  // ── Restored Darkstar project themes (missing in 2107) ───────────
-  'chimera-native': [0x00e5cc, 0x7c3aed, 0x7defff, 0x041214, 'full', .42, .48, .025],
-  'verdant': [0x007d71, 0x7c3aed, 0x00e68a, 0x04140f, 'full', .40, .48, .022],
-  'aurora-borealis': [0x00e68a, 0x7c3aed, 0x7defff, 0x05101d, 'full', .46, .52, .024],
-  'deep-ocean': [0x006d91, 0x315da8, 0x7defff, 0x041019, 'full', .30, .50, .015],
-  'ember': [0xa34213, 0xc26a00, 0xff8e3a, 0x140a05, 'trading', .44, .30, .05],
-  'twilight': [0x4648a3, 0x7651a8, 0xb8a1ff, 0x07071a, 'minimal', .30, .55, .014],
-};
-
-const sourceThemePresets = {
+const themePresets = {
+  'mindrecipe-core': 'full',
   'chimera-native': 'full',
   'cyberpunk-neon': 'holographic',
   'organic-bioluminescent': 'cinematic',
   'quantum-void': 'minimal',
   'holographic-matrix': 'trading',
+  'midnight-trading': 'trading',
+  'neon-samurai': 'holographic',
+  'deep-ocean': 'cinematic',
+  'solar-flare': 'cinematic',
+  'void-walker': 'minimal',
+  'crystal-matrix': 'lite',
+  'aurora-borealis': 'full',
+  'obsidian-forge': 'cinematic',
+  'orchid-vapor': 'holographic',
+  'tidal-glass': 'trading',
 };
 
 // These are the source renderer's named compositions with only the
@@ -86,36 +73,7 @@ const mobileBackgroundComponents = {
   minimal: ['nebula'],
 };
 
-const themePreset = name => visualThemeSpecs[name]?.[4] || sourceThemePresets[name] || 'full';
-
-for (const [name, [primaryHex, secondaryHex, tertiaryHex, backgroundHex, _preset, bloom, radius, grain]] of Object.entries(visualThemeSpecs)) {
-  const primary = new THREE.Color(primaryHex);
-  const secondary = new THREE.Color(secondaryHex);
-  const tertiary = new THREE.Color(tertiaryHex);
-  const background = new THREE.Color(backgroundHex);
-  const base = ChimeraFX.ChimeraNative;
-  ChimeraFX.registerTheme(name, {
-    ...base,
-    name,
-    colors: { ...base.colors, primary, secondary, tertiary, background, surface: background.clone().offsetHSL(0, 0, .035) },
-    particleColors: [primary.toArray(), secondary.toArray(), tertiary.toArray(), primary.clone().lerp(secondary, .5).toArray()],
-    tendrilColors: [primary, secondary, tertiary],
-    riverColors: [primary.toArray(), secondary.toArray(), tertiary.toArray()],
-    metalColors: [primary, secondary],
-    reactionColors: [primary, secondary, tertiary],
-    fogColor: background,
-    fogDensity: name === 'void-walker' ? .0032 : name === 'crystal-matrix' ? .0012 : .002,
-    postfx: { ...base.postfx, bloomStrength: bloom, bloomRadius: radius, grainIntensity: grain },
-    apply(engine) {
-      engine.scene.fog.color.copy(this.fogColor);
-      engine.scene.fog.density = this.fogDensity;
-      engine.bloomPass.strength = this.postfx.bloomStrength;
-      engine.bloomPass.radius = this.postfx.bloomRadius;
-      engine.bloomPass.threshold = this.postfx.bloomThreshold;
-      engine.grainPass.uniforms.uIntensity.value = this.postfx.grainIntensity;
-    },
-  });
-}
+const themePreset = name => themePresets[name] || 'full';
 
 // The original ray-marched IridescentOrb is retained in the engine,
 // but some mobile WebViews compile it without drawing its surface. This is a
@@ -139,7 +97,7 @@ class EvolvingOrb {
       const value = Math.sin((this.seed + index * 7919) * 12.9898) * 43758.5453;
       return value - Math.floor(value);
     };
-    const theme = engine.theme || ChimeraFX.themes['chimera-native'];
+    const theme = engine.theme || ChimeraFX.themes['mindrecipe-core'];
     const primary = theme.colors.primary.clone();
     const secondary = theme.colors.secondary.clone();
     const geometry = new THREE.IcosahedronGeometry(4.25, 4);
@@ -281,6 +239,15 @@ function configureCanvas() {
   engine.renderer.setClearColor(0x000000, sceneKind === 'background' ? 0 : 1);
 }
 
+function configureSurface() {
+  const background = engine?.theme?.colors?.background;
+  if (!background) return;
+  const color = `#${background.getHexString()}`;
+  document.documentElement.style.background = color;
+  document.body.style.background = color;
+  host.style.background = color;
+}
+
 function attachContextHandler() {
   engine?.renderer?.domElement?.addEventListener('webglcontextlost', event => {
     event.preventDefault();
@@ -289,38 +256,46 @@ function attachContextHandler() {
 }
 
 function createEngine() {
-  engine = seededCreate(lastState.seed, () => ChimeraFX.create(optionsFor(sceneKind)));
-  if (sceneKind === 'pulse') engine.addComponent(new EvolvingOrb(lastState.seed));
+  engine = seededCreate(activeSeed, () => ChimeraFX.create(optionsFor(sceneKind)));
+  if (sceneKind === 'pulse') engine.addComponent(new EvolvingOrb(activeSeed));
   configureCanvas();
+  configureSurface();
   attachContextHandler();
   engine.renderer.compile(engine.scene, engine.camera);
-  engine.renderer.render(engine.scene, engine.camera);
+  engine.renderOnce?.();
 }
 
-function replaceBackgroundPreset(nextPreset) {
-  if (sceneKind !== 'background' || nextPreset === activePreset) return;
+function normalizeSeed(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed !== 0 ? Math.abs(Math.trunc(parsed)) : 17;
+}
+
+function rebuildEngine() {
   engine?.dispose();
-  activePreset = nextPreset;
   createEngine();
 }
 
 function apply(state = {}) {
   lastState = { ...lastState, ...state };
   if (!engine) return;
-  const nextRequestedPreset = backgroundPreset(lastState.variant);
-  if (nextRequestedPreset !== requestedPreset) {
-    requestedPreset = nextRequestedPreset;
-    replaceBackgroundPreset(nextRequestedPreset);
-  }
-  const nextTheme = ChimeraFX.themes[lastState.theme] ? lastState.theme : 'chimera-native';
-  if (nextTheme !== activeTheme) {
-    activeTheme = nextTheme;
-    engine.setTheme(ChimeraFX.themes[activeTheme]);
-    // The unified native theme descriptor already selected this source
-    // composition. Rebuild with it instead of replacing it with a generic
-    // palette default.
-    replaceBackgroundPreset(requestedPreset);
-  }
+  const nextTheme = ChimeraFX.themes[lastState.theme] ? lastState.theme : 'mindrecipe-core';
+  const nextRequestedPreset = lastState.variant
+    ? backgroundPreset(lastState.variant)
+    : themePreset(nextTheme);
+  const nextSeed = normalizeSeed(lastState.seed);
+  const themeChanged = nextTheme !== activeTheme;
+  const presetChanged = sceneKind === 'background' && nextRequestedPreset !== activePreset;
+  const seedChanged = sceneKind === 'pulse' && nextSeed !== activeSeed;
+  requestedPreset = nextRequestedPreset;
+  activeTheme = nextTheme;
+  activePreset = nextRequestedPreset;
+  activeSeed = nextSeed;
+  // Most source components read their palette while constructing GPU
+  // buffers. Recreate the local renderer when its theme, composition, or
+  // visual genome changes so the selection changes real geometry and shaders.
+  if (themeChanged || presetChanged || seedChanged) rebuildEngine();
+  configureSurface();
+
   const growth = Math.max(0, Math.min(1, Number(lastState.growth ?? lastState.progress ?? 0)));
   const complexity = Math.max(0, Math.min(1, Number(lastState.complexity ?? growth)));
   const activation = Math.max(0, Math.min(1, Number(lastState.activation ?? lastState.intensity ?? .35)));
@@ -342,15 +317,17 @@ function apply(state = {}) {
     engine.pulse('success');
     lastState._lastMilestone = growth;
   }
+  engine.renderOnce?.();
 }
 
 function start() {
   try {
-    activeTheme = ChimeraFX.themes[lastState.theme] ? lastState.theme : 'chimera-native';
+    activeTheme = ChimeraFX.themes[lastState.theme] ? lastState.theme : 'mindrecipe-core';
     activePreset = lastState.variant
       ? backgroundPreset(lastState.variant)
       : themePreset(activeTheme);
     requestedPreset = activePreset;
+    activeSeed = normalizeSeed(lastState.seed);
     createEngine();
     apply(lastState);
     bridge('ready');

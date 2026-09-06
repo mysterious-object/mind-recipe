@@ -6,7 +6,7 @@
  * Sharp bloom, minimal grain, pristine holographic feel.
  */
 
-import * as THREE from 'three';
+import * as THREE from '../../three.module.min.js';
 
 export const CrystalMatrix = {
   name: 'crystal-matrix',

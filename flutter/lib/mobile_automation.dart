@@ -1,5 +1,5 @@
 // ignore_for_file: dangling_library_doc_comments, empty_catches
-// Mind Recipe Mobile Automation — branded phone control layer
+// MindRecipe Mobile Automation — branded phone control layer
 //
 // Branded from https://github.com/droidrun/mobilerun (MIT, 0.6.17) but
 // implemented as lightweight OS-intent automation for the shipping APK.
@@ -17,7 +17,7 @@
 /// import 'mobile_automation.dart';
 /// final auto = MindRecipeMobileAutomation();
 /// final r = await auto.setAppointment(
-///   title: 'Therapy — Mind Recipe follow-up',
+///   title: 'Therapy — MindRecipe follow-up',
 ///   start: DateTime(2026, 8, 25, 10, 30),
 ///   end: DateTime(2026, 8, 25, 11, 30),
 ///   location: 'Clinic / Video',
@@ -51,18 +51,20 @@ class AutomationResult {
   final String? nativeCode;
   final Map<String, dynamic>? debugPayload;
 
-  bool get isFallback => nativeCode == 'fallback_url' || nativeCode == 'fallback_clipboard';
+  bool get isFallback =>
+      nativeCode == 'fallback_url' || nativeCode == 'fallback_clipboard';
   bool get isUnavailable => nativeCode == 'unavailable';
 
   Map<String, dynamic> toMap() => {
-        'success': success,
-        'message': message,
-        if (nativeCode != null) 'nativeCode': nativeCode,
-        if (debugPayload != null) 'debugPayload': debugPayload,
-      };
+    'success': success,
+    'message': message,
+    if (nativeCode != null) 'nativeCode': nativeCode,
+    if (debugPayload != null) 'debugPayload': debugPayload,
+  };
 
   @override
-  String toString() => 'AutomationResult(success:$success, code:$nativeCode, message:$message)';
+  String toString() =>
+      'AutomationResult(success:$success, code:$nativeCode, message:$message)';
 }
 
 /// What the device can do (probed from native or inferred).
@@ -89,12 +91,21 @@ class AutomationCapabilities {
     String platform = map['platform']?.toString() ?? _inferPlatform();
     return AutomationCapabilities(
       platform: platform,
-      canInsertCalendarEvent: map['canInsertCalendarEvent'] == true || platform == 'android' || platform == 'ios',
+      canInsertCalendarEvent:
+          map['canInsertCalendarEvent'] == true ||
+          platform == 'android' ||
+          platform == 'ios',
       canSetAlarm: map['canSetAlarm'] == true || platform == 'android',
-      canAddReminder: map['canAddReminder'] == true || platform == 'ios' || platform == 'android',
+      canAddReminder:
+          map['canAddReminder'] == true ||
+          platform == 'ios' ||
+          platform == 'android',
       canOpenCalendar: map['canOpenCalendar'] == true || true,
-      canInvokeShortcuts: map['canInvokeShortcuts'] == true || platform == 'ios',
-      details: map['details'] is Map ? (map['details'] as Map).cast<String, dynamic>() : null,
+      canInvokeShortcuts:
+          map['canInvokeShortcuts'] == true || platform == 'ios',
+      details: map['details'] is Map
+          ? (map['details'] as Map).cast<String, dynamic>()
+          : null,
     );
   }
 
@@ -113,15 +124,15 @@ class AutomationRecurrence {
   final int? intervalDays;
 }
 
-/// Mind Recipe Mobile Automation — the Navigator-callable surface.
+/// MindRecipe Mobile Automation — the Navigator-callable surface.
 ///
 /// Every `set*` method is **member-confirmed**: native side launches the
 /// system insert sheet; the member taps Save. No silent background writes
 /// unless you later add WRITE_CALENDAR / EventKit full-access behind a toggle.
 class MindRecipeMobileAutomation {
   MindRecipeMobileAutomation({MethodChannel? channel, UrlLauncher? urlLauncher})
-      : _channel = channel ?? const MethodChannel(_channelName),
-        _urlLauncher = urlLauncher ?? const _DefaultUrlLauncher();
+    : _channel = channel ?? const MethodChannel(_channelName),
+      _urlLauncher = urlLauncher ?? const _DefaultUrlLauncher();
 
   static const _channelName = 'contextfield.mindrecipe/mobile_automation';
   final MethodChannel _channel;
@@ -150,10 +161,18 @@ class MindRecipeMobileAutomation {
   }) async {
     final safeTitle = title.trim();
     if (safeTitle.isEmpty) {
-      return const AutomationResult(success: false, message: 'Add a title for the appointment.', nativeCode: 'validation');
+      return const AutomationResult(
+        success: false,
+        message: 'Add a title for the appointment.',
+        nativeCode: 'validation',
+      );
     }
     if (end != null && !end.isAfter(start)) {
-      return const AutomationResult(success: false, message: 'End time must be after start time.', nativeCode: 'validation');
+      return const AutomationResult(
+        success: false,
+        message: 'End time must be after start time.',
+        nativeCode: 'validation',
+      );
     }
     final resolvedEnd = end ?? start.add(const Duration(hours: 1));
     final payload = <String, dynamic>{
@@ -170,17 +189,29 @@ class MindRecipeMobileAutomation {
     };
 
     try {
-      final result = await _channel.invokeMapMethod<Object?, Object?>('setAppointment', payload);
+      final result = await _channel.invokeMapMethod<Object?, Object?>(
+        'setAppointment',
+        payload,
+      );
       if (result != null) return _fromNativeMap(result, debugFallback: payload);
     } on MissingPluginException {
       // Plugin not yet wired — fall back to URL scheme so developer still sees behavior
     } on PlatformException catch (e) {
       debugPrint('[MobileAutomation] setAppointment PlatformException: $e');
-      return AutomationResult(success: false, message: 'Could not open calendar: ${e.message ?? e.code}', nativeCode: 'platform_error', debugPayload: payload);
+      return AutomationResult(
+        success: false,
+        message: 'Could not open calendar: ${e.message ?? e.code}',
+        nativeCode: 'platform_error',
+        debugPayload: payload,
+      );
     }
 
     // Fallback: try a URL scheme that at least opens the calendar app
-    return _fallbackOpenCalendar(start: start, payload: payload, reason: 'native unavailable — opened calendar instead');
+    return _fallbackOpenCalendar(
+      start: start,
+      payload: payload,
+      reason: 'native unavailable — opened calendar instead',
+    );
   }
 
   /// Alias for setAppointment — matches common LLM phrasing.
@@ -193,29 +224,37 @@ class MindRecipeMobileAutomation {
     int? alarmMinutesBefore,
     List<String>? attendees,
     bool allDay = false,
-  }) =>
-      setAppointment(
-        title: title,
-        start: start,
-        end: end,
-        description: description,
-        location: location,
-        alarmMinutesBefore: alarmMinutesBefore,
-        attendees: attendees,
-        allDay: allDay,
-      );
+  }) => setAppointment(
+    title: title,
+    start: start,
+    end: end,
+    description: description,
+    location: location,
+    alarmMinutesBefore: alarmMinutesBefore,
+    attendees: attendees,
+    allDay: allDay,
+  );
 
   Future<AutomationResult> openCalendar({DateTime? date}) async {
     try {
-      final r = await _channel.invokeMapMethod<Object?, Object?>('openCalendar', {
-        if (date != null) 'epochMillis': date.millisecondsSinceEpoch,
-      });
+      final r = await _channel.invokeMapMethod<Object?, Object?>(
+        'openCalendar',
+        {if (date != null) 'epochMillis': date.millisecondsSinceEpoch},
+      );
       if (r != null) return _fromNativeMap(r);
     } on MissingPluginException {
     } on PlatformException catch (e) {
-      return AutomationResult(success: false, message: 'Could not open calendar: ${e.message}', nativeCode: 'platform_error');
+      return AutomationResult(
+        success: false,
+        message: 'Could not open calendar: ${e.message}',
+        nativeCode: 'platform_error',
+      );
     }
-    return _fallbackOpenCalendar(start: date ?? DateTime.now(), payload: {}, reason: 'opened calendar via fallback');
+    return _fallbackOpenCalendar(
+      start: date ?? DateTime.now(),
+      payload: {},
+      reason: 'opened calendar via fallback',
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -236,7 +275,11 @@ class MindRecipeMobileAutomation {
   }) async {
     final safeTitle = title.trim();
     if (safeTitle.isEmpty) {
-      return const AutomationResult(success: false, message: 'Add a title for the reminder.', nativeCode: 'validation');
+      return const AutomationResult(
+        success: false,
+        message: 'Add a title for the reminder.',
+        nativeCode: 'validation',
+      );
     }
     final payload = <String, dynamic>{
       'title': safeTitle,
@@ -247,11 +290,19 @@ class MindRecipeMobileAutomation {
       if (isFlagged != null) 'isFlagged': isFlagged,
     };
     try {
-      final r = await _channel.invokeMapMethod<Object?, Object?>('setReminder', payload);
+      final r = await _channel.invokeMapMethod<Object?, Object?>(
+        'setReminder',
+        payload,
+      );
       if (r != null) return _fromNativeMap(r, debugFallback: payload);
     } on MissingPluginException {
     } on PlatformException catch (e) {
-      return AutomationResult(success: false, message: 'Could not create reminder: ${e.message}', nativeCode: 'platform_error', debugPayload: payload);
+      return AutomationResult(
+        success: false,
+        message: 'Could not create reminder: ${e.message}',
+        nativeCode: 'platform_error',
+        debugPayload: payload,
+      );
     }
     // Fallback: open reminders app via URL scheme if possible
     return _fallbackOpenReminders(payload: payload);
@@ -259,11 +310,18 @@ class MindRecipeMobileAutomation {
 
   Future<AutomationResult> openReminders() async {
     try {
-      final r = await _channel.invokeMapMethod<Object?, Object?>('openReminders', {});
+      final r = await _channel.invokeMapMethod<Object?, Object?>(
+        'openReminders',
+        {},
+      );
       if (r != null) return _fromNativeMap(r);
     } on MissingPluginException {
     } on PlatformException catch (e) {
-      return AutomationResult(success: false, message: 'Could not open reminders: ${e.message}', nativeCode: 'platform_error');
+      return AutomationResult(
+        success: false,
+        message: 'Could not open reminders: ${e.message}',
+        nativeCode: 'platform_error',
+      );
     }
     return _fallbackOpenReminders(payload: {});
   }
@@ -285,7 +343,11 @@ class MindRecipeMobileAutomation {
     bool vibrate = true,
   }) async {
     if (hour < 0 || hour > 23 || minute < 0 || minute > 59) {
-      return const AutomationResult(success: false, message: 'Hour must be 0-23 and minute 0-59.', nativeCode: 'validation');
+      return const AutomationResult(
+        success: false,
+        message: 'Hour must be 0-23 and minute 0-59.',
+        nativeCode: 'validation',
+      );
     }
     final payload = <String, dynamic>{
       'hour': hour,
@@ -296,11 +358,19 @@ class MindRecipeMobileAutomation {
       'vibrate': vibrate,
     };
     try {
-      final r = await _channel.invokeMapMethod<Object?, Object?>('setAlarm', payload);
+      final r = await _channel.invokeMapMethod<Object?, Object?>(
+        'setAlarm',
+        payload,
+      );
       if (r != null) return _fromNativeMap(r, debugFallback: payload);
     } on MissingPluginException {
     } on PlatformException catch (e) {
-      return AutomationResult(success: false, message: 'Could not set alarm: ${e.message}', nativeCode: 'platform_error', debugPayload: payload);
+      return AutomationResult(
+        success: false,
+        message: 'Could not set alarm: ${e.message}',
+        nativeCode: 'platform_error',
+        debugPayload: payload,
+      );
     }
     if (defaultTargetPlatform == TargetPlatform.android) {
       // Last resort fallback for Android without plugin: try to fire intent via url_launcher? No direct URL, so return guidance.
@@ -322,7 +392,7 @@ class MindRecipeMobileAutomation {
 
   /// Schedule a gentle wellness reminder derived from a saved practice.
   ///
-  /// Wraps `setReminder` with Mind Recipe voice defaults and quiet-hours awareness.
+  /// Wraps `setReminder` with MindRecipe voice defaults and quiet-hours awareness.
   /// Caller should check `NotificationScheduler` quiet hours if mixing with in-app reminders.
   Future<AutomationResult> scheduleWellnessReminder({
     required String practiceName,
@@ -333,9 +403,11 @@ class MindRecipeMobileAutomation {
   }) {
     final styleSuffix = messageStyle == null ? '' : ' · $messageStyle';
     return setReminder(
-      title: practiceName.trim().isEmpty ? 'Mind Recipe — gentle check-in' : practiceName.trim(),
+      title: practiceName.trim().isEmpty
+          ? 'MindRecipe — gentle check-in'
+          : practiceName.trim(),
       dueDate: time,
-      notes: notes ?? 'From Mind Recipe Navigator$styleSuffix',
+      notes: notes ?? 'From MindRecipe Navigator$styleSuffix',
       alarmMinutesBefore: alarmMinutesBefore,
     );
   }
@@ -352,7 +424,7 @@ class MindRecipeMobileAutomation {
     return setAlarm(
       hour: time.hour,
       minute: time.minute,
-      label: 'Mind Recipe — daily navigation',
+      label: 'MindRecipe — daily navigation',
       daysOfWeek: days,
       skipUi: false,
     );
@@ -362,16 +434,35 @@ class MindRecipeMobileAutomation {
   ///
   /// Android: fires an implicit intent with action `name` or broadcasts to `com.contextfield.mindrecipe.SHORTCUT`.
   /// iOS: opens `shortcuts://run-shortcut?name=<name>&input=<input>` (requires Shortcuts app).
-  Future<AutomationResult> invokeShortcut({required String name, Map<String, dynamic>? input}) async {
+  Future<AutomationResult> invokeShortcut({
+    required String name,
+    Map<String, dynamic>? input,
+  }) async {
     final trimmed = name.trim();
-    if (trimmed.isEmpty) return const AutomationResult(success: false, message: 'Shortcut name is required.', nativeCode: 'validation');
-    final payload = <String, dynamic>{'name': trimmed, if (input != null) 'input': input};
+    if (trimmed.isEmpty)
+      return const AutomationResult(
+        success: false,
+        message: 'Shortcut name is required.',
+        nativeCode: 'validation',
+      );
+    final payload = <String, dynamic>{
+      'name': trimmed,
+      if (input != null) 'input': input,
+    };
     try {
-      final r = await _channel.invokeMapMethod<Object?, Object?>('invokeShortcut', payload);
+      final r = await _channel.invokeMapMethod<Object?, Object?>(
+        'invokeShortcut',
+        payload,
+      );
       if (r != null) return _fromNativeMap(r, debugFallback: payload);
     } on MissingPluginException {
     } on PlatformException catch (e) {
-      return AutomationResult(success: false, message: 'Could not invoke shortcut: ${e.message}', nativeCode: 'platform_error', debugPayload: payload);
+      return AutomationResult(
+        success: false,
+        message: 'Could not invoke shortcut: ${e.message}',
+        nativeCode: 'platform_error',
+        debugPayload: payload,
+      );
     }
     // Fallback: try shortcuts:// URL directly via url_launcher
     if (defaultTargetPlatform == TargetPlatform.iOS) {
@@ -379,19 +470,33 @@ class MindRecipeMobileAutomation {
       final url = Uri.parse('shortcuts://run-shortcut?name=$encoded');
       if (await _urlLauncher.canLaunchUrl(url)) {
         final ok = await _urlLauncher.launchUrl(url);
-        return AutomationResult(success: ok, message: ok ? 'Opened Shortcut "$trimmed" in Shortcuts app.' : 'Could not open Shortcuts app.', nativeCode: ok ? 'fallback_url' : 'unavailable', debugPayload: payload);
+        return AutomationResult(
+          success: ok,
+          message: ok
+              ? 'Opened Shortcut "$trimmed" in Shortcuts app.'
+              : 'Could not open Shortcuts app.',
+          nativeCode: ok ? 'fallback_url' : 'unavailable',
+          debugPayload: payload,
+        );
       }
     }
-    return AutomationResult(success: false, message: 'Shortcut "$trimmed" is not available on this device.', nativeCode: 'unavailable', debugPayload: payload);
+    return AutomationResult(
+      success: false,
+      message: 'Shortcut "$trimmed" is not available on this device.',
+      nativeCode: 'unavailable',
+      debugPayload: payload,
+    );
   }
 
   Future<AutomationCapabilities> capabilities() async {
     try {
-      final r = await _channel.invokeMapMethod<Object?, Object?>('capabilities', {});
+      final r = await _channel.invokeMapMethod<Object?, Object?>(
+        'capabilities',
+        {},
+      );
       if (r != null) return AutomationCapabilities.fromMap(r);
     } on MissingPluginException {
-    } on PlatformException {
-    }
+    } on PlatformException {}
     // Fallback: infer from platform
     return AutomationCapabilities.fromMap(const {});
   }
@@ -399,40 +504,67 @@ class MindRecipeMobileAutomation {
   /// Delegate to existing harness haptics (MindRecipeDeviceHarness.acknowledgeTurn)
   Future<void> acknowledgeTurn() async {
     try {
-      await const MethodChannel('contextfield.mindrecipe/device_harness').invokeMethod<void>('acknowledgeTurn');
+      await const MethodChannel('contextfield.mindrecipe/device_harness')
+          .invokeMethod<void>('acknowledgeTurn');
     } on MissingPluginException {
-    } on PlatformException {
-    }
+    } on PlatformException {}
   }
 
   // ---------------------------------------------------------------------------
   // Internals
   // ---------------------------------------------------------------------------
 
-  AutomationResult _fromNativeMap(Map<Object?, Object?> map, {Map<String, dynamic>? debugFallback}) {
+  AutomationResult _fromNativeMap(
+    Map<Object?, Object?> map, {
+    Map<String, dynamic>? debugFallback,
+  }) {
     final rawSuccess = map['success'];
-    final success = rawSuccess == true || rawSuccess == 1 || rawSuccess?.toString() == 'true';
+    final success =
+        rawSuccess == true ||
+        rawSuccess == 1 ||
+        rawSuccess?.toString() == 'true';
     final code = map['code']?.toString() ?? map['nativeCode']?.toString();
-    final msg = map['message']?.toString() ?? map['msg']?.toString() ?? (success ? 'Done.' : 'Not completed.');
+    final msg =
+        map['message']?.toString() ??
+        map['msg']?.toString() ??
+        (success ? 'Done.' : 'Not completed.');
     final details = map['debugPayload'] ?? map['payload'];
     Map<String, dynamic>? debugMap;
     if (details is Map) debugMap = details.cast<String, dynamic>();
     debugMap ??= debugFallback;
-    return AutomationResult(success: success, message: msg, nativeCode: code, debugPayload: debugMap);
+    return AutomationResult(
+      success: success,
+      message: msg,
+      nativeCode: code,
+      debugPayload: debugMap,
+    );
   }
 
-  Future<AutomationResult> _fallbackOpenCalendar({required DateTime start, required Map<String, dynamic> payload, required String reason}) async {
+  Future<AutomationResult> _fallbackOpenCalendar({
+    required DateTime start,
+    required Map<String, dynamic> payload,
+    required String reason,
+  }) async {
     // Try platform calendar URL schemes; these open the calendar app without adding an event.
     // For a real event insert without the plugin, there's no reliable cross-platform URL — we guide the user.
     final urls = <Uri>[
-      if (defaultTargetPlatform == TargetPlatform.android) Uri.parse('content://com.android.calendar/time/${start.millisecondsSinceEpoch}'),
-      if (defaultTargetPlatform == TargetPlatform.iOS) Uri.parse('calshow:${start.millisecondsSinceEpoch ~/ 1000}'),
-      Uri.parse('https://calendar.google.com/calendar/render?action=TEMPLATE&text=${Uri.encodeComponent(payload['title']?.toString() ?? 'Mind Recipe')}'),
+      if (defaultTargetPlatform == TargetPlatform.android)
+        Uri.parse(
+          'content://com.android.calendar/time/${start.millisecondsSinceEpoch}',
+        ),
+      if (defaultTargetPlatform == TargetPlatform.iOS)
+        Uri.parse('calshow:${start.millisecondsSinceEpoch ~/ 1000}'),
+      Uri.parse(
+        'https://calendar.google.com/calendar/render?action=TEMPLATE&text=${Uri.encodeComponent(payload['title']?.toString() ?? 'MindRecipe')}',
+      ),
     ];
     for (final u in urls) {
       try {
         if (await _urlLauncher.canLaunchUrl(u)) {
-          final ok = await _urlLauncher.launchUrl(u, mode: launcher.LaunchMode.externalApplication);
+          final ok = await _urlLauncher.launchUrl(
+            u,
+            mode: launcher.LaunchMode.externalApplication,
+          );
           if (ok) {
             return AutomationResult(
               success: true,
@@ -452,35 +584,71 @@ class MindRecipeMobileAutomation {
     );
   }
 
-  Future<AutomationResult> _fallbackOpenReminders({required Map<String, dynamic> payload}) async {
+  Future<AutomationResult> _fallbackOpenReminders({
+    required Map<String, dynamic> payload,
+  }) async {
     final urls = <Uri>[
-      if (defaultTargetPlatform == TargetPlatform.iOS) Uri.parse('x-apple-reminderkit://'),
-      Uri.parse('https://calendar.google.com/calendar/r?tab=rc'), // Google Tasks fallback
+      if (defaultTargetPlatform == TargetPlatform.iOS)
+        Uri.parse('x-apple-reminderkit://'),
+      Uri.parse(
+        'https://calendar.google.com/calendar/r?tab=rc',
+      ), // Google Tasks fallback
     ];
     for (final u in urls) {
       try {
-        if (await _urlLauncher.canLaunchUrl(u) && await _urlLauncher.launchUrl(u, mode: launcher.LaunchMode.externalApplication)) {
-          return AutomationResult(success: true, message: 'Opened reminders so you can add it manually.', nativeCode: 'fallback_url', debugPayload: {...payload, 'fallbackUrl': u.toString()});
+        if (await _urlLauncher.canLaunchUrl(u) &&
+            await _urlLauncher.launchUrl(
+              u,
+              mode: launcher.LaunchMode.externalApplication,
+            )) {
+          return AutomationResult(
+            success: true,
+            message: 'Opened reminders so you can add it manually.',
+            nativeCode: 'fallback_url',
+            debugPayload: {...payload, 'fallbackUrl': u.toString()},
+          );
         }
       } catch (_) {}
     }
-    return AutomationResult(success: false, message: 'Reminders plugin not yet wired. Wire native plugin, then retry.', nativeCode: 'unavailable', debugPayload: payload);
+    return AutomationResult(
+      success: false,
+      message:
+          'Reminders plugin not yet wired. Wire native plugin, then retry.',
+      nativeCode: 'unavailable',
+      debugPayload: payload,
+    );
   }
 
-  Future<AutomationResult> _fallbackIosAlarm({String? label, required Map<String, dynamic> payload}) async {
+  Future<AutomationResult> _fallbackIosAlarm({
+    String? label,
+    required Map<String, dynamic> payload,
+  }) async {
     // iOS has no public alarm intent. Best effort is Shortcuts `Create Alarm`.
     final name = Uri.encodeComponent('Create Alarm');
     final shortcutsUrl = Uri.parse('shortcuts://run-shortcut?name=$name');
     try {
-      if (await _urlLauncher.canLaunchUrl(shortcutsUrl) && await _urlLauncher.launchUrl(shortcutsUrl)) {
-        return AutomationResult(success: true, message: 'Opened Shortcuts to create an alarm${label == null ? '' : ' for "$label"'} — confirm there.', nativeCode: 'fallback_url', debugPayload: payload);
+      if (await _urlLauncher.canLaunchUrl(shortcutsUrl) &&
+          await _urlLauncher.launchUrl(shortcutsUrl)) {
+        return AutomationResult(
+          success: true,
+          message:
+              'Opened Shortcuts to create an alarm${label == null ? '' : ' for "$label"'} — confirm there.',
+          nativeCode: 'fallback_url',
+          debugPayload: payload,
+        );
       }
     } catch (_) {}
     // Fallback to clock URL scheme (undocumented, may not resolve)
     final clockUrl = Uri.parse('clock-alarm://');
     try {
-      if (await _urlLauncher.canLaunchUrl(clockUrl) && await _urlLauncher.launchUrl(clockUrl)) {
-        return AutomationResult(success: true, message: 'Opened Clock so you can set the alarm manually.', nativeCode: 'fallback_url', debugPayload: payload);
+      if (await _urlLauncher.canLaunchUrl(clockUrl) &&
+          await _urlLauncher.launchUrl(clockUrl)) {
+        return AutomationResult(
+          success: true,
+          message: 'Opened Clock so you can set the alarm manually.',
+          nativeCode: 'fallback_url',
+          debugPayload: payload,
+        );
       }
     } catch (_) {}
     return AutomationResult(
@@ -498,7 +666,10 @@ class MindRecipeMobileAutomation {
 
 abstract class UrlLauncher {
   Future<bool> canLaunchUrl(Uri url);
-  Future<bool> launchUrl(Uri url, {launcher.LaunchMode mode = launcher.LaunchMode.platformDefault});
+  Future<bool> launchUrl(
+    Uri url, {
+    launcher.LaunchMode mode = launcher.LaunchMode.platformDefault,
+  });
 }
 
 class _DefaultUrlLauncher implements UrlLauncher {
@@ -506,6 +677,8 @@ class _DefaultUrlLauncher implements UrlLauncher {
   @override
   Future<bool> canLaunchUrl(Uri url) => launcher.canLaunchUrl(url);
   @override
-  Future<bool> launchUrl(Uri url, {launcher.LaunchMode mode = launcher.LaunchMode.platformDefault}) =>
-      launcher.launchUrl(url, mode: mode);
+  Future<bool> launchUrl(
+    Uri url, {
+    launcher.LaunchMode mode = launcher.LaunchMode.platformDefault,
+  }) => launcher.launchUrl(url, mode: mode);
 }

@@ -32,9 +32,15 @@ import 'three_background.dart';
 void main() => runApp(const MindRecipeApp());
 
 class MindRecipeApp extends StatefulWidget {
-  const MindRecipeApp({super.key, this.initialAppState, this.initialApi});
+  const MindRecipeApp({
+    super.key,
+    this.initialAppState,
+    this.initialApi,
+    this.initialLocalInference,
+  });
   final SecureAppState? initialAppState;
   final MindRecipeApiClient? initialApi;
+  final LocalInference? initialLocalInference;
   @override
   State<MindRecipeApp> createState() => _MindRecipeAppState();
 }
@@ -144,6 +150,7 @@ class _MindRecipeAppState extends State<MindRecipeApp> {
               onPractitioner: () => setState(() => practitionerMode = true),
               api: api,
               appState: appState,
+              localInference: widget.initialLocalInference,
               onSignOut: () async {
                 await appState.signOut();
                 if (mounted) setState(() => onboardingComplete = false);
@@ -160,11 +167,13 @@ class MemberHome extends StatefulWidget {
     required this.api,
     required this.appState,
     required this.onSignOut,
+    this.localInference,
   });
   final VoidCallback onPractitioner;
   final MindRecipeApiClient api;
   final SecureAppState appState;
   final VoidCallback onSignOut;
+  final LocalInference? localInference;
   @override
   State<MemberHome> createState() => _MemberHomeState();
 }
@@ -176,20 +185,25 @@ class _MemberHomeState extends State<MemberHome> {
   final tools = <String>{};
   final chatMessages = <ChatMessage>[];
   final labels = const [
-    'Daily Nav',
     'Navigator',
-    'Recipes',
+    'MindRecipe',
     'Pulse',
-    'Booking',
+    'Actions',
     'Settings',
   ];
   final icons = const [
-    Icons.route_rounded,
     Icons.explore_rounded,
-    Icons.menu_book,
-    Icons.monitor_heart,
-    Icons.calendar_month,
+    Icons.auto_stories_rounded,
+    Icons.motion_photos_on_rounded,
+    Icons.task_alt_rounded,
     Icons.settings,
+  ];
+  final iconAssets = const <String?>[
+    'assets/branding/navigator-compass.png',
+    'assets/branding/mind-recipe-mark.png',
+    null,
+    null,
+    null,
   ];
   late final PageController pageController;
   late final ScrollController railController;
@@ -252,7 +266,7 @@ class _MemberHomeState extends State<MemberHome> {
   }
 
   Future<void> _primeNavigator() async {
-    await OnDeviceInference().refreshStatus();
+    await (widget.localInference ?? OnDeviceInference()).refreshStatus();
     if (!widget.appState.aiAvailable) {
       widget.appState.setManagedAiAvailable(await widget.api.aiAvailable());
     }
@@ -376,7 +390,7 @@ class _MemberHomeState extends State<MemberHome> {
         ),
       );
     });
-    goToPage(1);
+    goToPage(0);
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Added to Navigator — continue the conversation there'),
@@ -450,6 +464,7 @@ class _MemberHomeState extends State<MemberHome> {
                 api: widget.api,
                 appState: widget.appState,
                 messages: chatMessages,
+                localInference: widget.localInference,
               ),
             ),
           ],
@@ -463,38 +478,14 @@ class _MemberHomeState extends State<MemberHome> {
   Widget build(BuildContext context) {
     final screens = [
       _KeepAlivePage(
-        child: DailyNavigation(
-          appState: widget.appState,
-          onCheckInQueued: _flushPendingCheckIns,
-          syncSummary: '',
-          onSeePulse: () => goToPage(3),
-          onComplete: () {
-            _recordNavigationEvent();
-            widget.appState.recordAssistantMessage(startsSession: true);
-            widget.appState.recordAiReflection();
-            final mood = MoodState.fromCheckIn(checkIn);
-            widget.appState.recordMoodPulse(
-              valence: mood.valence,
-              activation: mood.activation,
-              source: 'navigation',
-            );
-            chatMessages.add(
-              const ChatMessage(
-                role: ChatRole.status,
-                text: 'Daily navigation complete — your pulse was updated.',
-              ),
-            );
-            setState(() {});
-          },
-        ),
-      ),
-      _KeepAlivePage(
         child: NavigatorChatExperience(
           state: checkIn,
           onChanged: () => setState(() {}),
           api: widget.api,
           appState: widget.appState,
           messages: chatMessages,
+          localInference: widget.localInference,
+          onStartDailyNav: _showDailyNav,
         ),
       ),
       _KeepAlivePage(
@@ -507,7 +498,7 @@ class _MemberHomeState extends State<MemberHome> {
       _KeepAlivePage(
         child: PulseScreen(checkIn: checkIn, appState: widget.appState),
       ),
-      const _KeepAlivePage(child: BookingScreen()),
+      _KeepAlivePage(child: ActionsScreen(appState: widget.appState)),
       _KeepAlivePage(
         child: ProfileScreen(
           onPractitioner: widget.onPractitioner,
@@ -577,7 +568,7 @@ class _MemberHomeState extends State<MemberHome> {
                         },
                         children: screens,
                       ),
-                      if (index != 1)
+                      if (index != 0)
                         Positioned(
                           right: (12 - _navigatorBubbleOffset.dx)
                               .clamp(8, 220)
@@ -619,21 +610,21 @@ class _MemberHomeState extends State<MemberHome> {
                 return MindRecipePageRail(
                   labels: labels,
                   icons: icons,
+                  iconAssets: iconAssets,
                   selectedIndex: index,
                   progress: progress,
                   scrollController: railController,
                   onSelected: goToPage,
-                  useCompassIcon: true,
                 );
               }
               return MindRecipePageRail(
                 labels: labels,
                 icons: icons,
+                iconAssets: iconAssets,
                 selectedIndex: index,
                 progress: progress,
                 scrollController: railController,
                 onSelected: goToPage,
-                useCompassIcon: true,
               );
             },
           ),
@@ -1400,8 +1391,9 @@ class _ProgressScreenState extends State<ProgressScreen> {
   }
 }
 
-class BookingScreen extends StatelessWidget {
-  const BookingScreen({super.key});
+class ActionsScreen extends StatelessWidget {
+  const ActionsScreen({super.key, required this.appState});
+  final SecureAppState appState;
   static const bookingUrl = String.fromEnvironment('BOOKING_URL');
 
   static const _healthApps = [
@@ -1462,7 +1454,7 @@ class BookingScreen extends StatelessWidget {
     child: ListView(
       children: [
         const Text(
-          'Booking & levels of care',
+          'Actions & connected apps',
           style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 12),
@@ -1470,6 +1462,23 @@ class BookingScreen extends StatelessWidget {
           'Open your device calendar, or continue in a health app you already use. This app does not decide what level of care you need.',
         ),
         const SizedBox(height: 20),
+        Card(
+          child: ListTile(
+            leading: const Icon(Icons.task_alt_rounded),
+            title: const Text('Confirmed commitments'),
+            subtitle: const Text(
+              'Review, edit, complete, skip, or cancel actions you approved.',
+            ),
+            trailing: const Icon(Icons.chevron_right_rounded),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => CommitmentsScreen(appState: appState),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
         FilledButton.icon(
           onPressed: () => _openApp(context, 'Calendar'),
           icon: const Icon(Icons.calendar_month_rounded),

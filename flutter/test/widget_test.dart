@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -8,6 +9,29 @@ import 'package:mind_recipe/app_services.dart';
 import 'package:mind_recipe/daily_navigation_scan.dart';
 import 'package:mind_recipe/main.dart';
 import 'package:mind_recipe/navigator_agent.dart';
+import 'package:mind_recipe/on_device_inference.dart';
+
+class FakeLocalInference implements LocalInference {
+  @override
+  LocalInferenceSnapshot get snapshot =>
+      const LocalInferenceSnapshot(OnDeviceStatus.notInstalled);
+
+  @override
+  Future<LocalInferenceSnapshot> refreshStatus() async => snapshot;
+
+  @override
+  Future<void> installModel({bool allowCellular = false}) async {}
+
+  @override
+  Future<String?> infer(
+    String userMessage, {
+    List<LocalConversationTurn> history = const [],
+    void Function(String token)? onToken,
+  }) async => null;
+
+  @override
+  Future<void> removeModel() async {}
+}
 
 class FakeMindRecipeApi extends MindRecipeApiClient {
   @override
@@ -37,9 +61,31 @@ class FakeMindRecipeApi extends MindRecipeApiClient {
       model: 'openrouter/free',
     );
   }
+
+  @override
+  Stream<NavigatorStreamEvent> navigatorTurn({
+    required String token,
+    required String providerKey,
+    required String text,
+    required Map<String, dynamic> context,
+    required String model,
+    bool externalResearchOptIn = false,
+  }) async* {
+    yield const NavigatorStreamEvent('accepted', {'route': 'cloud'});
+    yield const NavigatorStreamEvent('delta', {
+      'token': 'Let’s begin gently. What emotion feels closest right now?',
+    });
+    yield const NavigatorStreamEvent('done', {
+      'mode': 'cloud_ai',
+      'provider': 'openrouter',
+      'model': 'openrouter/free',
+    });
+  }
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  FlutterSecureStorage.setMockInitialValues(const {});
   Future<void> pumpFrames(WidgetTester tester, [int count = 9]) async {
     for (var frame = 0; frame < count; frame++) {
       await tester.pump(const Duration(milliseconds: 100));
@@ -51,6 +97,7 @@ void main() {
     return MindRecipeApp(
       initialAppState: state,
       initialApi: api ?? FakeMindRecipeApi(),
+      initialLocalInference: FakeLocalInference(),
     );
   }
 
@@ -157,33 +204,32 @@ void main() {
     tester,
   ) async {
     await enterMemberApp(tester, skipOnboarding: false);
+    await tester.pump(const Duration(seconds: 7));
     expect(find.text('The weather of your mind.'), findsOneWidget);
     expect(find.text('A guided path—not a test.'), findsOneWidget);
   });
 
   testWidgets('Check-in is a full Navigator conversation', (tester) async {
     await enterCheckIn(tester);
-    expect(
-      find.text('Cloud guidance ready · consent required per conversation'),
-      findsOneWidget,
-    );
+    expect(find.text('Navigator online'), findsOneWidget);
+    expect(find.text('Cloud · connected'), findsOneWidget);
     expect(find.text('CLOUD'), findsOneWidget);
     expect(find.text('Begin daily navigation'), findsOneWidget);
-    expect(find.text('Tell Navigator what is present…'), findsOneWidget);
+    expect(find.text('Tell Navigator what you want…'), findsOneWidget);
     expect(find.text('Begin today’s signal scan'), findsNothing);
   });
 
-  testWidgets('AI chat dynamically responds to an opening choice', (
+  testWidgets('AI chat dynamically responds to free conversation', (
     tester,
   ) async {
     await enterCheckIn(tester);
-    await tester.tap(find.text('Begin daily navigation'));
-    await tester.pump();
-    await pumpFrames(tester);
-    expect(
-      find.text('Begin my daily navigation. Guide me one step at a time.'),
-      findsOneWidget,
+    await tester.enterText(
+      find.byType(TextField).last,
+      'Help me decide what to do next.',
     );
+    await tester.tap(find.byTooltip('Send to Navigator'));
+    await tester.pump();
+    await pumpFrames(tester, 40);
     expect(
       find.text('Let’s begin gently. What emotion feels closest right now?'),
       findsOneWidget,

@@ -162,7 +162,11 @@ class _DailyNavigationScanState extends State<DailyNavigationScan> {
 
   Future<void> sendToAi() async {
     final text = chatController.text.trim();
-    if (text.isEmpty || !widget.appState.hasProviderKey || !cloudConsent || aiLoading) return;
+    if (text.isEmpty ||
+        !widget.appState.hasProviderKey ||
+        !cloudConsent ||
+        aiLoading)
+      return;
     setState(() {
       aiLoading = true;
       aiError = null;
@@ -184,7 +188,10 @@ class _DailyNavigationScanState extends State<DailyNavigationScan> {
       );
       if (mounted) setState(() => aiReply = reply);
     } catch (_) {
-      if (mounted) setState(() => aiError = 'The AI provider could not be reached. Your structured check-in still works.');
+      if (mounted)
+        setState(
+          () => aiError = 'The AI provider could not be reached. Your structured check-in still works.',
+        );
     } finally {
       if (mounted) setState(() => aiLoading = false);
     }
@@ -242,22 +249,48 @@ class _DailyNavigationScanState extends State<DailyNavigationScan> {
         children: [
           Row(
             children: [
-              Icon(connected ? Icons.auto_awesome_rounded : Icons.hub_outlined,
-                  color: connected ? MindRecipeFxPalette.livingGreen : Theme.of(context).colorScheme.outline),
+              Icon(
+                connected ? Icons.auto_awesome_rounded : Icons.hub_outlined,
+                color: connected
+                    ? MindRecipeFxPalette.livingGreen
+                    : Theme.of(context).colorScheme.outline,
+              ),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(connected ? 'Navigator ready' : 'Structured guide active', style: const TextStyle(fontWeight: FontWeight.w800)),
-                    Text(connected ? 'OpenRouter · your key · consent required below' : 'No AI provider is connected. Connect one in Profile.', style: Theme.of(context).textTheme.bodySmall),
+                    Text(
+                      connected ? 'Navigator ready' : 'Structured guide active',
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                    Text(
+                      connected
+                          ? 'OpenRouter · your key · consent required below'
+                          : 'No AI provider is connected. Connect one in Profile.',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
                   ],
                 ),
               ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-                decoration: BoxDecoration(color: (connected ? MindRecipeFxPalette.livingGreen : Colors.grey).withValues(alpha: 0.13), borderRadius: BorderRadius.circular(99)),
-                child: Text(connected ? 'AI READY' : 'NO AI', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1)),
+                decoration: BoxDecoration(
+                  color:
+                      (connected
+                              ? MindRecipeFxPalette.livingGreen
+                              : Colors.grey)
+                          .withValues(alpha: 0.13),
+                  borderRadius: BorderRadius.circular(99),
+                ),
+                child: Text(
+                  connected ? 'AI READY' : 'NO AI',
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1,
+                  ),
+                ),
               ),
             ],
           ),
@@ -268,7 +301,10 @@ class _DailyNavigationScanState extends State<DailyNavigationScan> {
               child: Container(
                 constraints: const BoxConstraints(maxWidth: 320),
                 padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(color: Theme.of(context).colorScheme.primaryContainer, borderRadius: BorderRadius.circular(18)),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(18),
+                ),
                 child: Text(lastUserMessage!),
               ),
             ),
@@ -278,18 +314,47 @@ class _DailyNavigationScanState extends State<DailyNavigationScan> {
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                border: Border.all(color: aiReply!.isCloudAi ? MindRecipeFxPalette.livingGreen.withValues(alpha: 0.5) : Theme.of(context).colorScheme.outlineVariant),
+                border: Border.all(
+                  color: aiReply!.isCloudAi
+                      ? MindRecipeFxPalette.livingGreen.withValues(alpha: 0.5)
+                      : Theme.of(context).colorScheme.outlineVariant,
+                ),
                 borderRadius: BorderRadius.circular(18),
               ),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(aiReply!.isCloudAi ? 'AI-GENERATED REFLECTION' : 'SYSTEM STATUS', style: Theme.of(context).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w900, letterSpacing: 1.1)),
-                const SizedBox(height: 7),
-                Text(aiReply!.message),
-                if (aiReply!.isCloudAi) const Padding(padding: EdgeInsets.only(top: 7), child: Text('A suggestion—not a fact, diagnosis, or treatment direction.', style: TextStyle(fontSize: 11))),
-              ]),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    aiReply!.isCloudAi
+                        ? 'AI-GENERATED REFLECTION'
+                        : 'SYSTEM STATUS',
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1.1,
+                    ),
+                  ),
+                  const SizedBox(height: 7),
+                  Text(aiReply!.message),
+                  if (aiReply!.isCloudAi)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 7),
+                      child: Text(
+                        'A suggestion—not a fact, diagnosis, or treatment direction.',
+                        style: TextStyle(fontSize: 11),
+                      ),
+                    ),
+                ],
+              ),
             ),
           ],
-          if (aiError != null) Padding(padding: const EdgeInsets.only(top: 10), child: Text(aiError!, style: TextStyle(color: Theme.of(context).colorScheme.error))),
+          if (aiError != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: Text(
+                aiError!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+            ),
           const SizedBox(height: 14),
           TextField(
             controller: chatController,
@@ -298,12 +363,25 @@ class _DailyNavigationScanState extends State<DailyNavigationScan> {
             enabled: connected && !aiLoading,
             onSubmitted: (_) => sendToAi(),
             decoration: InputDecoration(
-              labelText: connected ? 'Talk with Navigator' : 'Connect Navigator in Settings to chat',
+              labelText: connected
+                  ? 'Talk with Navigator'
+                  : 'Connect Navigator in Settings to chat',
               hintText: 'What should I pay attention to today?',
               border: const OutlineInputBorder(),
               suffixIcon: aiLoading
-                  ? const Padding(padding: EdgeInsets.all(14), child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)))
-                  : IconButton(onPressed: connected && cloudConsent ? sendToAi : null, icon: const Icon(Icons.arrow_upward_rounded), tooltip: 'Send to Navigator'),
+                  ? const Padding(
+                      padding: EdgeInsets.all(14),
+                      child: SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    )
+                  : IconButton(
+                      onPressed: connected && cloudConsent ? sendToAi : null,
+                      icon: const Icon(Icons.arrow_upward_rounded),
+                      tooltip: 'Send to Navigator',
+                    ),
             ),
           ),
           if (connected)
@@ -311,9 +389,12 @@ class _DailyNavigationScanState extends State<DailyNavigationScan> {
               contentPadding: EdgeInsets.zero,
               dense: true,
               value: cloudConsent,
-              onChanged: (value) => setState(() => cloudConsent = value ?? false),
+              onChanged: (value) =>
+                  setState(() => cloudConsent = value ?? false),
               title: const Text('Use cloud AI for this check-in'),
-              subtitle: const Text('Only the message and selected check-in fields are sent. Your journal is excluded.'),
+              subtitle: const Text(
+                'Only the message and selected check-in fields are sent. Your journal is excluded.',
+              ),
             ),
         ],
       ),
@@ -347,11 +428,25 @@ class _DailyNavigationScanState extends State<DailyNavigationScan> {
         const SizedBox(height: 12),
         Row(
           children: [
-            Icon(widget.appState.hasProviderKey ? Icons.auto_awesome_rounded : Icons.hub_outlined, size: 19),
+            Icon(
+              widget.appState.hasProviderKey
+                  ? Icons.auto_awesome_rounded
+                  : Icons.hub_outlined,
+              size: 19,
+            ),
             const SizedBox(width: 8),
-            Text(widget.appState.hasProviderKey ? 'Navigator ready' : 'Structured guide active', style: const TextStyle(fontWeight: FontWeight.w800)),
+            Text(
+              widget.appState.hasProviderKey
+                  ? 'Navigator ready'
+                  : 'Structured guide active',
+              style: const TextStyle(fontWeight: FontWeight.w800),
+            ),
             const Spacer(),
-            Text(widget.appState.hasProviderKey ? 'AI READY' : 'NO AI', style: Theme.of(context).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w900)),
+            Text(
+              widget.appState.hasProviderKey ? 'AI READY' : 'NO AI',
+              style: Theme.of(context).textTheme.labelSmall
+                  ?.copyWith(fontWeight: FontWeight.w900),
+            ),
           ],
         ),
         const SizedBox(height: 16),
@@ -857,12 +952,14 @@ class _EvidenceDisclosure extends StatelessWidget {
         ),
         const SizedBox(height: 10),
         const Text(
-          'Validated measures belong in a separate, less-frequent assessment with exact wording, scoring, licensing, age, and clinical-review controls. Mind Recipe will not silently blend one into an AI conversation.',
+          'Validated measures belong in a separate, less-frequent assessment with exact wording, scoring, licensing, age, and clinical-review controls. MindRecipe will not silently blend one into an AI conversation.',
         ),
         const SizedBox(height: 8),
         TextButton.icon(
           onPressed: () => launchUrl(
-            Uri.parse('https://www.who.int/publications/m/item/WHO-UCN-MSD-MHE-2024.01'),
+            Uri.parse(
+              'https://www.who.int/publications/m/item/WHO-UCN-MSD-MHE-2024.01',
+            ),
             mode: LaunchMode.externalApplication,
           ),
           icon: const Icon(Icons.open_in_new, size: 18),

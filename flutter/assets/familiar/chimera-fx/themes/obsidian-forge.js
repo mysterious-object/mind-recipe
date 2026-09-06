@@ -5,7 +5,7 @@
  * WebGL-compatible ChimeraFX theme; no WebGPU renderer path.
  */
 
-import * as THREE from 'three';
+import * as THREE from '../../three.module.min.js';
 
 export const ObsidianForge = {
   name: 'obsidian-forge',

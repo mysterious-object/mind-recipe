@@ -1,4 +1,4 @@
-name: Mind Recipe Android APK
+name: MindRecipe Android APK
 
 on:
   workflow_dispatch:

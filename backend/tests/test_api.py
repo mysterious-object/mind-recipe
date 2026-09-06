@@ -60,8 +60,8 @@ def test_member_export_notification_preferences_and_confirmed_account_deletion()
     assert exported.status_code == 200
     assert exported.json()["checkins"][0]["emotions"] == ["Steady"]
     assert exported.json()["notification_preferences"]["message_style"] == "gentle"
-    assert client.delete("/v1/account", headers=headers, json={"confirmation": "REMOVE"}).status_code == 422
-    assert client.delete("/v1/account", headers=headers, json={"confirmation": "DELETE"}).status_code == 204
+    assert client.request("DELETE", "/v1/account", headers=headers, json={"confirmation": "REMOVE"}).status_code == 422
+    assert client.request("DELETE", "/v1/account", headers=headers, json={"confirmation": "DELETE"}).status_code == 204
     assert client.get("/v1/auth/me", headers=headers).status_code == 404
 
 

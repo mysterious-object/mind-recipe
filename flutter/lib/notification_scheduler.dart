@@ -44,7 +44,7 @@ class _NotificationSchedulerState extends State<NotificationScheduler> {
     'discreet': 'Just checking in 🌿',
     'gentle': 'A moment for yourself 💭',
     'encouraging': 'You\'ve got this ✨',
-    'minimal': 'Mind Recipe',
+    'minimal': 'MindRecipe',
   };
 
   static const _days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -63,19 +63,33 @@ class _NotificationSchedulerState extends State<NotificationScheduler> {
       if (!mounted) return;
       setState(() {
         _enabled = value['enabled'] == true;
-        _morningTime = _parseTime(value['morning_time']?.toString(), _morningTime);
+        _morningTime = _parseTime(
+          value['morning_time']?.toString(),
+          _morningTime,
+        );
         _middayTime = _parseTime(value['midday_time']?.toString(), _middayTime);
-        _eveningTime = _parseTime(value['evening_time']?.toString(), _eveningTime);
-        _quietStart = _parseTime(value['quiet_hours_start']?.toString(), _quietStart);
+        _eveningTime = _parseTime(
+          value['evening_time']?.toString(),
+          _eveningTime,
+        );
+        _quietStart = _parseTime(
+          value['quiet_hours_start']?.toString(),
+          _quietStart,
+        );
         _quietEnd = _parseTime(value['quiet_hours_end']?.toString(), _quietEnd);
-        _quietHoursEnabled = value['quiet_hours_start'] != null && value['quiet_hours_end'] != null;
+        _quietHoursEnabled =
+            value['quiet_hours_start'] != null &&
+            value['quiet_hours_end'] != null;
         final active = (value['active_weekdays'] as List? ?? const [])
             .map((item) => int.tryParse(item.toString()))
             .whereType<int>()
             .toSet();
-        for (var i = 0; i < _slots.length; i++) _slots[i] = active.contains(i + 1);
+        for (var i = 0; i < _slots.length; i++)
+          _slots[i] = active.contains(i + 1);
         _messageStyle = value['message_style']?.toString() ?? _messageStyle;
-        _snoozeUntil = DateTime.tryParse(value['snooze_until']?.toString() ?? '');
+        _snoozeUntil = DateTime.tryParse(
+          value['snooze_until']?.toString() ?? '',
+        );
         _pauseUntil = DateTime.tryParse(value['pause_until']?.toString() ?? '');
         _snoozed = _snoozeUntil?.isAfter(DateTime.now()) == true;
         _paused = _pauseUntil?.isAfter(DateTime.now()) == true;
@@ -92,7 +106,9 @@ class _NotificationSchedulerState extends State<NotificationScheduler> {
     try {
       await _api.saveNotificationPreferences(_token, {
         'enabled': _enabled,
-        'quiet_hours_start': _quietHoursEnabled ? _timeValue(_quietStart) : null,
+        'quiet_hours_start': _quietHoursEnabled
+            ? _timeValue(_quietStart)
+            : null,
         'quiet_hours_end': _quietHoursEnabled ? _timeValue(_quietEnd) : null,
         'check_in_reminder': true,
         'lesson_reminder': true,
@@ -101,10 +117,15 @@ class _NotificationSchedulerState extends State<NotificationScheduler> {
         'morning_time': _timeValue(_morningTime),
         'midday_time': _timeValue(_middayTime),
         'evening_time': _timeValue(_eveningTime),
-        'active_weekdays': [for (var i = 0; i < _slots.length; i++) if (_slots[i]) i + 1],
+        'active_weekdays': [
+          for (var i = 0; i < _slots.length; i++)
+            if (_slots[i]) i + 1,
+        ],
         'message_style': _messageStyle,
-        if (_snoozeUntil != null) 'snooze_until': _snoozeUntil!.toUtc().toIso8601String(),
-        if (_pauseUntil != null) 'pause_until': _pauseUntil!.toUtc().toIso8601String(),
+        if (_snoozeUntil != null)
+          'snooze_until': _snoozeUntil!.toUtc().toIso8601String(),
+        if (_pauseUntil != null)
+          'pause_until': _pauseUntil!.toUtc().toIso8601String(),
       });
     } catch (_) {
       // The next interaction retries the member-scoped save.
@@ -116,10 +137,13 @@ class _NotificationSchedulerState extends State<NotificationScheduler> {
     if (parts.length != 2) return fallback;
     final hour = int.tryParse(parts[0]);
     final minute = int.tryParse(parts[1]);
-    return hour == null || minute == null ? fallback : TimeOfDay(hour: hour, minute: minute);
+    return hour == null || minute == null
+        ? fallback
+        : TimeOfDay(hour: hour, minute: minute);
   }
 
-  String _timeValue(TimeOfDay value) => '${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
+  String _timeValue(TimeOfDay value) =>
+      '${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
 
   @override
   Widget build(BuildContext context) {
@@ -129,21 +153,38 @@ class _NotificationSchedulerState extends State<NotificationScheduler> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Notification Scheduler', style: MindRecipeTokens.displayMedium(context)),
+          Text(
+            'Notification Scheduler',
+            style: MindRecipeTokens.displayMedium(context),
+          ),
           const SizedBox(height: 8),
-          Text('Gentle, discreet reminders. Nothing intrusive. You control when and how often.',
-            style: MindRecipeTokens.bodyMedium(context)!.copyWith(color: MindRecipeTokens.gray600),
+          Text(
+            'Gentle, discreet reminders. Nothing intrusive. You control when and how often.',
+            style: MindRecipeTokens.bodyMedium(context)!
+                .copyWith(color: MindRecipeTokens.gray600),
           ),
           const SizedBox(height: 20),
 
           // Master toggle
           Semantics(
-            label: _enabled ? 'Notifications enabled' : 'Notifications disabled',
+            label: _enabled
+                ? 'Notifications enabled'
+                : 'Notifications disabled',
             child: SwitchListTile.adaptive(
               value: _enabled,
-              onChanged: (v) { setState(() => _enabled = v); _savePreferences(); },
-              title: const Text('Enable wellness reminders', style: TextStyle(fontWeight: FontWeight.w600)),
-              subtitle: Text(_enabled ? 'Active — ${_activeSlotsCount} reminders per week' : 'All reminders paused'),
+              onChanged: (v) {
+                setState(() => _enabled = v);
+                _savePreferences();
+              },
+              title: const Text(
+                'Enable wellness reminders',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              subtitle: Text(
+                _enabled
+                    ? 'Active — ${_activeSlotsCount} reminders per week'
+                    : 'All reminders paused',
+              ),
               activeColor: MindRecipeTokens.primary,
             ),
           ),
@@ -151,30 +192,44 @@ class _NotificationSchedulerState extends State<NotificationScheduler> {
 
           if (_enabled) ...[
             // Time slots
-            _buildTimePicker('Morning reminder', _morningTime,
-              (t) { setState(() => _morningTime = t); _savePreferences(); }),
-            _buildTimePicker('Midday check-in', _middayTime,
-              (t) { setState(() => _middayTime = t); _savePreferences(); }),
-            _buildTimePicker('Evening reflection', _eveningTime,
-              (t) { setState(() => _eveningTime = t); _savePreferences(); }),
+            _buildTimePicker('Morning reminder', _morningTime, (t) {
+              setState(() => _morningTime = t);
+              _savePreferences();
+            }),
+            _buildTimePicker('Midday check-in', _middayTime, (t) {
+              setState(() => _middayTime = t);
+              _savePreferences();
+            }),
+            _buildTimePicker('Evening reflection', _eveningTime, (t) {
+              setState(() => _eveningTime = t);
+              _savePreferences();
+            }),
             const SizedBox(height: 16),
 
             // Days of week
             Text('Active days', style: MindRecipeTokens.title(context)),
             const SizedBox(height: 8),
-            Wrap(spacing: 4, children: List.generate(7, (i) =>
-              FilterChip(
-                label: Text(_days[i]),
-                selected: _slots[i],
-                onSelected: (v) { setState(() => _slots[i] = v); _savePreferences(); },
-                selectedColor: MindRecipeTokens.primary.withAlpha(40),
+            Wrap(
+              spacing: 4,
+              children: List.generate(
+                7,
+                (i) => FilterChip(
+                  label: Text(_days[i]),
+                  selected: _slots[i],
+                  onSelected: (v) {
+                    setState(() => _slots[i] = v);
+                    _savePreferences();
+                  },
+                  selectedColor: MindRecipeTokens.primary.withAlpha(40),
+                ),
               ),
-            )),
+            ),
             const SizedBox(height: 20),
 
             // Quiet hours
             Semantics(
-              label: 'Quiet hours from ${_quietStart.format(context)} to ${_quietEnd.format(context)}',
+              label:
+                  'Quiet hours from ${_quietStart.format(context)} to ${_quietEnd.format(context)}',
               child: Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -182,31 +237,56 @@ class _NotificationSchedulerState extends State<NotificationScheduler> {
                     children: [
                       SwitchListTile.adaptive(
                         value: _quietHoursEnabled,
-                        onChanged: (v) { setState(() => _quietHoursEnabled = v); _savePreferences(); },
-                        title: const Text('Quiet hours', style: TextStyle(fontWeight: FontWeight.w600)),
-                        subtitle: const Text('No notifications during your rest window'),
+                        onChanged: (v) {
+                          setState(() => _quietHoursEnabled = v);
+                          _savePreferences();
+                        },
+                        title: const Text(
+                          'Quiet hours',
+                          style: TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        subtitle: const Text(
+                          'No notifications during your rest window',
+                        ),
                         activeColor: MindRecipeTokens.primary,
                       ),
-                      if (_quietHoursEnabled) Row(
-                        children: [
-                          Expanded(child: ListTile(
-                            title: const Text('From'),
-                            subtitle: Text(_quietStart.format(context)),
-                            onTap: () async {
-                              final t = await showTimePicker(context: context, initialTime: _quietStart);
-                              if (t != null) { setState(() => _quietStart = t); _savePreferences(); }
-                            },
-                          )),
-                          Expanded(child: ListTile(
-                            title: const Text('Until'),
-                            subtitle: Text(_quietEnd.format(context)),
-                            onTap: () async {
-                              final t = await showTimePicker(context: context, initialTime: _quietEnd);
-                              if (t != null) { setState(() => _quietEnd = t); _savePreferences(); }
-                            },
-                          )),
-                        ],
-                      ),
+                      if (_quietHoursEnabled)
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ListTile(
+                                title: const Text('From'),
+                                subtitle: Text(_quietStart.format(context)),
+                                onTap: () async {
+                                  final t = await showTimePicker(
+                                    context: context,
+                                    initialTime: _quietStart,
+                                  );
+                                  if (t != null) {
+                                    setState(() => _quietStart = t);
+                                    _savePreferences();
+                                  }
+                                },
+                              ),
+                            ),
+                            Expanded(
+                              child: ListTile(
+                                title: const Text('Until'),
+                                subtitle: Text(_quietEnd.format(context)),
+                                onTap: () async {
+                                  final t = await showTimePicker(
+                                    context: context,
+                                    initialTime: _quietEnd,
+                                  );
+                                  if (t != null) {
+                                    setState(() => _quietEnd = t);
+                                    _savePreferences();
+                                  }
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
                     ],
                   ),
                 ),
@@ -220,14 +300,29 @@ class _NotificationSchedulerState extends State<NotificationScheduler> {
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   children: [
-                    Text('Snooze & pause', style: MindRecipeTokens.title(context)),
+                    Text(
+                      'Snooze & pause',
+                      style: MindRecipeTokens.title(context),
+                    ),
                     const SizedBox(height: 12),
                     if (_snoozed && _snoozeUntil != null)
-                      _buildStatusChip('Snoozed until ${_formatDateTime(_snoozeUntil!)}', Icons.snooze, true)
+                      _buildStatusChip(
+                        'Snoozed until ${_formatDateTime(_snoozeUntil!)}',
+                        Icons.snooze,
+                        true,
+                      )
                     else if (_paused && _pauseUntil != null)
-                      _buildStatusChip('Paused until ${_formatDateTime(_pauseUntil!)}', Icons.pause_circle, true)
+                      _buildStatusChip(
+                        'Paused until ${_formatDateTime(_pauseUntil!)}',
+                        Icons.pause_circle,
+                        true,
+                      )
                     else
-                      _buildStatusChip('Active — reminders will arrive as scheduled', Icons.check_circle, false),
+                      _buildStatusChip(
+                        'Active — reminders will arrive as scheduled',
+                        Icons.check_circle,
+                        false,
+                      ),
                     const SizedBox(height: 8),
                     Row(
                       children: [
@@ -239,7 +334,9 @@ class _NotificationSchedulerState extends State<NotificationScheduler> {
                         const SizedBox(width: 8),
                         OutlinedButton.icon(
                           onPressed: _paused ? _cancelPause : _pauseOneDay,
-                          icon: Icon(_paused ? Icons.close : Icons.pause_circle),
+                          icon: Icon(
+                            _paused ? Icons.close : Icons.pause_circle,
+                          ),
                           label: Text(_paused ? 'Cancel pause' : 'Pause 24h'),
                         ),
                       ],
@@ -253,15 +350,20 @@ class _NotificationSchedulerState extends State<NotificationScheduler> {
             // Message style
             Text('Message style', style: MindRecipeTokens.title(context)),
             const SizedBox(height: 8),
-            ...(_styles.entries.map((e) => RadioListTile<String>(
-              title: Text(e.value),
-              subtitle: Text(e.key),
-              value: e.key,
-              groupValue: _messageStyle,
-              onChanged: (v) { setState(() => _messageStyle = v ?? 'discreet'); _savePreferences(); },
-              activeColor: MindRecipeTokens.primary,
-              dense: true,
-            ))),
+            ...(_styles.entries.map(
+              (e) => RadioListTile<String>(
+                title: Text(e.value),
+                subtitle: Text(e.key),
+                value: e.key,
+                groupValue: _messageStyle,
+                onChanged: (v) {
+                  setState(() => _messageStyle = v ?? 'discreet');
+                  _savePreferences();
+                },
+                activeColor: MindRecipeTokens.primary,
+                dense: true,
+              ),
+            )),
           ],
           const SizedBox(height: 24),
           _buildWellnessBoundary(),
@@ -270,7 +372,11 @@ class _NotificationSchedulerState extends State<NotificationScheduler> {
     );
   }
 
-  Widget _buildTimePicker(String label, TimeOfDay time, ValueChanged<TimeOfDay> onChanged) => Card(
+  Widget _buildTimePicker(
+    String label,
+    TimeOfDay time,
+    ValueChanged<TimeOfDay> onChanged,
+  ) => Card(
     child: ListTile(
       title: Text(label),
       subtitle: Text(time.format(context)),
@@ -282,17 +388,37 @@ class _NotificationSchedulerState extends State<NotificationScheduler> {
     ),
   );
 
-  Widget _buildStatusChip(String text, IconData icon, bool isActive) => Container(
+  Widget _buildStatusChip(
+    String text,
+    IconData icon,
+    bool isActive,
+  ) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
     decoration: BoxDecoration(
-      color: (isActive ? MindRecipeTokens.warning : MindRecipeTokens.success).withAlpha(20),
+      color: (isActive ? MindRecipeTokens.warning : MindRecipeTokens.success)
+          .withAlpha(20),
       borderRadius: BorderRadius.circular(12),
     ),
-    child: Row(mainAxisSize: MainAxisSize.min, children: [
-      Icon(icon, size: 16, color: isActive ? MindRecipeTokens.warning : MindRecipeTokens.success),
-      const SizedBox(width: 6),
-      Text(text, style: TextStyle(color: isActive ? MindRecipeTokens.warning : MindRecipeTokens.success, fontSize: 13)),
-    ]),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          icon,
+          size: 16,
+          color: isActive ? MindRecipeTokens.warning : MindRecipeTokens.success,
+        ),
+        const SizedBox(width: 6),
+        Text(
+          text,
+          style: TextStyle(
+            color: isActive
+                ? MindRecipeTokens.warning
+                : MindRecipeTokens.success,
+            fontSize: 13,
+          ),
+        ),
+      ],
+    ),
   );
 
   int get _activeSlotsCount => _slots.where((s) => s).length * 3;
@@ -301,13 +427,17 @@ class _NotificationSchedulerState extends State<NotificationScheduler> {
     setState(() {
       _snoozed = true;
       _snoozeUntil = DateTime.now().add(const Duration(hours: 1));
-      _paused = false; _pauseUntil = null;
+      _paused = false;
+      _pauseUntil = null;
     });
     _savePreferences();
   }
 
   void _cancelSnooze() {
-    setState(() { _snoozed = false; _snoozeUntil = null; });
+    setState(() {
+      _snoozed = false;
+      _snoozeUntil = null;
+    });
     _savePreferences();
   }
 
@@ -315,13 +445,17 @@ class _NotificationSchedulerState extends State<NotificationScheduler> {
     setState(() {
       _paused = true;
       _pauseUntil = DateTime.now().add(const Duration(hours: 24));
-      _snoozed = false; _snoozeUntil = null;
+      _snoozed = false;
+      _snoozeUntil = null;
     });
     _savePreferences();
   }
 
   void _cancelPause() {
-    setState(() { _paused = false; _pauseUntil = null; });
+    setState(() {
+      _paused = false;
+      _pauseUntil = null;
+    });
     _savePreferences();
   }
 
@@ -332,7 +466,7 @@ class _NotificationSchedulerState extends State<NotificationScheduler> {
   }
 
   Widget _buildWellnessBoundary() => const Text(
-    'Mind Recipe is a wellness tool, not medical care. Notifications are not clinical alerts.',
+    'MindRecipe is a wellness tool, not medical care. Notifications are not clinical alerts.',
     style: TextStyle(fontSize: 12, color: Colors.black54),
   );
 }

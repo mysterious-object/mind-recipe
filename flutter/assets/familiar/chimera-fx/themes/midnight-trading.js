@@ -6,7 +6,7 @@
  * Heavy data rivers, subtle matrix rain, restrained bloom.
  */
 
-import * as THREE from 'three';
+import * as THREE from '../../three.module.min.js';
 
 export const MidnightTrading = {
   name: 'midnight-trading',

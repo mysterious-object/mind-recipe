@@ -1,5 +1,5 @@
 /**
- * Mind Recipe visual engine. This is the library renderer: Three core,
+ * MindRecipe visual engine. This is the library renderer: Three core,
  * original effect composer, AI state machine, component registry and themes.
  */
 import * as THREE from '../../three.module.min.js';
@@ -54,7 +54,10 @@ export class Engine {
     this._onResize = this._resize.bind(this); this._onMouseMove = e => { this.mouse.set(e.clientX, e.clientY); const w = this.container.clientWidth, h = this.container.clientHeight; this.mouseNDC.set((e.clientX / w) * 2 - 1, -(e.clientY / h) * 2 + 1); };
     this._onVisChange = () => { if (document.hidden) this._pause(); else this._resume(); };
     window.addEventListener('resize', this._onResize); window.addEventListener('mousemove', this._onMouseMove); document.addEventListener('visibilitychange', this._onVisChange);
-    window.matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', e => { this.reducedMotion = e.matches; });
+    window.matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', e => {
+      this.reducedMotion = e.matches;
+      if (e.matches) { this._pause(); this.renderOnce(); } else { this._resume(); }
+    });
   }
   _resize() { const w = this.container.clientWidth, h = this.container.clientHeight; this.camera.aspect = w / h; this.camera.updateProjectionMatrix(); this.renderer.setSize(w, h); this.composer.setSize(w, h); this.components.forEach(c => c.onResize?.(w, h, this)); }
   addComponent(component) { component.init?.(this); this.components.push(component); return this; }
@@ -62,9 +65,28 @@ export class Engine {
   setTheme(theme) { this.theme = theme; if (theme) { theme.apply?.(this); this.components.forEach(c => c.onThemeChange?.(theme, this)); } return this; }
   setState(state) { this.stateMachine.transitionTo(state); this.components.forEach(c => c.onStateChange?.(state, this)); return this; }
   pulse(type = 'default', data = {}) { this.components.forEach(c => c.onPulse?.(type, data, this)); if (type === 'trade' || type === 'success') { this.setState('success'); setTimeout(() => this.setState('idle'), 2000); } else if (type === 'error') { this.setState('error'); this.glitchPass.enabled = true; setTimeout(() => { this.setState('idle'); this.glitchPass.enabled = false; }, 1500); } return this; }
-  start() { if (this.running) return this; this.running = true; this.clock.start(); this._animate(performance.now()); return this; }
+  renderOnce() {
+    if (this.disposed) return this;
+    const elapsed = this.clock.getElapsedTime();
+    const target = this._targetState || this.stateMachine.currentValues;
+    if (target) {
+      this.bloomPass.strength = target.bloomStrength;
+      this.chromaPass.uniforms.uIntensity.value = target.chromaIntensity;
+      this.grainPass.uniforms.uTime.value = elapsed;
+      this.grainPass.uniforms.uIntensity.value = target.grainIntensity;
+      if (this.glitchPass.enabled) {
+        this.glitchPass.uniforms.uTime.value = elapsed;
+        this.glitchPass.uniforms.uIntensity.value = target.glitchIntensity;
+      }
+    }
+    const ctx = { dt: 0, elapsed, mouse: this.mouse, mouseNDC: this.mouseNDC, state: this.stateMachine.current, intensity: target?.componentIntensity ?? .3, theme: this.theme };
+    this.components.forEach(c => c.update?.(ctx, this));
+    this.composer.render(0);
+    return this;
+  }
+  start() { if (this.running) return this; this.clock.start(); if (this.reducedMotion) return this.renderOnce(); this.running = true; this._animate(performance.now()); return this; }
   _pause() { this.running = false; }
-  _resume() { if (!this.running && !this.disposed) { this.running = true; this.clock.start(); this._animate(performance.now()); } }
+  _resume() { if (!this.running && !this.disposed) { if (this.reducedMotion) { this.renderOnce(); } else { this.running = true; this.clock.start(); this._animate(performance.now()); } } }
   _animate(now) { if (!this.running || this.disposed) return; requestAnimationFrame(this._animate.bind(this)); if (now - this.lastFrame < this.frameInterval) return; this.lastFrame = now; if (this.reducedMotion) return; const dt = Math.min(this.clock.getDelta(), .05), elapsed = this.clock.getElapsedTime(); const target = this._targetState || this.stateMachine.currentValues; if (target) { const speed = target.transitionSpeed || .05; this.bloomPass.strength += (target.bloomStrength - this.bloomPass.strength) * speed; this.chromaPass.uniforms.uIntensity.value += (target.chromaIntensity - this.chromaPass.uniforms.uIntensity.value) * speed; this.grainPass.uniforms.uTime.value = elapsed; this.grainPass.uniforms.uIntensity.value += (target.grainIntensity - this.grainPass.uniforms.uIntensity.value) * speed; if (this.glitchPass.enabled) { this.glitchPass.uniforms.uTime.value = elapsed; this.glitchPass.uniforms.uIntensity.value += (target.glitchIntensity - this.glitchPass.uniforms.uIntensity.value) * speed; } } const ctx = { dt, elapsed, mouse: this.mouse, mouseNDC: this.mouseNDC, state: this.stateMachine.current, intensity: target?.componentIntensity ?? .3, theme: this.theme }; this.components.forEach(c => c.update?.(ctx, this)); this.camera.position.x = Math.sin(elapsed * .1) * .5; this.camera.position.y = Math.cos(elapsed * .07) * .3; this.composer.render(dt); }
   dispose() { this.disposed = true; this.running = false; window.removeEventListener('resize', this._onResize); window.removeEventListener('mousemove', this._onMouseMove); document.removeEventListener('visibilitychange', this._onVisChange); this.components.forEach(c => c.dispose?.(this)); this.components = []; this.composer.dispose(); this.renderer.dispose(); this.renderer.domElement.remove(); }
 }

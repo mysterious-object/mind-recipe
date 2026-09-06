@@ -6,7 +6,7 @@
  * more saturated colors, full component energy.
  */
 
-import * as THREE from 'three';
+import * as THREE from '../../three.module.min.js';
 
 export const NeonSamurai = {
   name: 'neon-samurai',

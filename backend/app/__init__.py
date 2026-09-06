@@ -1,1 +1,1 @@
-"""Mind Recipe backend package."""
+"""MindRecipe backend package."""

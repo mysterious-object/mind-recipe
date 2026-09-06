@@ -22,7 +22,7 @@ Future<void> _voiceLog(String msg) async {
   } catch (_) {}
 }
 
-/// Voice interface for Mind Recipe — native recognition and interruptible audio.
+/// Voice interface for MindRecipe — native recognition and interruptible audio.
 class VoiceInterface {
   static final VoiceInterface _instance = VoiceInterface._();
   factory VoiceInterface() => _instance;
@@ -80,7 +80,7 @@ class VoiceInterface {
 
   /// Plays a licensed human recording and resolves when playback ends.
   ///
-  /// Dynamic AI text is deliberately not accepted here: Mind Recipe must never
+  /// Dynamic AI text is deliberately not accepted here: MindRecipe must never
   /// substitute synthetic speech when the member selected a human voice.
   Future<bool> playRecordedCueAndWait(String filePath) async {
     if (_isSpeaking) await stopSpeaking();
@@ -99,7 +99,7 @@ class VoiceInterface {
     }
   }
 
-  /// Renders the current Mind Recipe companion voice, then plays the completed
+  /// Renders the current MindRecipe companion voice, then plays the completed
   /// audio through the same interruption-safe recorded-audio path.
   /// If the cloud voice is unavailable (offline, 1.2 GB model verifying, or
   /// API error), falls back to the offline system TTS so read-aloud still

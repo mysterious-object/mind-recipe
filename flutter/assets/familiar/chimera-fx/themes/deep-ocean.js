@@ -6,7 +6,7 @@
  * Soft, calming, rich with particle detail.
  */
 
-import * as THREE from 'three';
+import * as THREE from '../../three.module.min.js';
 
 export const DeepOcean = {
   name: 'deep-ocean',

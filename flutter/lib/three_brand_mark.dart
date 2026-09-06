@@ -65,7 +65,7 @@ class _ThreeBrandMarkState extends State<ThreeBrandMark> {
     children: [
       if (controller != null)
         IgnorePointer(child: WebViewWidget(controller: controller!)),
-      // Keep the actual Mind Recipe mark visible until its WebGL texture has
+      // Keep the actual MindRecipe mark visible until its WebGL texture has
       // loaded. A WebView allocation must never result in an empty login card.
       AnimatedOpacity(
         opacity: _webReady ? 0 : 1,

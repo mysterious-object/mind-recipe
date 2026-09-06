@@ -58,9 +58,15 @@ class LessonGenerator {
         .take(6)
         .map((r) => r.length > 140 ? '${r.substring(0, 140)}…' : r)
         .join(' | ');
-    final module1 = completed.where((id) => RegExp(r'^lesson-[1-5]$').hasMatch(id)).length;
-    final module2 = completed.where((id) => RegExp(r'^lesson-(6|7|8|9|10)$').hasMatch(id)).length;
-    final module3 = completed.where((id) => RegExp(r'^lesson-(11|12|13|14|15)$').hasMatch(id)).length;
+    final module1 = completed
+        .where((id) => RegExp(r'^lesson-[1-5]$').hasMatch(id))
+        .length;
+    final module2 = completed
+        .where((id) => RegExp(r'^lesson-(6|7|8|9|10)$').hasMatch(id))
+        .length;
+    final module3 = completed
+        .where((id) => RegExp(r'^lesson-(11|12|13|14|15)$').hasMatch(id))
+        .length;
     return 'Completed core modules: Foundations $module1/5, Patterns $module2/5, '
         'Direction $module3/5. Recent reflections: ${reflectionSample.isEmpty ? "(none yet)" : reflectionSample}';
   }
@@ -70,8 +76,9 @@ class LessonGenerator {
   Future<RecipeLesson?> generateNext({int generatedCount = 0}) async {
     final summary = await buildPatternSummary();
     final number = recipeLessons.length + generatedCount + 1;
-    final prompt = '''
-You are Mind Recipe's curriculum designer. Based on this member's pattern summary, write ONE new wellness lesson that continues their path. Do not diagnose. Do not repeat the core lessons. Ground it in what the member actually wrote.
+    final prompt =
+        '''
+You are MindRecipe's curriculum designer. Based on this member's pattern summary, write ONE new wellness lesson that continues their path. Do not diagnose. Do not repeat the core lessons. Ground it in what the member actually wrote.
 
 Pattern summary: $summary
 
@@ -125,7 +132,9 @@ PRACTICE: <one concrete 2-3 minute practice with 3 numbered steps>
     final existing = await loadGenerated();
     final added = <RecipeLesson>[];
     for (var i = 0; i < count; i++) {
-      final lesson = await generateNext(generatedCount: existing.length + added.length);
+      final lesson = await generateNext(
+        generatedCount: existing.length + added.length,
+      );
       if (lesson == null) break;
       added.add(lesson);
     }

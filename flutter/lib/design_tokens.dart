@@ -1,4 +1,4 @@
-/// Design tokens for Mind Recipe wellness platform.
+/// Design tokens for the MindRecipe wellness platform.
 /// 
 /// These replace hardcoded colors, sizes, and typography throughout the app.
 /// All components should reference these tokens rather than using Material defaults.

@@ -1,4 +1,4 @@
-name: Mind Recipe checks
+name: MindRecipe checks
 
 on:
   push:

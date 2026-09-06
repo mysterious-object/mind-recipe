@@ -1,11 +1,11 @@
 {
-    "name": "Mind Recipe",
-    "short_name": "Mind Recipe",
+    "name": "MindRecipe",
+    "short_name": "MindRecipe",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#F7F6F1",
     "theme_color": "#006B60",
-    "description": "Mind Recipe by Context Field — navigate, learn, and practice with Navigator.",
+    "description": "MindRecipe by Context Field — navigate, learn, and practice with Navigator.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

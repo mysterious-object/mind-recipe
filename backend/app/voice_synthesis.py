@@ -1,4 +1,4 @@
-"""Mind Recipe speech rendering with bounded, non-identifying voice presets.
+"""MindRecipe speech rendering with bounded, non-identifying voice presets.
 
 The service never clones a performer or character voice. A source recording may
 only be added after its owner and license have been verified; until then the
@@ -29,7 +29,7 @@ class VoicePreset:
 VOICE_PRESETS: dict[str, VoicePreset] = {
     "navigator_companion": VoicePreset(
         "en-GB-SoniaNeural",
-        "Warm, present British female voice — the original Mind Recipe default.",
+        "Warm, present British female voice — the original MindRecipe default.",
         rate_offset=1,
         pitch="-1Hz",
     ),

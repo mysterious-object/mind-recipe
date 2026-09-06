@@ -1,4 +1,4 @@
-/// Bounded, private tool routing for the on-device Mind Recipe assistant.
+/// Bounded, private tool routing for the on-device MindRecipe assistant.
 ///
 /// The router is deterministic so tool selection remains available without a
 /// network connection or provider key. It supplies context to the local model;
@@ -19,7 +19,7 @@ class NavigatorAgentPlan {
       '''
 Member message: $memberMessage
 
-Selected Mind Recipe support: $tool
+Selected MindRecipe support: $tool
 Tool guidance: $instruction
 Respond to the member directly. Do not mention tool routing or internal systems.
 ''';
@@ -39,17 +39,33 @@ class NavigatorAgent {
     // General AGI assistance (phone features, tasks) is distinct from
     // therapeutic support — route it practically, not clinically.
     if (_contains(text, const [
-      'remind', 'reminder', 'appointment', 'alarm', 'wake me',
-      'calendar', 'my calendar', 'set a timer', 'add to my calendar',
-      'book', 'schedule an appointment',
-    ]) && !_contains(text, const [
-      'anxious', 'sad', 'depressed', 'overwhelmed', 'panic', 'grief',
-      'therapy', 'therapist', 'crisis', 'hopeless',
-    ])) {
+          'remind',
+          'reminder',
+          'appointment',
+          'alarm',
+          'wake me',
+          'calendar',
+          'my calendar',
+          'set a timer',
+          'add to my calendar',
+          'book',
+          'schedule an appointment',
+        ]) &&
+        !_contains(text, const [
+          'anxious',
+          'sad',
+          'depressed',
+          'overwhelmed',
+          'panic',
+          'grief',
+          'therapy',
+          'therapist',
+          'crisis',
+          'hopeless',
+        ])) {
       return const NavigatorAgentPlan(
         tool: 'phone assistance',
-        instruction:
-            'This is a practical phone task, not a therapy moment. Reply in one short sentence confirming what you can do; the app shows an on-device action card for the member to approve. No emotional framing, no questions about feelings.',
+        instruction: 'This is a practical phone task, not a therapy moment. Reply in one short sentence confirming what you can do; the app shows an on-device action card for the member to approve. No emotional framing, no questions about feelings.',
       );
     }
     if (_contains(text, const [
@@ -80,8 +96,8 @@ class NavigatorAgent {
     }
     if (_contains(text, const ['lesson', 'orientation', 'course'])) {
       return const NavigatorAgentPlan(
-        tool: 'Mind Recipe lesson',
-        instruction: 'Help the member choose a relevant lesson and direct them to the Mind Recipe tab. Do not claim unimported lesson content exists.',
+        tool: 'MindRecipe lesson',
+        instruction: 'Help the member choose a relevant lesson and direct them to the MindRecipe tab. Do not claim unimported lesson content exists.',
       );
     }
     if (_contains(text, const ['book', 'booking', 'appointment', 'schedule'])) {
@@ -100,13 +116,12 @@ class NavigatorAgent {
     ])) {
       return const NavigatorAgentPlan(
         tool: 'wellness recipe',
-        instruction: 'Offer one short, voluntary Mind Recipe-style practice and ask whether it feels useful. Avoid diagnosis or treatment claims.',
+        instruction: 'Offer one short, voluntary MindRecipe-style practice and ask whether it feels useful. Avoid diagnosis or treatment claims.',
       );
     }
     return const NavigatorAgentPlan(
       tool: 'open conversation',
-      instruction:
-          'Listen for what the member wants before choosing a mode. Answer, plan, reflect, or help practically based on their request. Never start Daily Nav or a wellness exercise unless they explicitly choose it.',
+      instruction: 'Listen for what the member wants before choosing a mode. Answer, plan, reflect, or help practically based on their request. Never start Daily Nav or a wellness exercise unless they explicitly choose it.',
     );
   }
 

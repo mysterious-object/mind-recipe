@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'mobile_automation.dart';
 
-/// Mind Recipe's on-device version of phone-harness: free chat detects
+/// MindRecipe's on-device version of phone-harness: free chat detects
 /// phone-action intents ("remind me to…", "appointment with…", "wake me at…")
 /// and offers a consent-gated action card. Nothing runs until the member
 /// taps Allow, and everything executes locally through the
@@ -22,13 +22,15 @@ class PhoneAction {
   final String? notes;
 
   String get summaryLabel => switch (type) {
-        PhoneActionType.reminder => 'Reminder',
-        PhoneActionType.appointment => 'Calendar event',
-        PhoneActionType.alarm => 'Alarm',
-      };
+    PhoneActionType.reminder => 'Reminder',
+    PhoneActionType.appointment => 'Calendar event',
+    PhoneActionType.alarm => 'Alarm',
+  };
 
   String get summary {
-    final whenText = when == null ? '' : ' · ${formatActionTime(when!)}${_daySuffix(when!)}';
+    final whenText = when == null
+        ? ''
+        : ' · ${formatActionTime(when!)}${_daySuffix(when!)}';
     return '$summaryLabel: $title$whenText';
   }
 
@@ -85,7 +87,10 @@ class PhoneActionParser {
     final after = body
         .substring(m.end)
         .trim()
-        .replaceFirst(RegExp(r'^(?:to|that|about)\s+', caseSensitive: false), '');
+        .replaceFirst(
+          RegExp(r'^(?:to|that|about)\s+', caseSensitive: false),
+          '',
+        );
     return _tidy(after);
   }
 
@@ -105,25 +110,36 @@ class PhoneActionParser {
       RegExp(r'\b(Dr|Mr|Mrs|Ms|St)\.', caseSensitive: false),
       (m) => m.group(1)!,
     );
-    final preferMorning = RegExp(r'wake|get up', caseSensitive: false).hasMatch(text);
+    final preferMorning = RegExp(
+      r'wake|get up',
+      caseSensitive: false,
+    ).hasMatch(text);
     final alarm = _alarm.firstMatch(text);
     if (alarm != null) {
       final body = (alarm.namedGroup('body') ?? '').trim();
-      final when = parseWhen(body, preferMorning: preferMorning) ??
+      final when =
+          parseWhen(body, preferMorning: preferMorning) ??
           parseWhen(text, preferMorning: preferMorning);
       if (when != null) {
         var label = body
-            .replaceFirst(RegExp(r'\b(at|for|tomorrow|tonight|today)\b', caseSensitive: false), '')
+            .replaceFirst(
+              RegExp(
+                r'\b(at|for|tomorrow|tonight|today)\b',
+                caseSensitive: false,
+              ),
+              '',
+            )
             .trim();
         final timeMatch = RegExp(
           r'\d{1,2}(:\d{2})?\s*(am|pm)?|\bin\s+\d+\s+(minutes?|mins?|hours?|hrs?)\b',
           caseSensitive: false,
         ).firstMatch(label);
-        if (timeMatch != null) label = label.replaceRange(timeMatch.start, timeMatch.end, '');
+        if (timeMatch != null)
+          label = label.replaceRange(timeMatch.start, timeMatch.end, '');
         label = label.replaceAll(RegExp(r'\s+'), ' ').trim();
         return PhoneAction(
           type: PhoneActionType.alarm,
-          title: label.isEmpty ? 'Mind Recipe alarm' : label,
+          title: label.isEmpty ? 'MindRecipe alarm' : label,
           when: when,
         );
       }
@@ -133,7 +149,8 @@ class PhoneActionParser {
     if (reminder != null) {
       final body = (reminder.namedGroup('body') ?? '').trim();
       if (body.isNotEmpty) {
-        final when = parseWhen(body, preferMorning: preferMorning) ??
+        final when =
+            parseWhen(body, preferMorning: preferMorning) ??
             parseWhen(message, preferMorning: preferMorning);
         final title = _titleFrom(body);
         if (title.isNotEmpty) {
@@ -150,7 +167,8 @@ class PhoneActionParser {
     if (appointment != null) {
       final body = (appointment.namedGroup('body') ?? '').trim();
       if (body.isNotEmpty) {
-        final when = parseWhen(body, preferMorning: preferMorning) ??
+        final when =
+            parseWhen(body, preferMorning: preferMorning) ??
             parseWhen(message, preferMorning: preferMorning);
         var title = _titleFrom(
           body.replaceFirst(
@@ -164,7 +182,7 @@ class PhoneActionParser {
           type: PhoneActionType.appointment,
           title: title,
           when: when ?? DateTime.now().add(const Duration(hours: 1)),
-          notes: 'Created from a Mind Recipe conversation.',
+          notes: 'Created from a MindRecipe conversation.',
         );
       }
     }
@@ -178,13 +196,12 @@ class PhoneActionParser {
     final text = input.toLowerCase();
     final now = DateTime.now();
 
-    final relative = RegExp(r'in\s+(\d+)\s+(minutes?|mins?|hours?|hrs?)').firstMatch(text);
+    final relative = RegExp(r'in\s+(\d+)\s+(minutes?|mins?|hours?|hrs?)')
+        .firstMatch(text);
     if (relative != null) {
       final n = int.parse(relative.group(1)!);
       final unit = relative.group(2)!;
-      return now.add(
-        Duration(minutes: unit.startsWith('m') ? n : n * 60),
-      );
+      return now.add(Duration(minutes: unit.startsWith('m') ? n : n * 60));
     }
 
     var day = DateTime(now.year, now.month, now.day);
@@ -192,7 +209,8 @@ class PhoneActionParser {
       day = day.add(const Duration(days: 1));
     }
 
-    final clock = RegExp(r'(?:at\s+)?\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b').firstMatch(text);
+    final clock = RegExp(r'(?:at\s+)?\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b')
+        .firstMatch(text);
     if (clock != null) {
       var hour = int.parse(clock.group(1)!);
       final minute = clock.group(2) != null ? int.parse(clock.group(2)!) : 0;
@@ -234,19 +252,20 @@ Future<AutomationResult> executePhoneAction(PhoneAction action) async {
   final auto = MindRecipeMobileAutomation();
   return switch (action.type) {
     PhoneActionType.reminder => auto.setReminder(
-        title: action.title,
-        dueDate: action.when,
-        notes: action.notes ?? 'Added from Mind Recipe Navigator.',
-      ),
+      title: action.title,
+      dueDate: action.when,
+      notes: action.notes ?? 'Added from MindRecipe Navigator.',
+    ),
     PhoneActionType.appointment => auto.setAppointment(
-        title: action.title,
-        start: action.when ?? DateTime.now().add(const Duration(hours: 1)),
-        description: action.notes ?? 'Added from Mind Recipe Navigator.',
-      ),
+      title: action.title,
+      start: action.when ?? DateTime.now().add(const Duration(hours: 1)),
+      description: action.notes ?? 'Added from MindRecipe Navigator.',
+    ),
     PhoneActionType.alarm => auto.setAlarm(
-        hour: (action.when ?? DateTime.now().add(const Duration(hours: 8))).hour,
-        minute: (action.when ?? DateTime.now().add(const Duration(hours: 8))).minute,
-        label: action.title,
-      ),
+      hour: (action.when ?? DateTime.now().add(const Duration(hours: 8))).hour,
+      minute:
+          (action.when ?? DateTime.now().add(const Duration(hours: 8))).minute,
+      label: action.title,
+    ),
   };
 }

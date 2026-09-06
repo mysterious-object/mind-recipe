@@ -58,10 +58,13 @@ pipeline {
         withCredentials([file(credentialsId: 'mind-recipe-google-drive-service-account', variable: 'GOOGLE_APPLICATION_CREDENTIALS')]) {
           sh '''
             chmod +x ci/upload_drive.sh
+            release_version=$(awk '/^version:/ {print $2}' flutter/pubspec.yaml)
+            app_version=${release_version%%+*}
+            build_number=${release_version##*+}
             ci/upload_drive.sh flutter/build/app/outputs/flutter-apk/app-release.apk \
-              MindRecipe-1.0.0-2108-Android.apk "$MIND_RECIPE_DRIVE_FOLDER"
+              "MindRecipe-${app_version}-${build_number}-APK.apk" "$MIND_RECIPE_DRIVE_FOLDER"
             ci/upload_drive.sh flutter/build/ios/ipa/mind-recipe-ios-unsigned.ipa \
-              MindRecipe-1.0.0-2108-iOS-unsigned.ipa "$MIND_RECIPE_DRIVE_FOLDER" \
+              "MindRecipe-${app_version}-${build_number}-iOS-unsigned.ipa" "$MIND_RECIPE_DRIVE_FOLDER" \
               victoria@contextfield.co
           '''
         }
@@ -81,7 +84,7 @@ pipeline {
       echo "MindRecipe build #${env.BUILD_NUMBER} — artifacts archived in Jenkins."
     }
     failure {
-      echo 'Mind Recipe build failed — check the stage that failed.'
+      echo 'MindRecipe build failed — check the stage that failed.'
     }
   }
 }

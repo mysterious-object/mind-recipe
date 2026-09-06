@@ -1,4 +1,4 @@
-name: Mind Recipe iOS IPA (unsigned)
+name: MindRecipe iOS IPA (unsigned)
 
 on:
   workflow_dispatch:
@@ -35,8 +35,17 @@ jobs:
         run: flutter build ios --release --no-codesign --dart-define=MIND_RECIPE_API_BASE=${MIND_RECIPE_STAGING_API_URL}
         working-directory: flutter
 
+      - name: Build and embed pinned private-AI runtime
+        run: |
+          chmod +x ci/build_llama_ios_framework.sh
+          ci/build_llama_ios_framework.sh flutter/build/ios/iphoneos/Runner.app
+
       - name: Verify Runner.app exists
-        run: test -d build/ios/iphoneos/Runner.app && ls -lh build/ios/iphoneos/Runner.app
+        run: |
+          test -d build/ios/iphoneos/Runner.app
+          test -x build/ios/iphoneos/Runner.app/Frameworks/llama.framework/llama
+          xcrun nm -gU build/ios/iphoneos/Runner.app/Frameworks/llama.framework/llama | grep -q _llama_model_load_from_file
+          ls -lh build/ios/iphoneos/Runner.app/Frameworks/llama.framework/llama
         working-directory: flutter
 
       - name: Create unsigned .ipa

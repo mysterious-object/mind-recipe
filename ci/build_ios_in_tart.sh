@@ -62,6 +62,8 @@ done
   flutter --version
   flutter pub get
   flutter build ios --release --no-codesign --dart-define=MIND_RECIPE_API_BASE='$API_URL'
+  chmod +x '../ci/build_llama_ios_framework.sh'
+  '../ci/build_llama_ios_framework.sh' build/ios/iphoneos/Runner.app
   rm -rf build/ios/ipa/Payload
   mkdir -p build/ios/ipa/Payload
   cp -R build/ios/iphoneos/Runner.app build/ios/ipa/Payload/
@@ -72,3 +74,4 @@ done
 
 test -s flutter/build/ios/ipa/mind-recipe-ios-unsigned.ipa
 unzip -t flutter/build/ios/ipa/mind-recipe-ios-unsigned.ipa >/dev/null
+unzip -l flutter/build/ios/ipa/mind-recipe-ios-unsigned.ipa | grep -q 'Payload/Runner.app/Frameworks/llama.framework/llama'

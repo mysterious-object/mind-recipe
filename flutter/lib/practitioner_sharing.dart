@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import 'app_services.dart';
 import 'design_tokens.dart';
 
@@ -29,7 +30,12 @@ class _PractitionerSharingState extends State<PractitionerSharing> {
     try {
       final consents = await api.fetchConsents(token);
       final audit = await api.fetchAudit(token);
-      if (mounted) setState(() { _consents = consents; _auditLog = audit; _loaded = true; });
+      if (mounted)
+        setState(() {
+          _consents = consents;
+          _auditLog = audit;
+          _loaded = true;
+        });
     } catch (_) {
       if (mounted) setState(() => _loaded = true);
     }
@@ -59,9 +65,14 @@ class _PractitionerSharingState extends State<PractitionerSharing> {
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
           FilledButton(
-            onPressed: () => Navigator.pop(ctx, {'practitioner': practitionerCtl.text.trim()}),
+            onPressed: () => Navigator.pop(ctx, {
+              'practitioner': practitionerCtl.text.trim(),
+            }),
             child: const Text('Grant access'),
           ),
         ],
@@ -83,10 +94,16 @@ class _PractitionerSharingState extends State<PractitionerSharing> {
   Widget build(BuildContext context) => ListView(
     padding: const EdgeInsets.all(20),
     children: [
-      Text('Practitioner sharing', style: MindRecipeTokens.displayMedium(context)),
+      Text(
+        'Practitioner sharing',
+        style: MindRecipeTokens.displayMedium(context),
+      ),
       const SizedBox(height: 4),
-      Text('Share selected wellness data with your practitioner. You control what is shared, for how long, and can revoke access at any time.',
-        style: MindRecipeTokens.bodyMedium(context)!.copyWith(color: MindRecipeTokens.gray600)),
+      Text(
+        'Share selected wellness data with your practitioner. You control what is shared, for how long, and can revoke access at any time.',
+        style: MindRecipeTokens.bodyMedium(context)!
+            .copyWith(color: MindRecipeTokens.gray600),
+      ),
       const SizedBox(height: 8),
       _buildWellnessCaveat(),
       const SizedBox(height: 16),
@@ -98,45 +115,81 @@ class _PractitionerSharingState extends State<PractitionerSharing> {
       const SizedBox(height: 20),
       Text('Active consents', style: MindRecipeTokens.headlineMedium(context)),
       if (!_loaded)
-        const Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator())
+        const Padding(
+          padding: EdgeInsets.all(20),
+          child: CircularProgressIndicator(),
+        )
       else if (_consents.isEmpty)
-        Card(child: Padding(padding: const EdgeInsets.all(16), child: Text('No active consent grants. Share data when you are ready.')))
-      else
-        ...(_consents.map((c) => Card(
-          child: ListTile(
-            leading: const Icon(Icons.medical_services, color: MindRecipeTokens.primary),
-            title: Text('Practitioner: ${c['recipient_practitioner_id'] ?? 'Unknown'}'),
-            subtitle: Text('Categories: ${c['categories'] ?? 'none'} · Expires: ${_formatDate(c['expires_at']?.toString())}'),
-            trailing: TextButton(
-              onPressed: () async {
-                try {
-                  await MindRecipeApiClient().revokeConsent(
-                    token: widget.appState.session?.token ?? '',
-                    grantId: c['id'].toString(),
-                  );
-                  await _load();
-                } catch (_) {
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Could not revoke access.')),
-                    );
-                  }
-                }
-              },
-              child: const Text('Revoke'),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Text(
+              'No active consent grants. Share data when you are ready.',
             ),
           ),
-        ))),
+        )
+      else
+        ...(_consents.map(
+          (c) => Card(
+            child: ListTile(
+              leading: const Icon(
+                Icons.medical_services,
+                color: MindRecipeTokens.primary,
+              ),
+              title: Text(
+                'Practitioner: ${c['recipient_practitioner_id'] ?? 'Unknown'}',
+              ),
+              subtitle: Text(
+                'Categories: ${c['categories'] ?? 'none'} · Expires: ${_formatDate(c['expires_at']?.toString())}',
+              ),
+              trailing: TextButton(
+                onPressed: () async {
+                  try {
+                    await MindRecipeApiClient().revokeConsent(
+                      token: widget.appState.session?.token ?? '',
+                      grantId: c['id'].toString(),
+                    );
+                    await _load();
+                  } catch (_) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Could not revoke access.'),
+                        ),
+                      );
+                    }
+                  }
+                },
+                child: const Text('Revoke'),
+              ),
+            ),
+          ),
+        )),
       const SizedBox(height: 20),
       Text('Audit trail', style: MindRecipeTokens.headlineMedium(context)),
       if (_auditLog.isEmpty)
-        const Card(child: Padding(padding: EdgeInsets.all(16), child: Text('No audit events yet. Every access is logged.')))
+        const Card(
+          child: Padding(
+            padding: EdgeInsets.all(16),
+            child: Text('No audit events yet. Every access is logged.'),
+          ),
+        )
       else
-        ...(_auditLog.take(5).map((a) => ListTile(
-          dense: true,
-          title: Text(a['action']?.toString() ?? '', style: const TextStyle(fontSize: 13)),
-          subtitle: Text(a['occurred_at']?.toString() ?? '', style: const TextStyle(fontSize: 11)),
-        ))),
+        ...(_auditLog
+            .take(5)
+            .map(
+              (a) => ListTile(
+                dense: true,
+                title: Text(
+                  a['action']?.toString() ?? '',
+                  style: const TextStyle(fontSize: 13),
+                ),
+                subtitle: Text(
+                  a['occurred_at']?.toString() ?? '',
+                  style: const TextStyle(fontSize: 11),
+                ),
+              ),
+            )),
       const SizedBox(height: 24),
     ],
   );
@@ -147,16 +200,30 @@ class _PractitionerSharingState extends State<PractitionerSharing> {
       color: MindRecipeTokens.primary.withAlpha(15),
       borderRadius: BorderRadius.circular(12),
     ),
-    child: Row(children: [
-      const Icon(Icons.info_outline, size: 16, color: MindRecipeTokens.primary),
-      const SizedBox(width: 8),
-      const Expanded(child: Text('Mind Recipe is a wellness tool, not medical care. Shared data does not constitute a clinical record.',
-        style: TextStyle(fontSize: 12))),
-    ]),
+    child: Row(
+      children: [
+        const Icon(
+          Icons.info_outline,
+          size: 16,
+          color: MindRecipeTokens.primary,
+        ),
+        const SizedBox(width: 8),
+        const Expanded(
+          child: Text(
+            'MindRecipe is a wellness tool, not medical care. Shared data does not constitute a clinical record.',
+            style: TextStyle(fontSize: 12),
+          ),
+        ),
+      ],
+    ),
   );
 
   String _formatDate(String? iso) {
     if (iso == null) return 'Unknown';
-    try { return DateTime.parse(iso).toLocal().toString().split('.')[0]; } catch (_) { return iso; }
+    try {
+      return DateTime.parse(iso).toLocal().toString().split('.')[0];
+    } catch (_) {
+      return iso;
+    }
   }
 }

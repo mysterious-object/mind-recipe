@@ -575,9 +575,18 @@ async def respond(
     ]
 
     try:
-        message = await _call_provider(
-            request.provider, messages, model, provider_key, on_delta=on_delta,
-        )
+        if on_delta is None:
+            message = await _call_provider(
+                request.provider, messages, model, provider_key,
+            )
+        else:
+            message = await _call_provider(
+                request.provider,
+                messages,
+                model,
+                provider_key,
+                on_delta=on_delta,
+            )
     except Exception:
         return AiResponse(
             mode="provider_error",
