@@ -117,7 +117,11 @@ void main() {
       expect(shader, contains('mod(u_variant, 15.0)'));
       expect(shader, contains('variant == 14.0'));
       expect(page, contains('mind-recipe-vfx-engine.js'));
-      expect(page, contains('mobile-scene.bundle.js'));
+      expect(
+        page,
+        isNot(contains('mobile-scene.bundle.js')),
+        reason: 'Background must use one WebGL context on mobile.',
+      );
     });
 
     test('user-visible source strings contain no retired product language', () {

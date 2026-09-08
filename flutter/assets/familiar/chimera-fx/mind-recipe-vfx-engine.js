@@ -15,6 +15,10 @@ const ChimeraVFX = (() => {
     let aiIntensity = 0, aiTarget = 0, holoPhase = 0;
     let visualVariant = 0;
 
+    function report(value) {
+        try { window.BackgroundBridge?.postMessage(value); } catch (_) {}
+    }
+
     // ── Text-to-matter system ──
     let textCanvas = null, textCtx = null, textTexture = null;
     let textContent = '', textDirty = false, textAlpha = 0, textAlphaTarget = 0;
@@ -532,7 +536,7 @@ const ChimeraVFX = (() => {
     // INIT & RENDER
     // ═══════════════════════════════════════════
     function init() {
-        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { enabled = false; return; }
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { enabled = false; report('ready'); return; }
 
         glCanvas = document.createElement('canvas');
         glCanvas.id = 'chimera-vfx-gl';
@@ -540,13 +544,13 @@ const ChimeraVFX = (() => {
         document.body.prepend(glCanvas);
 
         gl = glCanvas.getContext('webgl2', { alpha: false, antialias: false, powerPreference: 'low-power' });
-        if (!gl) { glCanvas.remove(); enabled = false; return; }
+        if (!gl) { glCanvas.remove(); enabled = false; report('engine_error'); return; }
 
         const vs = mkShader(gl.VERTEX_SHADER, VERT), fs = mkShader(gl.FRAGMENT_SHADER, FRAG);
-        if (!vs || !fs) { enabled = false; return; }
+        if (!vs || !fs) { enabled = false; report('shader_error'); return; }
         program = gl.createProgram();
         gl.attachShader(program, vs); gl.attachShader(program, fs); gl.linkProgram(program);
-        if (!gl.getProgramParameter(program, gl.LINK_STATUS)) { enabled = false; return; }
+        if (!gl.getProgramParameter(program, gl.LINK_STATUS)) { enabled = false; report('shader_error'); return; }
 
         const buf = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, buf);
@@ -580,6 +584,11 @@ const ChimeraVFX = (() => {
         initTextSystem();
         resolveColors();
         render();
+        glCanvas.addEventListener('webglcontextlost', event => {
+            event.preventDefault();
+            report('context_lost');
+        });
+        report('ready');
     }
 
     function resize() {
@@ -673,3 +682,35 @@ const ChimeraVFX = (() => {
 window.MindRecipeMatterVFX = ChimeraVFX;
 if (document.readyState==='loading') document.addEventListener('DOMContentLoaded', ChimeraVFX.init);
 else ChimeraVFX.init();
+
+const matterThemes = {
+    'mindrecipe-core': { field: 0, colors: [[0.0,.851,.753],[.545,.361,.965],[.961,.725,.259]] },
+    'cyberpunk-neon': { field: 1, colors: [[1.0,0.0,.400],[0.0,1.0,1.0],[.224,1.0,.078]] },
+    'organic-bioluminescent': { field: 2, colors: [[0.0,.898,1.0],[.463,1.0,.012],[1.0,.671,0.0]] },
+    'quantum-void': { field: 3, colors: [[.486,.302,1.0],[.267,.541,1.0],[1.0,.431,.251]] },
+    'holographic-matrix': { field: 4, colors: [[0.0,1.0,.255],[0.0,.737,.831],[1.0,.251,.506]] },
+    'midnight-trading': { field: 5, colors: [[.078,.482,1.0],[0.0,.929,.675],[.663,.549,1.0]] },
+    'neon-samurai': { field: 6, colors: [[.933,.173,.455],[.439,.220,1.0],[.310,.875,1.0]] },
+    'deep-ocean': { field: 7, colors: [[0.0,.467,1.0],[0.0,.890,.824],[.459,1.0,.851]] },
+    'solar-flare': { field: 8, colors: [[1.0,.616,0.0],[1.0,.812,.361],[1.0,.302,.137]] },
+    'void-walker': { field: 9, colors: [[.275,.188,.710],[.616,.447,1.0],[.773,.702,1.0]] },
+    'crystal-matrix': { field: 10, colors: [[.459,.969,1.0],[.914,.996,1.0],[.357,.659,.788]] },
+    'aurora-borealis': { field: 11, colors: [[.137,.929,.671],[.604,.337,1.0],[1.0,.455,.722]] },
+    'obsidian-forge': { field: 12, colors: [[.937,.404,.212],[1.0,.690,.294],[.529,.231,.184]] },
+    'orchid-vapor': { field: 13, colors: [[.859,.329,.910],[.494,.914,1.0],[.773,.627,1.0]] },
+    'tidal-glass': { field: 14, colors: [[0.0,.776,.863],[.890,1.0,1.0],[.271,.863,.706]] },
+};
+
+function applyMatterTheme(state = {}) {
+    const selected = matterThemes[state.theme] || matterThemes['mindrecipe-core'];
+    const progress = Math.max(0, Math.min(1, Number(state.progress ?? 0)));
+    const intensity = Math.max(.72, Math.min(1, Number(state.intensity ?? .82)));
+    ChimeraVFX.setPalette(selected.colors[0], selected.colors[1], selected.colors[2]);
+    ChimeraVFX.setVariant(selected.field);
+    ChimeraVFX.setIntensity(intensity);
+    ChimeraVFX.setAI((progress + intensity) / 2);
+    ChimeraVFX.setThinking(progress > .28 || intensity > .72);
+}
+
+window.setBackgroundState = applyMatterTheme;
+window.setBackgroundPaused = paused => ChimeraVFX.toggle(!paused);
