@@ -64,6 +64,11 @@ void main() {
         hasLength(visualThemes.length),
         reason: 'Every picker entry must select a distinct renderer theme.',
       );
+      expect(
+        visualThemes.map((theme) => theme.composition).toSet(),
+        hasLength(visualThemes.length),
+        reason: 'Every picker entry must select a distinct live composition.',
+      );
     });
 
     test('bundles and registers every approved source theme module', () {
@@ -91,6 +96,28 @@ void main() {
       expect(source, isNot(contains('visualThemeSpecs')));
       expect(source, isNot(contains('Object.entries(visualThemeSpecs)')));
       expect(source, isNot(contains('ChimeraFX.registerTheme(name')));
+    });
+
+    test('all themes drive distinct source VFX and matter-field variants', () {
+      final scene = File('assets/familiar/chimera-fx/mobile-scene.js')
+          .readAsStringSync();
+      final shader = File(
+        'assets/familiar/chimera-fx/mind-recipe-vfx-engine.js',
+      ).readAsStringSync();
+      final page = File('assets/familiar/background.html').readAsStringSync();
+
+      for (var index = 0; index < visualThemes.length; index++) {
+        expect(
+          scene,
+          contains('field: $index'),
+          reason: '${visualThemes[index].id} needs its own shader field.',
+        );
+      }
+      expect(scene, contains('MindRecipeMatterVFX'));
+      expect(shader, contains('mod(u_variant, 15.0)'));
+      expect(shader, contains('variant == 14.0'));
+      expect(page, contains('mind-recipe-vfx-engine.js'));
+      expect(page, contains('mobile-scene.bundle.js'));
     });
 
     test('user-visible source strings contain no retired product language', () {

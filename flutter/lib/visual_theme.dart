@@ -37,7 +37,7 @@ const visualThemes = <VisualThemeDefinition>[
     tertiary: Color(0xfff5b942),
     background: Color(0xff06151b),
     engineTheme: 'mindrecipe-core',
-    composition: 'full',
+    composition: 'mindrecipe-core',
   ),
   VisualThemeDefinition(
     id: 'neon-circuit',
@@ -48,7 +48,7 @@ const visualThemes = <VisualThemeDefinition>[
     tertiary: Color(0xff39ff14),
     background: Color(0xff160414),
     engineTheme: 'cyberpunk-neon',
-    composition: 'holographic',
+    composition: 'neon-circuit',
   ),
   VisualThemeDefinition(
     id: 'bioluminescent',
@@ -59,7 +59,7 @@ const visualThemes = <VisualThemeDefinition>[
     tertiary: Color(0xffffab00),
     background: Color(0xff061a19),
     engineTheme: 'organic-bioluminescent',
-    composition: 'cinematic',
+    composition: 'bioluminescent',
   ),
   VisualThemeDefinition(
     id: 'quantum-void',
@@ -70,7 +70,7 @@ const visualThemes = <VisualThemeDefinition>[
     tertiary: Color(0xffff6e40),
     background: Color(0xff090614),
     engineTheme: 'quantum-void',
-    composition: 'minimal',
+    composition: 'quantum-void',
   ),
   VisualThemeDefinition(
     id: 'holographic-matrix',
@@ -81,7 +81,7 @@ const visualThemes = <VisualThemeDefinition>[
     tertiary: Color(0xffff4081),
     background: Color(0xff06130d),
     engineTheme: 'holographic-matrix',
-    composition: 'trading',
+    composition: 'holographic-matrix',
   ),
   VisualThemeDefinition(
     id: 'midnight-signal',
@@ -92,7 +92,7 @@ const visualThemes = <VisualThemeDefinition>[
     tertiary: Color(0xffa98cff),
     background: Color(0xff020719),
     engineTheme: 'midnight-trading',
-    composition: 'trading',
+    composition: 'midnight-signal',
   ),
   VisualThemeDefinition(
     id: 'neon-ronin',
@@ -103,7 +103,7 @@ const visualThemes = <VisualThemeDefinition>[
     tertiary: Color(0xff4fdfff),
     background: Color(0xff160414),
     engineTheme: 'neon-samurai',
-    composition: 'holographic',
+    composition: 'neon-ronin',
   ),
   VisualThemeDefinition(
     id: 'abyssal-current',
@@ -114,7 +114,7 @@ const visualThemes = <VisualThemeDefinition>[
     tertiary: Color(0xff75ffd9),
     background: Color(0xff000f25),
     engineTheme: 'deep-ocean',
-    composition: 'cinematic',
+    composition: 'abyssal-current',
   ),
   VisualThemeDefinition(
     id: 'solar-flare',
@@ -125,7 +125,7 @@ const visualThemes = <VisualThemeDefinition>[
     tertiary: Color(0xffff4d23),
     background: Color(0xff1a0c02),
     engineTheme: 'solar-flare',
-    composition: 'cinematic',
+    composition: 'solar-flare',
   ),
   VisualThemeDefinition(
     id: 'void-walker',
@@ -136,7 +136,7 @@ const visualThemes = <VisualThemeDefinition>[
     tertiary: Color(0xffc5b3ff),
     background: Color(0xff05020f),
     engineTheme: 'void-walker',
-    composition: 'minimal',
+    composition: 'void-walker',
   ),
   VisualThemeDefinition(
     id: 'crystal-matrix',
@@ -147,7 +147,7 @@ const visualThemes = <VisualThemeDefinition>[
     tertiary: Color(0xff5ba8c9),
     background: Color(0xff07151b),
     engineTheme: 'crystal-matrix',
-    composition: 'lite',
+    composition: 'crystal-matrix',
   ),
   VisualThemeDefinition(
     id: 'aurora',
@@ -158,7 +158,7 @@ const visualThemes = <VisualThemeDefinition>[
     tertiary: Color(0xffff74b8),
     background: Color(0xff07111d),
     engineTheme: 'aurora-borealis',
-    composition: 'full',
+    composition: 'aurora',
   ),
   VisualThemeDefinition(
     id: 'obsidian-forge',
@@ -169,7 +169,7 @@ const visualThemes = <VisualThemeDefinition>[
     tertiary: Color(0xff873b2f),
     background: Color(0xff140909),
     engineTheme: 'obsidian-forge',
-    composition: 'cinematic',
+    composition: 'obsidian-forge',
   ),
   VisualThemeDefinition(
     id: 'orchid-vapor',
@@ -180,7 +180,7 @@ const visualThemes = <VisualThemeDefinition>[
     tertiary: Color(0xffc5a0ff),
     background: Color(0xff160b20),
     engineTheme: 'orchid-vapor',
-    composition: 'holographic',
+    composition: 'orchid-vapor',
   ),
   VisualThemeDefinition(
     id: 'tidal-glass',
@@ -191,7 +191,7 @@ const visualThemes = <VisualThemeDefinition>[
     tertiary: Color(0xff45dcb4),
     background: Color(0xff031d25),
     engineTheme: 'tidal-glass',
-    composition: 'trading',
+    composition: 'tidal-glass',
   ),
 ];
 

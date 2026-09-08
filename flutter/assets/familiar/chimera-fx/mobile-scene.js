@@ -14,66 +14,33 @@ const sceneKind = document.body?.dataset.sceneMode || window.MIND_RECIPE_SCENE_M
 const host = document.getElementById('stage') || document.body;
 let engine = null;
 let activeTheme = 'mindrecipe-core';
-let activePreset = 'lite';
-let requestedPreset = 'lite';
+let activePreset = 'mindrecipe-core';
 let activeSeed = 17;
 let lastState = {};
 
-// This is the source Chimera FX background catalog.  Keep the identifiers in
-// lock-step with ChimeraFX.presets: each item is a distinct component stack,
-// not a color treatment of one generic background.
-const backgroundPresetIds = new Set([
-  'full', 'lite', 'trading', 'cinematic', 'holographic', 'minimal',
-]);
-
-// Existing installations saved one of the temporary MindRecipe scene names.
-// Migrate those choices into the actual source presets without discarding a
-// person's visual preference.
-const legacyPresetMap = {
-  field: 'full', nebula: 'lite', rivers: 'trading', tendrils: 'holographic',
-  orbs: 'cinematic', lattice: 'trading', void: 'minimal', prism: 'holographic',
-  aurora: 'cinematic', ember: 'trading', ocean: 'full', twilight: 'minimal',
+// The unified catalog preserves the source component vocabulary but gives
+// every selection a distinct scene graph and a distinct matter-field shader.
+// No picker entry is merely an alias for one of a handful of presets.
+const sceneProfiles = {
+  'mindrecipe-core': { id: 'mindrecipe-core', field: 0, components: ['nebula', 'tendrils', 'rivers', 'volumetric', 'voronoi', 'hud', 'beams'] },
+  'chimera-native': { id: 'mindrecipe-core', field: 0, components: ['nebula', 'tendrils', 'rivers', 'volumetric', 'voronoi', 'hud', 'beams'] },
+  'cyberpunk-neon': { id: 'neon-circuit', field: 1, components: ['hud', 'beams', 'tendrils', 'rivers'] },
+  'organic-bioluminescent': { id: 'bioluminescent', field: 2, components: ['nebula', 'tendrils', 'volumetric', 'reaction'] },
+  'quantum-void': { id: 'quantum-void', field: 3, components: ['nebula', 'voronoi', 'beams'] },
+  'holographic-matrix': { id: 'holographic-matrix', field: 4, components: ['hud', 'beams', 'rivers', 'voronoi'] },
+  'midnight-trading': { id: 'midnight-signal', field: 5, components: ['rivers', 'hud', 'beams'] },
+  'neon-samurai': { id: 'neon-ronin', field: 6, components: ['tendrils', 'beams', 'voronoi', 'hud'] },
+  'deep-ocean': { id: 'abyssal-current', field: 7, components: ['nebula', 'volumetric', 'tendrils', 'rivers'] },
+  'solar-flare': { id: 'solar-flare', field: 8, components: ['nebula', 'volumetric', 'metal', 'reaction', 'beams'] },
+  'void-walker': { id: 'void-walker', field: 9, components: ['nebula'] },
+  'crystal-matrix': { id: 'crystal-matrix', field: 10, components: ['voronoi', 'beams', 'hud'] },
+  'aurora-borealis': { id: 'aurora', field: 11, components: ['nebula', 'tendrils', 'beams', 'volumetric'] },
+  'obsidian-forge': { id: 'obsidian-forge', field: 12, components: ['metal', 'reaction', 'voronoi', 'beams'] },
+  'orchid-vapor': { id: 'orchid-vapor', field: 13, components: ['nebula', 'tendrils', 'metal', 'hud'] },
+  'tidal-glass': { id: 'tidal-glass', field: 14, components: ['rivers', 'volumetric', 'tendrils', 'hud', 'reaction'] },
 };
 
-function backgroundPreset(value) {
-  if (backgroundPresetIds.has(value)) return value;
-  return legacyPresetMap[value] || 'full';
-}
-
-const themePresets = {
-  'mindrecipe-core': 'full',
-  'chimera-native': 'full',
-  'cyberpunk-neon': 'holographic',
-  'organic-bioluminescent': 'cinematic',
-  'quantum-void': 'minimal',
-  'holographic-matrix': 'trading',
-  'midnight-trading': 'trading',
-  'neon-samurai': 'holographic',
-  'deep-ocean': 'cinematic',
-  'solar-flare': 'cinematic',
-  'void-walker': 'minimal',
-  'crystal-matrix': 'lite',
-  'aurora-borealis': 'full',
-  'obsidian-forge': 'cinematic',
-  'orchid-vapor': 'holographic',
-  'tidal-glass': 'trading',
-};
-
-// These are the source renderer's named compositions with only the
-// ray-marched IridescentOrb removed. That shader is retained for capable
-// desktop renderers, but it prevents the entire background scene from
-// starting on several Android WebViews. Pulse supplies its own geometry-backed
-// Three.js familiar, so omitting the background orb loses no user state.
-const mobileBackgroundComponents = {
-  full: ['nebula', 'tendrils', 'rivers', 'volumetric', 'voronoi', 'hud', 'beams'],
-  lite: ['nebula', 'tendrils', 'hud'],
-  trading: ['rivers', 'tendrils', 'voronoi', 'hud', 'beams'],
-  cinematic: ['nebula', 'volumetric', 'metal', 'reaction'],
-  holographic: ['hud', 'beams', 'tendrils', 'rivers'],
-  minimal: ['nebula'],
-};
-
-const themePreset = name => themePresets[name] || 'full';
+const profileFor = name => sceneProfiles[name] || sceneProfiles['mindrecipe-core'];
 
 // The original ray-marched IridescentOrb is retained in the engine,
 // but some mobile WebViews compile it without drawing its surface. This is a
@@ -211,9 +178,9 @@ function optionsFor(kind) {
       container: host,
       fps: 30,
       theme: activeTheme,
-      // Preserve each source composition while avoiding the one ray-marched
-      // component that is not reliable in Android's embedded renderer.
-      components: mobileBackgroundComponents[activePreset] || mobileBackgroundComponents.lite,
+      // The full-screen matter field is provided by the source shader layer;
+      // this Three.js graph supplies its matching geometry and post effects.
+      components: profileFor(activeTheme).components,
     };
   }
   return {
@@ -275,18 +242,32 @@ function rebuildEngine() {
   createEngine();
 }
 
+function syncMatterField(themeName, progress, activation) {
+  if (sceneKind !== 'background') return;
+  const matter = window.MindRecipeMatterVFX;
+  const theme = ChimeraFX.themes[themeName];
+  if (!matter || !theme) return;
+  const profile = profileFor(themeName);
+  matter.setPalette(
+    theme.colors.primary.toArray(),
+    theme.colors.secondary.toArray(),
+    theme.colors.tertiary.toArray(),
+  );
+  matter.setVariant(profile.field);
+  matter.setIntensity(Math.max(.72, Math.min(1, Number(activation) || .78)));
+  matter.setAI(Math.max(0, Math.min(1, (Number(progress) + Number(activation)) / 2)));
+  matter.setThinking(Number(progress) > .28 || Number(activation) > .72);
+}
+
 function apply(state = {}) {
   lastState = { ...lastState, ...state };
   if (!engine) return;
   const nextTheme = ChimeraFX.themes[lastState.theme] ? lastState.theme : 'mindrecipe-core';
-  const nextRequestedPreset = lastState.variant
-    ? backgroundPreset(lastState.variant)
-    : themePreset(nextTheme);
+  const nextRequestedPreset = profileFor(nextTheme).id;
   const nextSeed = normalizeSeed(lastState.seed);
   const themeChanged = nextTheme !== activeTheme;
   const presetChanged = sceneKind === 'background' && nextRequestedPreset !== activePreset;
   const seedChanged = sceneKind === 'pulse' && nextSeed !== activeSeed;
-  requestedPreset = nextRequestedPreset;
   activeTheme = nextTheme;
   activePreset = nextRequestedPreset;
   activeSeed = nextSeed;
@@ -300,6 +281,7 @@ function apply(state = {}) {
   const complexity = Math.max(0, Math.min(1, Number(lastState.complexity ?? growth)));
   const activation = Math.max(0, Math.min(1, Number(lastState.activation ?? lastState.intensity ?? .35)));
   const valence = Math.max(-1, Math.min(1, Number(lastState.valence ?? 0)));
+  syncMatterField(activeTheme, growth, activation);
 
   // Pulse state is deliberately expressive but never evaluative: changes in
   // current energy alter movement, while repeated progress unlocks anatomy.
@@ -323,10 +305,7 @@ function apply(state = {}) {
 function start() {
   try {
     activeTheme = ChimeraFX.themes[lastState.theme] ? lastState.theme : 'mindrecipe-core';
-    activePreset = lastState.variant
-      ? backgroundPreset(lastState.variant)
-      : themePreset(activeTheme);
-    requestedPreset = activePreset;
+    activePreset = profileFor(activeTheme).id;
     activeSeed = normalizeSeed(lastState.seed);
     createEngine();
     apply(lastState);
@@ -345,7 +324,10 @@ window.setIntroVariant = variant => apply({
   activation: .45,
   theme: 'mindrecipe-core',
 });
-window.setBackgroundPaused = paused => paused ? engine?._pause() : engine?._resume();
+window.setBackgroundPaused = paused => {
+  paused ? engine?._pause() : engine?._resume();
+  window.MindRecipeMatterVFX?.toggle(!paused);
+};
 window.setFamiliarPaused = paused => paused ? engine?._pause() : engine?._resume();
 
 start();
