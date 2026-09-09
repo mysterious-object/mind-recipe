@@ -605,8 +605,12 @@ const ChimeraVFX = (() => {
         // Foldables and tall phones can exceed the GPU's largest drawable
         // dimension at a nominal 2x DPR. Keep the local WebGL canvas below
         // the hardware limit instead of allocating an incomplete framebuffer.
-        const maxDimension = gl ? (gl.getParameter(gl.MAX_RENDERBUFFER_SIZE) || 3072) : 3072;
-        const dpr = Math.max(.5, Math.min(
+        // Some Android WebViews report a larger limit than the compositor can
+        // actually attach. 2048 is the reliable maximum on the Samsung test
+        // path and still leaves a high-density render on ordinary phones.
+        const reportedLimit = gl ? (gl.getParameter(gl.MAX_RENDERBUFFER_SIZE) || 2048) : 2048;
+        const maxDimension = Math.min(reportedLimit, 2048);
+        const dpr = Math.max(.25, Math.min(
             window.devicePixelRatio || 1,
             1.25,
             maxDimension / Math.max(w, h, 1)

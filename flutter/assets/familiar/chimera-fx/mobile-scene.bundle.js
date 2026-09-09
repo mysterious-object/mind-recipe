@@ -11511,8 +11511,9 @@
       else this.container.appendChild(canvas);
     }
     _safePixelRatio(width, height) {
-      const maxDimension = Math.min(this.renderer.capabilities.maxTextureSize || 3072, 3072);
-      return Math.max(0.5, Math.min(window.devicePixelRatio || 1, 1, maxDimension / Math.max(width, height, 1)));
+      const reportedLimit = this.renderer.capabilities.maxTextureSize || 2048;
+      const maxDimension = Math.min(reportedLimit, 2048);
+      return Math.max(0.25, Math.min(window.devicePixelRatio || 1, 1, maxDimension / Math.max(width, height, 1)));
     }
     _initScene() {
       this.scene = new Vr();
