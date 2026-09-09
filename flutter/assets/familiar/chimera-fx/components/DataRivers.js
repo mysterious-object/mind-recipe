@@ -180,6 +180,24 @@ export class DataRivers {
     });
   }
 
+  onThemeChange(theme, engine) {
+    if (!theme?.riverColors) return;
+    const colors = theme.riverColors;
+    this.rivers.forEach(({ mat, geo }, idx) => {
+      const col = colors[idx % colors.length];
+      // Rebuild the aColor buffer from the new theme's palette
+      const attr = geo.getAttribute('aColor');
+      if (!attr) return;
+      const count = attr.count;
+      for (let i = 0; i < count; i++) {
+        attr.setXYZ(i, col[0] + (Math.random() - 0.5) * 0.1,
+                         col[1] + (Math.random() - 0.5) * 0.1,
+                         col[2] + (Math.random() - 0.5) * 0.1);
+      }
+      attr.needsUpdate = true;
+    });
+  }
+
   dispose(engine) {
     this.rivers.forEach(({ points, mat, geo }) => {
       engine.scene.remove(points);

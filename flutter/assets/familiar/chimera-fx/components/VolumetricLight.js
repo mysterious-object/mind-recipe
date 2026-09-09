@@ -73,7 +73,7 @@ const VOLUME_FRAG = /* glsl */ `
     // Subtle pulsing
     float pulse = 0.9 + 0.1 * sin(uTime * 0.5);
 
-    gl_FragColor = vec4(accumColor * radialFade * pulse * 0.12, 0.18);
+    gl_FragColor = vec4(accumColor * radialFade * pulse * 0.12, 1.0);
   }
 `;
 

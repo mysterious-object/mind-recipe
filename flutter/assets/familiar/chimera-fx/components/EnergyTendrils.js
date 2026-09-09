@@ -174,6 +174,20 @@ export class EnergyTendrils {
     // Could spawn additional temporary tendrils for trade pulses
   }
 
+  onThemeChange(theme, engine) {
+    if (!theme?.tendrilColors) return;
+    const palette = theme.tendrilColors;
+    this.meshes.forEach(({ mat }, idx) => {
+      const color = palette[idx % palette.length];
+      // Handle both THREE.Color objects and [r,g,b] arrays
+      if (color instanceof THREE.Color) {
+        mat.uniforms.uColor.value.copy(color);
+      } else if (Array.isArray(color) && color.length === 3) {
+        mat.uniforms.uColor.value.setRGB(color[0], color[1], color[2]);
+      }
+    });
+  }
+
   dispose(engine) {
     this.meshes.forEach(({ line, mat, geo }) => {
       engine.scene.remove(line);

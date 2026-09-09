@@ -218,7 +218,17 @@ export class ParticleNebula {
   }
 
   onThemeChange(theme, engine) {
-    // Would rebuild color buffer here
+    if (!this.mesh || !theme?.particleColors) return;
+    // Rebuild the aColor buffer from the new theme's palette
+    const colors = this.mesh.geometry.getAttribute('aColor');
+    if (!colors) return;
+    const palette = theme.particleColors;
+    const count = colors.count;
+    for (let i = 0; i < count; i++) {
+      const col = palette[Math.floor(Math.random() * palette.length)];
+      colors.setXYZ(i, col[0], col[1], col[2]);
+    }
+    colors.needsUpdate = true;
   }
 
   dispose(engine) {

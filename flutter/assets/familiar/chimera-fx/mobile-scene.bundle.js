@@ -1,6 +1,6 @@
 "use strict";
 (() => {
-  // assets/familiar/three.core.min.js
+  // flutter/assets/familiar/three.core.min.js
   var t = "185";
   var i = 0;
   var r = 1;
@@ -6801,7 +6801,7 @@
   }
   "undefined" != typeof __THREE_DEVTOOLS__ && __THREE_DEVTOOLS__.dispatchEvent(new CustomEvent("register", { detail: { revision: t } })), "undefined" != typeof window && (window.__THREE__ ? ai("WARNING: Multiple instances of Three.js being imported.") : window.__THREE__ = t);
 
-  // assets/familiar/three.module.min.js
+  // flutter/assets/familiar/three.module.min.js
   function On2() {
     let e2 = null, t2 = false, n2 = null, i2 = null;
     function r2(t3, a2) {
@@ -10479,7 +10479,7 @@
     }
   };
 
-  // assets/familiar/three-addons/shaders/CopyShader.js
+  // flutter/assets/familiar/three-addons/shaders/CopyShader.js
   var CopyShader = {
     name: "CopyShader",
     uniforms: {
@@ -10519,7 +10519,7 @@
     )
   };
 
-  // assets/familiar/three-addons/postprocessing/Pass.js
+  // flutter/assets/familiar/three-addons/postprocessing/Pass.js
   var Pass = class {
     /**
      * Constructs a new pass.
@@ -10610,7 +10610,7 @@
     }
   };
 
-  // assets/familiar/three-addons/postprocessing/ShaderPass.js
+  // flutter/assets/familiar/three-addons/postprocessing/ShaderPass.js
   var ShaderPass = class extends Pass {
     /**
      * Constructs a new shader pass.
@@ -10675,7 +10675,7 @@
     }
   };
 
-  // assets/familiar/three-addons/postprocessing/MaskPass.js
+  // flutter/assets/familiar/three-addons/postprocessing/MaskPass.js
   var MaskPass = class extends Pass {
     /**
      * Constructs a new mask pass.
@@ -10763,7 +10763,7 @@
     }
   };
 
-  // assets/familiar/three-addons/postprocessing/EffectComposer.js
+  // flutter/assets/familiar/three-addons/postprocessing/EffectComposer.js
   var EffectComposer = class {
     /**
      * Constructs a new effect composer.
@@ -10948,7 +10948,7 @@
     }
   };
 
-  // assets/familiar/three-addons/postprocessing/RenderPass.js
+  // flutter/assets/familiar/three-addons/postprocessing/RenderPass.js
   var RenderPass = class extends Pass {
     /**
      * Constructs a new render pass.
@@ -11021,7 +11021,7 @@
     }
   };
 
-  // assets/familiar/three-addons/shaders/LuminosityHighPassShader.js
+  // flutter/assets/familiar/three-addons/shaders/LuminosityHighPassShader.js
   var LuminosityHighPassShader = {
     name: "LuminosityHighPassShader",
     uniforms: {
@@ -11073,7 +11073,7 @@
     )
   };
 
-  // assets/familiar/three-addons/postprocessing/UnrealBloomPass.js
+  // flutter/assets/familiar/three-addons/postprocessing/UnrealBloomPass.js
   var UnrealBloomPass = class _UnrealBloomPass extends Pass {
     /**
      * Constructs a new Unreal Bloom pass.
@@ -11403,7 +11403,7 @@
   UnrealBloomPass.BlurDirectionX = new _i(1, 0);
   UnrealBloomPass.BlurDirectionY = new _i(0, 1);
 
-  // assets/familiar/chimera-fx/core/StateMachine.js
+  // flutter/assets/familiar/chimera-fx/core/StateMachine.js
   var StateMachine = class {
     constructor(opts = {}) {
       this.states = opts.states || {};
@@ -11448,31 +11448,169 @@
     }
   };
 
-  // assets/familiar/chimera-fx/postfx/ChromaticAberrationShader.js
+  // flutter/assets/familiar/chimera-fx/postfx/ChromaticAberrationShader.js
   var ChromaticAberrationShader = {
     name: "ChromaticAberration",
-    uniforms: { tDiffuse: { value: null }, uIntensity: { value: 3e-3 }, uDirection: { value: [1, 0] } },
-    vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-    fragmentShader: `uniform sampler2D tDiffuse; uniform float uIntensity; uniform vec2 uDirection; varying vec2 vUv; void main() { vec2 offset = uIntensity * normalize(vUv - 0.5); float r = texture2D(tDiffuse, vUv + offset).r; float g = texture2D(tDiffuse, vUv).g; float b = texture2D(tDiffuse, vUv - offset).b; float a = texture2D(tDiffuse, vUv).a; gl_FragColor = vec4(r, g, b, a); }`
+    uniforms: {
+      tDiffuse: { value: null },
+      uIntensity: { value: 3e-3 },
+      uDirection: { value: [1, 0] }
+    },
+    vertexShader: (
+      /* glsl */
+      `
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `
+    ),
+    fragmentShader: (
+      /* glsl */
+      `
+    uniform sampler2D tDiffuse;
+    uniform float uIntensity;
+    uniform vec2 uDirection;
+    varying vec2 vUv;
+
+    void main() {
+      vec2 offset = uIntensity * normalize(vUv - 0.5);
+      float r = texture2D(tDiffuse, vUv + offset).r;
+      float g = texture2D(tDiffuse, vUv).g;
+      float b = texture2D(tDiffuse, vUv - offset).b;
+      float a = texture2D(tDiffuse, vUv).a;
+      gl_FragColor = vec4(r, g, b, a);
+    }
+  `
+    )
   };
 
-  // assets/familiar/chimera-fx/postfx/FilmGrainShader.js
+  // flutter/assets/familiar/chimera-fx/postfx/FilmGrainShader.js
   var FilmGrainShader = {
     name: "FilmGrain",
-    uniforms: { tDiffuse: { value: null }, uTime: { value: 0 }, uIntensity: { value: 0.08 }, uSize: { value: 1.5 } },
-    vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-    fragmentShader: `uniform sampler2D tDiffuse; uniform float uTime; uniform float uIntensity; uniform float uSize; varying vec2 vUv; float hash(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); } void main() { vec4 color = texture2D(tDiffuse, vUv); vec2 grainUv = vUv * uSize + uTime * vec2(12.9898, 78.233); float grain = hash(grainUv) * 2.0 - 1.0; float lum = dot(color.rgb, vec3(0.299, 0.587, 0.114)); color.rgb += grain * uIntensity * mix(1.0, 0.3, lum); gl_FragColor = color; }`
+    uniforms: {
+      tDiffuse: { value: null },
+      uTime: { value: 0 },
+      uIntensity: { value: 0.08 },
+      uSize: { value: 1.5 }
+    },
+    vertexShader: (
+      /* glsl */
+      `
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `
+    ),
+    fragmentShader: (
+      /* glsl */
+      `
+    uniform sampler2D tDiffuse;
+    uniform float uTime;
+    uniform float uIntensity;
+    uniform float uSize;
+    varying vec2 vUv;
+
+    // Fast pseudo-random
+    float hash(vec2 p) {
+      vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+      p3 += dot(p3, p3.yzx + 33.33);
+      return fract((p3.x + p3.y) * p3.z);
+    }
+
+    void main() {
+      vec4 color = texture2D(tDiffuse, vUv);
+
+      // Animated grain
+      vec2 grainUv = vUv * uSize + uTime * vec2(12.9898, 78.233);
+      float grain = hash(grainUv) * 2.0 - 1.0;
+
+      // Luminance-weighted: more grain in shadows, less in highlights
+      float lum = dot(color.rgb, vec3(0.299, 0.587, 0.114));
+      float grainWeight = mix(1.0, 0.3, lum);
+
+      color.rgb += grain * uIntensity * grainWeight;
+      gl_FragColor = color;
+    }
+  `
+    )
   };
 
-  // assets/familiar/chimera-fx/postfx/GlitchShader.js
+  // flutter/assets/familiar/chimera-fx/postfx/GlitchShader.js
   var GlitchShader = {
     name: "Glitch",
-    uniforms: { tDiffuse: { value: null }, uTime: { value: 0 }, uIntensity: { value: 0 }, uResolution: { value: [1920, 1080] } },
-    vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-    fragmentShader: `uniform sampler2D tDiffuse; uniform float uTime; uniform float uIntensity; uniform vec2 uResolution; varying vec2 vUv; float hash(float n) { return fract(sin(n) * 43758.5453); } float blockNoise(vec2 uv, float blockSize) { vec2 block = floor(uv * blockSize); return hash(block.x + block.y * 337.0 + floor(uTime * 8.0) * 1777.0); } void main() { vec2 uv = vUv; float scanLine = step(0.98, hash(floor(uv.y * 200.0) + uTime * 17.0)); uv.x += scanLine * (hash(uTime * 3.0 + uv.y) - 0.5) * 0.08 * uIntensity; float blockVal = blockNoise(uv, 8.0); uv.x += step(0.92, blockVal) * uIntensity * (hash(blockVal * 100.0 + uTime) - 0.5) * 0.1; float shift = uIntensity * 0.01; vec4 cr = texture2D(tDiffuse, uv + vec2(shift, 0.0)); vec4 cg = texture2D(tDiffuse, uv); vec4 cb = texture2D(tDiffuse, uv - vec2(shift, 0.0)); vec4 color = vec4(cr.r, cg.g, cb.b, cg.a); float noise = hash(uv.x * 10000.0 + uv.y * 10000.0 + uTime * 100.0); color.rgb = mix(color.rgb, vec3(noise), step(0.97, blockNoise(uv, 4.0)) * uIntensity * 0.5); color.rgb *= 1.0 - step(0.95, hash(floor(uTime * 20.0))) * uIntensity * 0.3; gl_FragColor = color; }`
+    uniforms: {
+      tDiffuse: { value: null },
+      uTime: { value: 0 },
+      uIntensity: { value: 0 },
+      uResolution: { value: [1920, 1080] }
+    },
+    vertexShader: (
+      /* glsl */
+      `
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `
+    ),
+    fragmentShader: (
+      /* glsl */
+      `
+    uniform sampler2D tDiffuse;
+    uniform float uTime;
+    uniform float uIntensity;
+    uniform vec2 uResolution;
+    varying vec2 vUv;
+
+    float hash(float n) { return fract(sin(n) * 43758.5453); }
+
+    float blockNoise(vec2 uv, float blockSize) {
+      vec2 block = floor(uv * blockSize);
+      return hash(block.x + block.y * 337.0 + floor(uTime * 8.0) * 1777.0);
+    }
+
+    void main() {
+      vec2 uv = vUv;
+      float intensity = uIntensity;
+
+      // \u2500\u2500 Scan-line displacement \u2500\u2500
+      float scanLine = step(0.98, hash(floor(uv.y * 200.0) + uTime * 17.0));
+      uv.x += scanLine * (hash(uTime * 3.0 + uv.y) - 0.5) * 0.08 * intensity;
+
+      // \u2500\u2500 Block displacement \u2500\u2500
+      float blockVal = blockNoise(uv, 8.0);
+      float blockActive = step(0.92, blockVal) * intensity;
+      uv.x += blockActive * (hash(blockVal * 100.0 + uTime) - 0.5) * 0.1;
+
+      // \u2500\u2500 RGB channel separation \u2500\u2500
+      float shift = intensity * 0.01;
+      vec4 cr = texture2D(tDiffuse, uv + vec2(shift, 0.0));
+      vec4 cg = texture2D(tDiffuse, uv);
+      vec4 cb = texture2D(tDiffuse, uv - vec2(shift, 0.0));
+
+      vec4 color = vec4(cr.r, cg.g, cb.b, cg.a);
+
+      // \u2500\u2500 Noise injection \u2500\u2500
+      float noise = hash(uv.x * 10000.0 + uv.y * 10000.0 + uTime * 100.0);
+      float noiseActive = step(0.97, blockNoise(uv, 4.0)) * intensity;
+      color.rgb = mix(color.rgb, vec3(noise), noiseActive * 0.5);
+
+      // \u2500\u2500 Temporal flicker \u2500\u2500
+      float flicker = 1.0 - step(0.95, hash(floor(uTime * 20.0))) * intensity * 0.3;
+      color.rgb *= flicker;
+
+      gl_FragColor = color;
+    }
+  `
+    )
   };
 
-  // assets/familiar/chimera-fx/core/Engine.js
+  // flutter/assets/familiar/chimera-fx/core/Engine.js
   var Engine = class {
     constructor(opts = {}) {
       this.container = typeof opts.container === "string" ? document.querySelector(opts.container) : opts.container || document.body;
@@ -11496,9 +11634,16 @@
       this._initEvents();
       if (opts.theme) this.setTheme(opts.theme);
     }
+    // ─── Renderer ───────────────────────────────────────────────────────────
     _initRenderer() {
-      this.renderer = new Pa2({ antialias: false, alpha: true, powerPreference: "high-performance", stencil: false, depth: true });
-      this.renderer.setPixelRatio(this._safePixelRatio(this.container.clientWidth, this.container.clientHeight));
+      this.renderer = new Pa2({
+        antialias: false,
+        alpha: true,
+        powerPreference: "high-performance",
+        stencil: false,
+        depth: true
+      });
+      this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
       this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
       this.renderer.setClearColor(0, 0);
       this.renderer.toneMapping = st;
@@ -11506,61 +11651,121 @@
       this.renderer.outputColorSpace = es;
       const canvas = this.renderer.domElement;
       canvas.id = "chimera-fx-canvas";
-      canvas.style.cssText = "position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:1;pointer-events:none;opacity:0.25;mix-blend-mode:screen;";
-      if (this.container.firstChild) this.container.insertBefore(canvas, this.container.firstChild);
-      else this.container.appendChild(canvas);
+      canvas.style.cssText = "position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:2;pointer-events:none;opacity:0.85;mix-blend-mode:screen;";
+      if (this.container.firstChild) {
+        this.container.insertBefore(canvas, this.container.firstChild);
+      } else {
+        this.container.appendChild(canvas);
+      }
     }
-    _safePixelRatio(width, height) {
-      const reportedLimit = this.renderer.capabilities.maxTextureSize || 1024;
-      const maxDimension = Math.min(reportedLimit, 1024);
-      return Math.max(0.25, Math.min(window.devicePixelRatio || 1, 1, maxDimension / Math.max(width, height, 1)));
-    }
+    // ─── Scene ──────────────────────────────────────────────────────────────
     _initScene() {
       this.scene = new Vr();
       this.scene.fog = new Er(0, 15e-4);
     }
+    // ─── Camera ─────────────────────────────────────────────────────────────
     _initCamera() {
       const aspect = this.container.clientWidth / this.container.clientHeight;
       this.camera = new eu(60, aspect, 0.1, 1e3);
       this.camera.position.set(0, 0, 30);
       this.camera.lookAt(0, 0, 0);
     }
+    // ─── Post-Processing Pipeline ───────────────────────────────────────────
     _initPostProcessing(opts) {
-      const w2 = this.container.clientWidth, h2 = this.container.clientHeight;
+      const w2 = this.container.clientWidth;
+      const h2 = this.container.clientHeight;
       this.composer = new EffectComposer(this.renderer);
       this.composer.setSize(w2, h2);
       this.renderPass = new RenderPass(this.scene, this.camera);
       this.composer.addPass(this.renderPass);
-      this.bloomPass = new UnrealBloomPass(new _i(w2, h2), opts.bloomStrength ?? 0.4, opts.bloomRadius ?? 0.6, opts.bloomThreshold ?? 0.3);
+      this.bloomPass = new UnrealBloomPass(
+        new _i(w2, h2),
+        opts.bloomStrength ?? 0.4,
+        // strength
+        opts.bloomRadius ?? 0.6,
+        // radius
+        opts.bloomThreshold ?? 0.3
+        // threshold
+      );
       this.composer.addPass(this.bloomPass);
       this.chromaPass = new ShaderPass(ChromaticAberrationShader);
       this.chromaPass.uniforms.uIntensity.value = 0;
       this.composer.addPass(this.chromaPass);
       this.grainPass = new ShaderPass(FilmGrainShader);
-      this.grainPass.uniforms.uIntensity.value = 0.08;
+      this.grainPass.uniforms.uIntensity.value = 0.01;
       this.composer.addPass(this.grainPass);
       this.glitchPass = new ShaderPass(GlitchShader);
       this.glitchPass.uniforms.uIntensity.value = 0;
       this.glitchPass.enabled = false;
       this.composer.addPass(this.glitchPass);
     }
+    // ─── AI State Machine ──────────────────────────────────────────────────
     _initStateMachine() {
-      this.stateMachine = new StateMachine({ initial: "idle", states: {
-        idle: { bloomStrength: 0.4, chromaIntensity: 0, grainIntensity: 0.04, glitchIntensity: 0, componentIntensity: 0.15, transitionSpeed: 0.03 },
-        thinking: { bloomStrength: 0.7, chromaIntensity: 1e-3, grainIntensity: 0.03, glitchIntensity: 0, componentIntensity: 0.35, transitionSpeed: 0.05 },
-        streaming: { bloomStrength: 0.6, chromaIntensity: 1e-3, grainIntensity: 0.03, glitchIntensity: 0, componentIntensity: 0.3, transitionSpeed: 0.04 },
-        executing: { bloomStrength: 0.9, chromaIntensity: 2e-3, grainIntensity: 0.02, glitchIntensity: 0, componentIntensity: 0.5, transitionSpeed: 0.08 },
-        error: { bloomStrength: 0.6, chromaIntensity: 4e-3, grainIntensity: 0.08, glitchIntensity: 0.5, componentIntensity: 0.25, transitionSpeed: 0.1 },
-        success: { bloomStrength: 1.2, chromaIntensity: 2e-3, grainIntensity: 0.02, glitchIntensity: 0, componentIntensity: 0.6, transitionSpeed: 0.08 }
-      }, onTransition: (_from, _to, values) => {
-        this._targetState = values;
-      } });
+      this.stateMachine = new StateMachine({
+        initial: "idle",
+        states: {
+          idle: {
+            bloomStrength: 0.4,
+            chromaIntensity: 0,
+            grainIntensity: 0.01,
+            glitchIntensity: 0,
+            componentIntensity: 0.15,
+            transitionSpeed: 0.03
+          },
+          thinking: {
+            bloomStrength: 0.7,
+            chromaIntensity: 1e-3,
+            grainIntensity: 8e-3,
+            glitchIntensity: 0,
+            componentIntensity: 0.35,
+            transitionSpeed: 0.05
+          },
+          streaming: {
+            bloomStrength: 0.6,
+            chromaIntensity: 1e-3,
+            grainIntensity: 8e-3,
+            glitchIntensity: 0,
+            componentIntensity: 0.3,
+            transitionSpeed: 0.04
+          },
+          executing: {
+            bloomStrength: 0.9,
+            chromaIntensity: 2e-3,
+            grainIntensity: 5e-3,
+            glitchIntensity: 0,
+            componentIntensity: 0.5,
+            transitionSpeed: 0.08
+          },
+          error: {
+            bloomStrength: 0.6,
+            chromaIntensity: 4e-3,
+            grainIntensity: 0.02,
+            glitchIntensity: 0.5,
+            componentIntensity: 0.25,
+            transitionSpeed: 0.1
+          },
+          success: {
+            bloomStrength: 1.2,
+            chromaIntensity: 2e-3,
+            grainIntensity: 5e-3,
+            glitchIntensity: 0,
+            componentIntensity: 0.6,
+            transitionSpeed: 0.08
+          }
+        },
+        onTransition: (from, to2, values) => this._applyStateValues(values)
+      });
     }
+    _applyStateValues(values) {
+      this._targetState = values;
+    }
+    // ─── Events ─────────────────────────────────────────────────────────────
     _initEvents() {
       this._onResize = this._resize.bind(this);
       this._onMouseMove = (e2) => {
         this.mouse.set(e2.clientX, e2.clientY);
-        const w2 = this.container.clientWidth, h2 = this.container.clientHeight;
+        const w2 = this.container.clientWidth;
+        const h2 = this.container.clientHeight;
         this.mouseNDC.set(e2.clientX / w2 * 2 - 1, -(e2.clientY / h2) * 2 + 1);
       };
       this._onVisChange = () => {
@@ -11572,49 +11777,118 @@
       document.addEventListener("visibilitychange", this._onVisChange);
       window.matchMedia("(prefers-reduced-motion: reduce)").addEventListener("change", (e2) => {
         this.reducedMotion = e2.matches;
-        if (e2.matches) {
-          this._pause();
-          this.renderOnce();
-        } else {
-          this._resume();
-        }
       });
     }
     _resize() {
-      const w2 = this.container.clientWidth, h2 = this.container.clientHeight;
+      const w2 = this.container.clientWidth;
+      const h2 = this.container.clientHeight;
       this.camera.aspect = w2 / h2;
       this.camera.updateProjectionMatrix();
-      this.renderer.setPixelRatio(this._safePixelRatio(w2, h2));
       this.renderer.setSize(w2, h2);
       this.composer.setSize(w2, h2);
       this.components.forEach((c2) => c2.onResize?.(w2, h2, this));
     }
+    // ─── Component API ──────────────────────────────────────────────────────
     addComponent(component) {
       component.init?.(this);
       this.components.push(component);
       return this;
     }
     removeComponent(component) {
-      const i2 = this.components.indexOf(component);
-      if (i2 >= 0) {
+      const idx = this.components.indexOf(component);
+      if (idx >= 0) {
         component.dispose?.(this);
-        this.components.splice(i2, 1);
+        this.components.splice(idx, 1);
       }
       return this;
     }
-    setTheme(theme) {
-      this.theme = theme;
-      if (theme) {
-        theme.apply?.(this);
-        this.components.forEach((c2) => c2.onThemeChange?.(theme, this));
+    /**
+     * Enable a component by registry name (e.g. 'nebula', 'tendrils', 'rivers').
+     * Uses window.ChimeraFX.components registry if available.
+     */
+    _resolveComponentCtor(name) {
+      const reg = window.ChimeraFX?.components;
+      if (!reg || !name) return null;
+      return reg[name] || reg[String(name).toLowerCase()] || null;
+    }
+    _hasComponentCtor(Ctor) {
+      if (!Ctor) return false;
+      return this.components.some((c2) => c2 instanceof Ctor || c2.constructor === Ctor || c2.constructor?.name === Ctor.name);
+    }
+    enableComponent(name) {
+      const Ctor = this._resolveComponentCtor(name);
+      if (!Ctor) {
+        console.warn("ChimeraFX: Unknown component:", name);
+        return this;
+      }
+      if (this._hasComponentCtor(Ctor)) return this;
+      const instance = new Ctor();
+      return this.addComponent(instance);
+    }
+    /**
+     * Disable and remove a component by registry name.
+     */
+    disableComponent(name) {
+      const Ctor = this._resolveComponentCtor(name);
+      const comp = Ctor ? this.components.find((c2) => c2 instanceof Ctor || c2.constructor === Ctor || c2.constructor?.name === Ctor.name) : this.components.find((c2) => c2.constructor?.name === name);
+      if (comp) this.removeComponent(comp);
+      return this;
+    }
+    /**
+     * Check if a component is currently enabled.
+     */
+    isComponentEnabled(name) {
+      const Ctor = this._resolveComponentCtor(name);
+      return Ctor ? this._hasComponentCtor(Ctor) : this.components.some((c2) => c2.constructor?.name === name);
+    }
+    /**
+     * Replace active components with a curated registry-name preset.
+     */
+    setComponentPreset(names = []) {
+      const requiredCtors = [];
+      for (const name of names) {
+        const Ctor = this._resolveComponentCtor(name);
+        if (Ctor && !requiredCtors.includes(Ctor)) requiredCtors.push(Ctor);
+      }
+      if (!requiredCtors.length) return this;
+      for (const comp of [...this.components]) {
+        if (!requiredCtors.some((Ctor) => comp instanceof Ctor || comp.constructor === Ctor || comp.constructor?.name === Ctor.name)) {
+          this.removeComponent(comp);
+        }
+      }
+      for (const Ctor of requiredCtors) {
+        if (!this._hasComponentCtor(Ctor)) {
+          this.addComponent(new Ctor());
+        }
       }
       return this;
     }
+    /**
+     * Get the current enabled component names.
+     */
+    getEnabledComponents() {
+      return this.components.map((c2) => c2.constructor?.name).filter(Boolean);
+    }
+    // ─── Theme API ──────────────────────────────────────────────────────────
+    setTheme(themeOrName) {
+      if (typeof themeOrName === "string") {
+        this.theme = window.ChimeraFX?._themes?.[themeOrName] || null;
+      } else {
+        this.theme = themeOrName;
+      }
+      if (this.theme) {
+        this.theme.apply?.(this);
+        this.components.forEach((c2) => c2.onThemeChange?.(this.theme, this));
+      }
+      return this;
+    }
+    // ─── State API (for AI hooks) ───────────────────────────────────────────
     setState(state) {
       this.stateMachine.transitionTo(state);
       this.components.forEach((c2) => c2.onStateChange?.(state, this));
       return this;
     }
+    /** One-shot burst effect (trade execution, notification, etc.) */
     pulse(type = "default", data = {}) {
       this.components.forEach((c2) => c2.onPulse?.(type, data, this));
       if (type === "trade" || type === "success") {
@@ -11630,30 +11904,64 @@
       }
       return this;
     }
-    renderOnce() {
-      if (this.disposed) return this;
-      const elapsed = this.clock.getElapsedTime();
-      const target = this._targetState || this.stateMachine.currentValues;
-      if (target) {
-        this.bloomPass.strength = target.bloomStrength;
-        this.chromaPass.uniforms.uIntensity.value = target.chromaIntensity;
-        this.grainPass.uniforms.uTime.value = elapsed;
-        this.grainPass.uniforms.uIntensity.value = target.grainIntensity;
-        if (this.glitchPass.enabled) {
-          this.glitchPass.uniforms.uTime.value = elapsed;
-          this.glitchPass.uniforms.uIntensity.value = target.glitchIntensity;
-        }
-      }
-      const ctx = { dt: 0, elapsed, mouse: this.mouse, mouseNDC: this.mouseNDC, state: this.stateMachine.current, intensity: target?.componentIntensity ?? 0.3, theme: this.theme };
-      this.components.forEach((c2) => c2.update?.(ctx, this));
-      this.composer.render(0);
+    /**
+     * User-facing intensity control (0–1).
+     * Scales all post-processing targets and component intensity.
+     * Unlike AI state transitions which are temporary, this persists
+     * until the user moves the slider again.
+     */
+    setUserIntensity(factor) {
+      this._userIntensity = Math.min(1, Math.max(0, factor));
+      this._syncPostProcessingToIntensity();
       return this;
     }
+    getUserIntensity() {
+      return this._userIntensity ?? 1;
+    }
+    /**
+     * Set post-processing multiplier on top of state-machine targets.
+     * factor = 0 → minimal effects, factor = 1 → full state intensity.
+     */
+    _getEffectiveTarget() {
+      const base = this._targetState || this.stateMachine.currentValues;
+      const u2 = this.getUserIntensity();
+      if (u2 >= 1) return base;
+      const result = { ...base };
+      const scaleKeys = [
+        "bloomStrength",
+        "chromaIntensity",
+        "grainIntensity",
+        "glitchIntensity",
+        "componentIntensity"
+      ];
+      for (const k2 of scaleKeys) {
+        if (typeof result[k2] === "number") {
+          result[k2] = result[k2] * u2;
+        }
+      }
+      return result;
+    }
+    _syncPostProcessingToIntensity() {
+      const target = this._getEffectiveTarget();
+      if (!target) return;
+      if (this.bloomPass && typeof target.bloomStrength === "number") {
+        this.bloomPass.strength = target.bloomStrength;
+      }
+      if (this.chromaPass?.uniforms?.uIntensity && typeof target.chromaIntensity === "number") {
+        this.chromaPass.uniforms.uIntensity.value = target.chromaIntensity;
+      }
+      if (this.grainPass?.uniforms?.uIntensity && typeof target.grainIntensity === "number") {
+        this.grainPass.uniforms.uIntensity.value = target.grainIntensity;
+      }
+      if (this.glitchPass?.uniforms?.uIntensity && typeof target.glitchIntensity === "number") {
+        this.glitchPass.uniforms.uIntensity.value = target.glitchIntensity;
+      }
+    }
+    // ─── Render Loop ────────────────────────────────────────────────────────
     start() {
-      if (this.running) return this;
-      this.clock.start();
-      if (this.reducedMotion) return this.renderOnce();
+      if (this.running) return;
       this.running = true;
+      this.clock.start();
       this._animate(performance.now());
       return this;
     }
@@ -11662,13 +11970,9 @@
     }
     _resume() {
       if (!this.running && !this.disposed) {
-        if (this.reducedMotion) {
-          this.renderOnce();
-        } else {
-          this.running = true;
-          this.clock.start();
-          this._animate(performance.now());
-        }
+        this.running = true;
+        this.clock.start();
+        this._animate(performance.now());
       }
     }
     _animate(now) {
@@ -11677,8 +11981,9 @@
       if (now - this.lastFrame < this.frameInterval) return;
       this.lastFrame = now;
       if (this.reducedMotion) return;
-      const dt2 = Math.min(this.clock.getDelta(), 0.05), elapsed = this.clock.getElapsedTime();
-      const target = this._targetState || this.stateMachine.currentValues;
+      const dt2 = Math.min(this.clock.getDelta(), 0.05);
+      const elapsed = this.clock.getElapsedTime();
+      const target = this._getEffectiveTarget();
       if (target) {
         const speed = target.transitionSpeed || 0.05;
         this.bloomPass.strength += (target.bloomStrength - this.bloomPass.strength) * speed;
@@ -11690,12 +11995,21 @@
           this.glitchPass.uniforms.uIntensity.value += (target.glitchIntensity - this.glitchPass.uniforms.uIntensity.value) * speed;
         }
       }
-      const ctx = { dt: dt2, elapsed, mouse: this.mouse, mouseNDC: this.mouseNDC, state: this.stateMachine.current, intensity: target?.componentIntensity ?? 0.3, theme: this.theme };
+      const ctx = {
+        dt: dt2,
+        elapsed,
+        mouse: this.mouse,
+        mouseNDC: this.mouseNDC,
+        state: this.stateMachine.current,
+        intensity: target?.componentIntensity ?? 0.3,
+        theme: this.theme
+      };
       this.components.forEach((c2) => c2.update?.(ctx, this));
       this.camera.position.x = Math.sin(elapsed * 0.1) * 0.5;
       this.camera.position.y = Math.cos(elapsed * 0.07) * 0.3;
       this.composer.render(dt2);
     }
+    // ─── Cleanup ────────────────────────────────────────────────────────────
     dispose() {
       this.disposed = true;
       this.running = false;
@@ -11709,8 +12023,1069 @@
       this.renderer.domElement.remove();
     }
   };
+  if (typeof window !== "undefined") {
+    window.ChimeraFX = window.ChimeraFX || {};
+    window.ChimeraFX.Engine = Engine;
+    window.ChimeraFX._themes = window.ChimeraFX._themes || {};
+  }
 
-  // assets/familiar/chimera-fx/components/ParticleNebula.js
+  // flutter/assets/familiar/chimera-fx/core/ShapableMatter.js
+  var SHARED_VERT = (
+    /* glsl */
+    `
+  uniform float uTime;
+  uniform float uIntensity;
+  uniform vec2 uMouse;
+  uniform float uModeParam;
+
+  attribute vec3 aOffset;
+  attribute vec3 aVelocity;
+  attribute float aLife;
+  attribute float aSize;
+  attribute vec3 aColor;
+
+  varying vec3 vColor;
+  varying float vAlpha;
+  varying float vLife;
+
+  // \u2500\u2500 3D curl noise \u2500\u2500
+  vec3 hash3(vec3 p) {
+    p = vec3(dot(p, vec3(127.1, 311.7, 74.7)),
+             dot(p, vec3(269.5, 183.3, 246.1)),
+             dot(p, vec3(113.5, 271.9, 124.6)));
+    return -1.0 + 2.0 * fract(sin(p) * 43758.5453);
+  }
+
+  float noise3D(vec3 p) {
+    vec3 i = floor(p);
+    vec3 f = fract(p);
+    vec3 u = f * f * (3.0 - 2.0 * f);
+    return mix(mix(mix(dot(hash3(i), f),
+                       dot(hash3(i + vec3(1,0,0)), f - vec3(1,0,0)), u.x),
+                   mix(dot(hash3(i + vec3(0,1,0)), f - vec3(0,1,0)),
+                       dot(hash3(i + vec3(1,1,0)), f - vec3(1,1,0)), u.x), u.y),
+               mix(mix(dot(hash3(i + vec3(0,0,1)), f - vec3(0,0,1)),
+                       dot(hash3(i + vec3(1,0,1)), f - vec3(1,0,1)), u.x),
+                   mix(dot(hash3(i + vec3(0,1,1)), f - vec3(0,1,1)),
+                       dot(hash3(i + vec3(1,1,1)), f - vec3(1,1,1)), u.x), u.y), u.z);
+  }
+
+  vec3 curlNoise(vec3 p) {
+    float e = 0.1;
+    vec3 dx = vec3(e, 0.0, 0.0);
+    vec3 dy = vec3(0.0, e, 0.0);
+    vec3 dz = vec3(0.0, 0.0, e);
+    float x = noise3D(p + dy) - noise3D(p - dy) - noise3D(p + dz) + noise3D(p - dz);
+    float y = noise3D(p + dz) - noise3D(p - dz) - noise3D(p + dx) + noise3D(p - dx);
+    float z = noise3D(p + dx) - noise3D(p - dx) - noise3D(p + dy) + noise3D(p - dy);
+    return normalize(vec3(x, y, z)) / (2.0 * e);
+  }
+
+  void main() {
+    float speed = 0.15 + uIntensity * 0.3;
+    vec3 pos = aOffset;
+    pos += curlNoise(pos * 0.08 + uTime * speed * 0.1) * uTime * speed * 0.5;
+
+    // Orbital rotation around center
+    float angle = uTime * 0.05 * (1.0 + uIntensity);
+    mat3 rot = mat3(
+      cos(angle), 0.0, sin(angle),
+      0.0, 1.0, 0.0,
+      -sin(angle), 0.0, cos(angle)
+    );
+    pos = rot * pos;
+
+    // Mouse influence
+    vec3 mouseWorld = vec3(uMouse * 15.0, 0.0);
+    vec3 toMouse = mouseWorld - pos;
+    float mouseDist = length(toMouse);
+    pos += normalize(toMouse) * (2.0 / max(mouseDist, 1.0)) * uIntensity;
+
+    float life = fract(aLife + uTime * 0.02);
+    vLife = life;
+    vAlpha = sin(life * 3.14159) * (0.25 + uIntensity * 0.75);
+    vColor = aColor * (0.5 + uIntensity * 0.5);
+
+    float size = aSize * (1.0 + sin(uTime * 2.0 + aLife * 20.0) * 0.3 * uIntensity);
+
+    vec4 mvPos = modelViewMatrix * vec4(pos, 1.0);
+    gl_PointSize = size * (300.0 / -mvPos.z);
+    gl_Position = projectionMatrix * mvPos;
+  }
+`
+  );
+  var FRAG_NEBULA = (
+    /* glsl */
+    `
+  varying vec3 vColor;
+  varying float vAlpha;
+
+  void main() {
+    float dist = length(gl_PointCoord - 0.5);
+    float core = smoothstep(0.5, 0.1, dist);
+    float halo = smoothstep(0.5, 0.0, dist) * 0.3;
+    float alpha = (core + halo) * vAlpha;
+    if (alpha < 0.01) discard;
+    gl_FragColor = vec4(vColor, alpha);
+  }
+`
+  );
+  var FRAG_FLUID = (
+    /* glsl */
+    `
+  uniform float uTime;
+  varying vec3 vColor;
+  varying float vAlpha;
+  varying float vLife;
+
+  void main() {
+    float dist = length(gl_PointCoord - 0.5);
+    // Soap-bubble iridescence: color shifts over time + distance from center
+    float hueShift = fract(vLife + uTime * 0.05 + dist * 2.0);
+    vec3 iridescent = vColor + 0.3 * vec3(
+      sin(hueShift * 6.28),
+      sin(hueShift * 6.28 + 2.09),
+      sin(hueShift * 6.28 + 4.18)
+    );
+    // Soft merging blob with Fresnel edge glow
+    float blob = smoothstep(0.5, 0.25, dist);
+    float edge = pow(1.0 - dist * 2.0, 3.0) * 0.6;
+    float alpha = (blob * 0.8 + edge * 0.4) * vAlpha;
+    if (alpha < 0.01) discard;
+    gl_FragColor = vec4(iridescent, alpha);
+  }
+`
+  );
+  var FRAG_CRYSTALLINE = (
+    /* glsl */
+    `
+  uniform float uTime;
+  varying vec3 vColor;
+  varying float vAlpha;
+  varying float vLife;
+
+  // Generate a pseudo-random value for faceting
+  float hash(vec2 p) {
+    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+  }
+
+  void main() {
+    vec2 uv = gl_PointCoord - 0.5;
+    float angle = atan(uv.y, uv.x);
+    // 6-sided crystal facets
+    float facet = floor((angle + 3.14159) / 1.0472); // 6 segments
+    float facetBright = 0.7 + hash(vec2(facet, vLife)) * 0.3;
+    // Sharp diamond-shaped core
+    float diamond = 1.0 - abs(uv.x) * 2.0 - abs(uv.y) * 2.0;
+    diamond = smoothstep(0.0, 0.15, diamond);
+    // Prismatic rainbow on edges
+    float edge = smoothstep(0.45, 0.5, length(uv)) - smoothstep(0.5, 0.55, length(uv));
+    vec3 prism = vColor * facetBright + edge * vec3(
+      sin(uTime * 3.0 + facet) * 0.4,
+      sin(uTime * 3.0 + facet + 2.09) * 0.4,
+      sin(uTime * 3.0 + facet + 4.18) * 0.4
+    );
+    float alpha = max(diamond * 0.85, edge * 0.9) * vAlpha;
+    if (alpha < 0.01) discard;
+    gl_FragColor = vec4(prism, alpha);
+  }
+`
+  );
+  var FRAG_PLASMA = (
+    /* glsl */
+    `
+  uniform float uTime;
+  uniform float uModeParam;
+  varying vec3 vColor;
+  varying float vAlpha;
+  varying float vLife;
+
+  float noise(vec2 p) {
+    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+  }
+
+  void main() {
+    vec2 uv = gl_PointCoord - 0.5;
+    float dist = length(uv);
+    // Bright-hot core with fuzzy halo
+    float core = exp(-dist * 8.0) * 1.5;
+    float halo = exp(-dist * 2.5) * 0.4;
+    // Tendril streaks via noise
+    float streak = noise(vec2(floor(dist * 12.0) + uTime * 2.0, vLife));
+    streak = smoothstep(0.3, 0.7, streak) * (1.0 - dist * 1.2);
+    // Fast flicker \u2014 20-30 Hz feel
+    float flicker = 0.7 + 0.3 * sin(uTime * 25.0 + vLife * 50.0);
+    // Color: white-hot core \u2192 colored outer glow
+    vec3 plasmaColor = mix(vec3(1.0), vColor, dist * 1.5) * flicker;
+    float alpha = (core * 0.9 + halo * 0.5 + streak * 0.6) * vAlpha * flicker;
+    if (alpha < 0.005) discard;
+    gl_FragColor = vec4(plasmaColor, alpha);
+  }
+`
+  );
+  var FRAG_FERROFLUID = (
+    /* glsl */
+    `
+  uniform float uTime;
+  uniform float uModeParam;
+  varying vec3 vColor;
+  varying float vAlpha;
+  varying float vLife;
+
+  void main() {
+    vec2 uv = gl_PointCoord - 0.5;
+    float dist = length(uv);
+    float angle = atan(uv.y, uv.x);
+    // Concentric ring ripples
+    float rings = sin(dist * 20.0 - uTime * 3.0) * 0.5 + 0.5;
+    rings *= exp(-dist * 2.0); // rings fade outward
+    // Spike vertices at 8 fixed intervals
+    float spike = 0.0;
+    for (int i = 0; i < 8; i++) {
+      float a = float(i) * 0.785; // PI/4 intervals
+      float spikeAngle = abs(mod(angle - a + 3.14159, 6.28318) - 3.14159);
+      float spikeDist = spikeAngle * 3.0;
+      float spikeHeight = uModeParam * 0.5 + 0.5;
+      spike += exp(-spikeDist * spikeDist * 15.0) * spikeHeight;
+    }
+    // Metallic sheen
+    float metallic = 0.4 + rings * 0.4 + spike * 0.3;
+    vec3 ferroColor = vColor * metallic + vec3(0.2) * spike;
+    float alpha = metallic * vAlpha;
+    if (alpha < 0.01) discard;
+    gl_FragColor = vec4(ferroColor, alpha);
+  }
+`
+  );
+  var FRAG_CELLULAR = (
+    /* glsl */
+    `
+  uniform float uTime;
+  varying vec3 vColor;
+  varying float vAlpha;
+  varying float vLife;
+
+  vec2 random2(vec2 p) {
+    return fract(sin(vec2(
+      dot(p, vec2(127.1, 311.7)),
+      dot(p, vec2(269.5, 183.3))
+    )) * 43758.5453);
+  }
+
+  void main() {
+    vec2 uv = gl_PointCoord - 0.5;
+    float dist = length(uv);
+    // Scale UV for larger cells
+    vec2 st = gl_PointCoord * 6.0;
+    vec2 i = floor(st);
+    vec2 f = fract(st);
+    // Voronoi: find nearest cell center
+    float mDist = 1.0;
+    vec2 mPoint = vec2(0.0);
+    for (int y = -1; y <= 1; y++) {
+      for (int x = -1; x <= 1; x++) {
+        vec2 neighbor = vec2(float(x), float(y));
+        vec2 point = random2(i + neighbor);
+        point = 0.5 + 0.5 * sin(uTime * 0.3 + 6.28318 * point);
+        vec2 diff = neighbor + point - f;
+        float d = dot(diff, diff);
+        if (d < mDist) {
+          mDist = d;
+          mPoint = point;
+        }
+      }
+    }
+    mDist = sqrt(mDist);
+    // Cell boundary as thin glowing line
+    float edge = smoothstep(0.0, 0.06, mDist) - smoothstep(0.06, 0.12, mDist);
+    // Interior slow gradient
+    float interior = (1.0 - smoothstep(0.0, 0.5, mDist)) * 0.3;
+    // Organic pulse
+    float pulse = 0.7 + 0.3 * sin(uTime * 2.0 + length(mPoint) * 10.0);
+    // Circular fade at particle edge
+    float fade = 1.0 - smoothstep(0.35, 0.5, dist);
+    vec3 cellColor = vColor * (interior + 0.3) + vColor * edge * 1.5 * pulse;
+    float alpha = max(edge * 0.9 * pulse, interior * 0.4) * vAlpha * fade;
+    if (alpha < 0.01) discard;
+    gl_FragColor = vec4(cellColor, alpha);
+  }
+`
+  );
+  var FRAG_ELECTRIC = (
+    /* glsl */
+    `
+  uniform float uTime;
+  uniform float uModeParam;
+  varying vec3 vColor;
+  varying float vAlpha;
+  varying float vLife;
+
+  float hash(float n) { return fract(sin(n) * 43758.5453); }
+
+  // Recursive branching bolt via noise displacement
+  float bolt(vec2 uv, float t) {
+    float d = abs(uv.x);
+    // Main branch with sinusoidal displacement
+    float y = uv.y;
+    float displace = 0.0;
+    float amp = 1.0;
+    float freq = 1.0;
+    for (int i = 0; i < 4; i++) {
+      displace += sin(y * freq * 10.0 + t * 15.0 + hash(float(i))) * amp * 0.04;
+      amp *= 0.5;
+      freq *= 2.0;
+    }
+    float boltX = displace;
+    float boltDist = abs(uv.x - boltX);
+    // White-hot core + colored glow
+    float core = exp(-boltDist * 80.0);
+    float glow = exp(-boltDist * 12.0) * 0.6;
+    return core + glow;
+  }
+
+  void main() {
+    vec2 uv = gl_PointCoord - 0.5;
+    float dist = length(uv);
+    // Rotate bolt direction based on life
+    float angle = vLife * 3.14159 * 2.0 + uTime * 0.5;
+    mat2 rot = mat2(cos(angle), -sin(angle), sin(angle), cos(angle));
+    vec2 ruv = rot * uv;
+    // Random flash \u2014 bright bolt ~every 0.5s
+    float flash = step(0.92, hash(vLife * 100.0 + floor(uTime * 2.0)));
+    float intensity = bolt(ruv, uTime) * (0.4 + flash * 0.6);
+    vec3 boltColor = mix(vec3(1.0, 0.98, 0.9), vColor, 0.5);
+    float alpha = intensity * vAlpha * (1.0 - smoothstep(0.3, 0.5, dist));
+    if (alpha < 0.005) discard;
+    gl_FragColor = vec4(boltColor, alpha);
+  }
+`
+  );
+  var FRAG_SUPERFLUID = (
+    /* glsl */
+    `
+  uniform float uTime;
+  varying vec3 vColor;
+  varying float vAlpha;
+  varying float vLife;
+
+  void main() {
+    vec2 uv = gl_PointCoord - 0.5;
+    float dist = length(uv);
+    float angle = atan(uv.y, uv.x);
+    float ripple = sin((dist * 34.0) - uTime * 3.2 + vLife * 9.0) * 0.5 + 0.5;
+    float phase = sin(angle * 3.0 + uTime * 1.1 + vLife * 5.0) * 0.5 + 0.5;
+    float droplet = smoothstep(0.48, 0.18, dist);
+    float edge = smoothstep(0.47, 0.40, dist) - smoothstep(0.36, 0.30, dist);
+    float vortex = exp(-abs(dist - (0.18 + phase * 0.08)) * 18.0) * 0.35;
+    vec3 coldShift = vec3(0.45, 0.85, 1.0);
+    vec3 superColor = mix(vColor * coldShift, vec3(0.9, 1.0, 1.0), ripple * 0.35);
+    float alpha = (droplet * 0.34 + ripple * edge * 0.8 + vortex) * vAlpha;
+    if (alpha < 0.008) discard;
+    gl_FragColor = vec4(superColor, alpha);
+  }
+`
+  );
+  var FRAG_IONSTORM = (
+    /* glsl */
+    `
+  uniform float uTime;
+  varying vec3 vColor;
+  varying float vAlpha;
+  varying float vLife;
+
+  float hash(float n) { return fract(sin(n) * 43758.5453); }
+
+  void main() {
+    vec2 uv = gl_PointCoord - 0.5;
+    float dist = length(uv);
+    float angle = atan(uv.y, uv.x);
+    float sheath = exp(-dist * 4.0);
+    float core = exp(-dist * 18.0);
+    float arc = 0.0;
+    for (int i = 0; i < 5; i++) {
+      float fi = float(i);
+      float spoke = sin(angle * (3.0 + fi) + uTime * (3.0 + fi) + vLife * 18.0);
+      float band = exp(-abs(spoke) * 16.0) * exp(-dist * (4.0 + fi * 0.7));
+      arc += band * (0.5 + 0.5 * hash(fi + floor(uTime * 8.0) + vLife * 30.0));
+    }
+    float flash = step(0.86, hash(floor(uTime * 10.0) + vLife * 99.0));
+    vec3 ionColor = mix(vColor, vec3(0.55, 0.95, 1.0), 0.35) + vec3(1.0, 0.25, 0.72) * flash * core;
+    float alpha = (sheath * 0.25 + core * 0.85 + arc * 0.35) * vAlpha * (1.0 - smoothstep(0.42, 0.5, dist));
+    if (alpha < 0.006) discard;
+    gl_FragColor = vec4(ionColor, alpha);
+  }
+`
+  );
+  var FRAG_AEROGEL = (
+    /* glsl */
+    `
+  uniform float uTime;
+  varying vec3 vColor;
+  varying float vAlpha;
+  varying float vLife;
+
+  void main() {
+    vec2 uv = gl_PointCoord - 0.5;
+    float dist = length(uv);
+    vec2 st = gl_PointCoord * 5.0;
+    vec2 cell = fract(st) - 0.5;
+    float strandX = exp(-abs(cell.x) * 26.0);
+    float strandY = exp(-abs(cell.y) * 26.0);
+    float diagonal = exp(-abs(cell.x + cell.y + sin(uTime * 0.4 + vLife * 8.0) * 0.08) * 20.0);
+    float node = exp(-length(cell) * 18.0);
+    float poreFade = 1.0 - smoothstep(0.36, 0.5, dist);
+    float lattice = (strandX + strandY + diagonal * 0.6 + node * 0.7) * poreFade;
+    vec3 airColor = mix(vColor * vec3(0.78, 0.95, 1.12), vec3(1.0), node * 0.35);
+    float alpha = lattice * 0.18 * vAlpha + node * 0.16 * vAlpha;
+    if (alpha < 0.006) discard;
+    gl_FragColor = vec4(airColor, alpha);
+  }
+`
+  );
+  var FRAG_PHOTONIC = (
+    /* glsl */
+    `
+  uniform float uTime;
+  varying vec3 vColor;
+  varying float vAlpha;
+  varying float vLife;
+
+  void main() {
+    vec2 uv = gl_PointCoord - 0.5;
+    float dist = length(uv);
+    float angle = atan(uv.y, uv.x);
+    float rings = sin(dist * 55.0 - uTime * 4.0 + vLife * 12.0) * 0.5 + 0.5;
+    float grating = sin((uv.x + uv.y) * 34.0 + uTime * 1.5) * 0.5 + 0.5;
+    float star = pow(abs(cos(angle * 6.0 + uTime * 0.6)), 14.0) * (1.0 - smoothstep(0.1, 0.5, dist));
+    float lens = smoothstep(0.48, 0.12, dist);
+    vec3 prism = vec3(
+      0.55 + 0.45 * sin(dist * 22.0 + uTime),
+      0.55 + 0.45 * sin(dist * 22.0 + uTime + 2.09),
+      0.55 + 0.45 * sin(dist * 22.0 + uTime + 4.18)
+    );
+    vec3 photonColor = mix(vColor * 0.72, prism, 0.48) + vec3(0.75, 0.88, 1.0) * star * 0.32;
+    float alpha = (rings * grating * 0.16 + star * 0.38 + lens * 0.08) * vAlpha * (1.0 - smoothstep(0.42, 0.5, dist));
+    if (alpha < 0.004) discard;
+    gl_FragColor = vec4(photonColor, alpha);
+  }
+`
+  );
+  var MATTER_MODES = {
+    nebula: {
+      label: "Nebula",
+      icon: "\u{1F30C}",
+      description: "Organic curl-noise particle cloud \u2014 the original default.",
+      fragShader: FRAG_NEBULA,
+      postfx: null,
+      palette: [
+        [0.2, 0.4, 1],
+        // deep blue
+        [0.6, 0.2, 0.9],
+        // violet
+        [0.1, 0.7, 1],
+        // cyan
+        [0.8, 0.3, 0.9]
+        // magenta
+      ]
+    },
+    fluid: {
+      label: "Fluid",
+      icon: "\u{1F4A7}",
+      description: "Iridescent soap-bubble blobs with surface tension.",
+      fragShader: FRAG_FLUID,
+      postfx: { bloomStrength: 0.5, grainIntensity: 8e-3 },
+      palette: [
+        [0.3, 0.9, 1],
+        // aqua
+        [0.9, 0.5, 0.8],
+        // pink
+        [0.5, 1, 0.6],
+        // mint
+        [1, 0.85, 0.4]
+        // gold
+      ]
+    },
+    crystalline: {
+      label: "Crystalline",
+      icon: "\u{1F48E}",
+      description: "Faceted geometric shards with prismatic rainbow edges.",
+      fragShader: FRAG_CRYSTALLINE,
+      postfx: { bloomStrength: 0.35, grainIntensity: 5e-3 },
+      palette: [
+        [0.85, 0.95, 1],
+        // ice white
+        [0.5, 0.8, 1],
+        // sky blue
+        [0.9, 0.9, 1],
+        // silver
+        [0.3, 0.6, 0.95]
+        // sapphire
+      ]
+    },
+    plasma: {
+      label: "Plasma",
+      icon: "\u26A1",
+      description: "High-energy electric tendrils with fast flicker.",
+      fragShader: FRAG_PLASMA,
+      postfx: { bloomStrength: 0.9, grainIntensity: 0.012 },
+      palette: [
+        [1, 0.4, 0],
+        // orange
+        [1, 0.1, 0.1],
+        // red
+        [1, 0.8, 0],
+        // yellow
+        [1, 0.6, 0.2]
+        // amber
+      ]
+    },
+    ferrofluid: {
+      label: "Ferrofluid",
+      icon: "\u{1F9F2}",
+      description: "Spike-field surface ripples with metallic sheen.",
+      fragShader: FRAG_FERROFLUID,
+      postfx: { bloomStrength: 0.45, grainIntensity: 0.01 },
+      palette: [
+        [0.7, 0.7, 0.75],
+        // silver
+        [0.3, 0.3, 0.35],
+        // gunmetal
+        [0.9, 0.9, 0.95],
+        // bright silver
+        [0.5, 0.5, 0.55]
+        // steel
+      ]
+    },
+    cellular: {
+      label: "Cellular",
+      icon: "\u{1FAE7}",
+      description: "Voronoi cell membranes with organic pulsing.",
+      fragShader: FRAG_CELLULAR,
+      postfx: { bloomStrength: 0.3, grainIntensity: 6e-3 },
+      palette: [
+        [0.1, 0.9, 0.5],
+        // bio green
+        [0, 0.7, 0.6],
+        // teal
+        [0.2, 1, 0.4],
+        // neon green
+        [0, 0.5, 0.4]
+        // deep teal
+      ]
+    },
+    electric: {
+      label: "Electric Arcs",
+      icon: "\u{1F329}\uFE0F",
+      description: "Branching lightning bolts with white-hot cores.",
+      fragShader: FRAG_ELECTRIC,
+      postfx: { bloomStrength: 0.7, grainIntensity: 0.015 },
+      palette: [
+        [0.8, 0.95, 1],
+        // white-cyan
+        [0, 0.8, 1],
+        // electric blue
+        [0.9, 0.9, 1],
+        // white
+        [0.2, 0.5, 1]
+        // blue
+      ]
+    },
+    superfluid: {
+      label: "Superfluid",
+      icon: "S",
+      description: "Frictionless liquid waves with quantized ripple rings.",
+      fragShader: FRAG_SUPERFLUID,
+      postfx: { bloomStrength: 0.52, grainIntensity: 5e-3 },
+      palette: [
+        [0.38, 0.86, 1],
+        [0.72, 0.95, 1],
+        [0.48, 0.6, 1],
+        [0.92, 1, 0.98]
+      ]
+    },
+    ionstorm: {
+      label: "Ion Storm",
+      icon: "I",
+      description: "Charged ion cores with flickering plasma sheaths.",
+      fragShader: FRAG_IONSTORM,
+      postfx: { bloomStrength: 0.74, grainIntensity: 0.014 },
+      palette: [
+        [1, 0.28, 0.56],
+        [0.36, 0.92, 1],
+        [1, 0.72, 0.22],
+        [0.72, 0.38, 1]
+      ]
+    },
+    aerogel: {
+      label: "Aerogel",
+      icon: "A",
+      description: "Ultra-light porous lattice filaments suspended in air.",
+      fragShader: FRAG_AEROGEL,
+      postfx: { bloomStrength: 0.38, grainIntensity: 4e-3 },
+      palette: [
+        [0.74, 0.94, 1],
+        [0.92, 0.98, 1],
+        [0.68, 1, 0.86],
+        [0.78, 0.72, 1]
+      ]
+    },
+    photonic: {
+      label: "Photonic",
+      icon: "P",
+      description: "Diffracted light matter with interference bands and star lenses.",
+      fragShader: FRAG_PHOTONIC,
+      postfx: { bloomStrength: 0.42, grainIntensity: 6e-3 },
+      palette: [
+        [0.55, 0.95, 1],
+        [1, 0.46, 0.78],
+        [0.82, 0.74, 1],
+        [1, 0.92, 0.42]
+      ]
+    }
+  };
+  var DEFAULT_MODE = "nebula";
+  var ShapableMatter = class {
+    constructor(opts = {}) {
+      this.count = opts.count || 12e3;
+      this.spread = opts.spread || 25;
+      this.mesh = null;
+      this.material = null;
+      this._currentMode = opts.mode || DEFAULT_MODE;
+      this._engine = null;
+    }
+    /** Build the shared particle geometry and initial material. */
+    init(engine2) {
+      this._engine = engine2;
+      const geo = new Wn();
+      const positions = new Float32Array(this.count * 3);
+      geo.setAttribute("position", new Mn(positions, 3));
+      const offsets = new Float32Array(this.count * 3);
+      const velocities = new Float32Array(this.count * 3);
+      const lives = new Float32Array(this.count);
+      const sizes = new Float32Array(this.count);
+      const colors = new Float32Array(this.count * 3);
+      const modePalette = MATTER_MODES[this._currentMode]?.palette;
+      const palette = engine2.theme?.particleColors || modePalette || [
+        [0.345, 0.651, 1],
+        // cyan
+        [0.737, 0.549, 1],
+        // purple
+        [0.247, 0.725, 0.314],
+        // green
+        [1, 0.596, 0],
+        // orange
+        [1, 0.2, 0.2],
+        // red
+        [1, 1, 1]
+        // white
+      ];
+      for (let i2 = 0; i2 < this.count; i2++) {
+        const i3 = i2 * 3;
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.acos(2 * Math.random() - 1);
+        const r2 = Math.pow(Math.random(), 0.5) * this.spread;
+        offsets[i3] = r2 * Math.sin(phi) * Math.cos(theta);
+        offsets[i3 + 1] = r2 * Math.sin(phi) * Math.sin(theta);
+        offsets[i3 + 2] = r2 * Math.cos(phi);
+        velocities[i3] = (Math.random() - 0.5) * 0.1;
+        velocities[i3 + 1] = (Math.random() - 0.5) * 0.1;
+        velocities[i3 + 2] = (Math.random() - 0.5) * 0.1;
+        lives[i2] = Math.random();
+        sizes[i2] = 2 + Math.random() * 8;
+        const col = palette[Math.floor(Math.random() * palette.length)];
+        colors[i3] = col[0];
+        colors[i3 + 1] = col[1];
+        colors[i3 + 2] = col[2];
+      }
+      geo.setAttribute("aOffset", new Mn(offsets, 3));
+      geo.setAttribute("aVelocity", new Mn(velocities, 3));
+      geo.setAttribute("aLife", new Mn(lives, 1));
+      geo.setAttribute("aSize", new Mn(sizes, 1));
+      geo.setAttribute("aColor", new Mn(colors, 3));
+      this._buildMaterial(this._currentMode);
+      this.mesh = new eh(geo, this.material);
+      this.mesh.frustumCulled = false;
+      engine2.scene.add(this.mesh);
+      try {
+        const stored = localStorage.getItem("chimera-matter-mode");
+        if (stored && MATTER_MODES[stored]) {
+          this.setMatterMode(stored);
+        }
+      } catch (_2) {
+      }
+    }
+    /** Create (or rebuild) the ShaderMaterial for the given mode. */
+    _buildMaterial(modeName) {
+      const mode = MATTER_MODES[modeName];
+      if (!mode) {
+        console.warn("ShapableMatter: unknown mode", modeName);
+        return;
+      }
+      if (this.material) this.material.dispose();
+      this.material = new Zl({
+        vertexShader: SHARED_VERT,
+        fragmentShader: mode.fragShader,
+        uniforms: {
+          uTime: { value: 0 },
+          uIntensity: { value: 0.8 },
+          uMouse: { value: new _i() },
+          uModeParam: { value: 0.5 }
+        },
+        transparent: true,
+        depthWrite: false,
+        blending: g
+      });
+      if (this.mesh) {
+        this.mesh.material = this.material;
+      }
+      if (mode.postfx && this._engine) {
+        const pf = mode.postfx;
+        const target = this._engine._targetState || {};
+        if (pf.bloomStrength != null) {
+          this._engine.bloomPass.strength = pf.bloomStrength;
+          if (target.bloomStrength != null) target.bloomStrength = pf.bloomStrength;
+        }
+        if (pf.grainIntensity != null) {
+          this._engine.grainPass.uniforms.uIntensity.value = pf.grainIntensity;
+          if (target.grainIntensity != null) target.grainIntensity = pf.grainIntensity;
+        }
+      }
+    }
+    /** Re-color particles from a palette (used on mode or theme change). */
+    _recolorParticles(palette) {
+      if (!this.mesh || !palette || !palette.length) return;
+      const colors = this.mesh.geometry.attributes.aColor.array;
+      for (let i2 = 0; i2 < this.count; i2++) {
+        const col = palette[Math.floor(Math.random() * palette.length)];
+        colors[i2 * 3] = col[0];
+        colors[i2 * 3 + 1] = col[1];
+        colors[i2 * 3 + 2] = col[2];
+      }
+      this.mesh.geometry.attributes.aColor.needsUpdate = true;
+    }
+    /** Switch to a different matter mode instantly. */
+    setMatterMode(name) {
+      if (!MATTER_MODES[name]) {
+        console.warn("ShapableMatter: unknown mode", name, "\u2014 valid:", Object.keys(MATTER_MODES));
+        return;
+      }
+      if (name === this._currentMode) {
+        console.log("[ShapableMatter] mode already", name, "\u2014 skipping");
+        return;
+      }
+      this._currentMode = name;
+      this._buildMaterial(name);
+      const modePalette = MATTER_MODES[name]?.palette;
+      if (modePalette) this._recolorParticles(modePalette);
+      console.log("[ShapableMatter] mode + colors updated:", name);
+      try {
+        localStorage.setItem("chimera-matter-mode", name);
+      } catch (_2) {
+      }
+    }
+    /** Return the currently active mode name. */
+    getMatterMode() {
+      return this._currentMode;
+    }
+    /** List all registered mode names. */
+    static getModes() {
+      return Object.keys(MATTER_MODES);
+    }
+    /** Get metadata for a mode. */
+    static getModeInfo(name) {
+      return MATTER_MODES[name] || null;
+    }
+    /** Per-frame update from the engine render loop. */
+    update(ctx, engine2) {
+      if (!this.material) return;
+      this.material.uniforms.uTime.value = ctx.elapsed;
+      this.material.uniforms.uIntensity.value = ctx.intensity;
+      this.material.uniforms.uMouse.value.copy(ctx.mouseNDC);
+    }
+    onStateChange(_state, _engine) {
+    }
+    onPulse(_type, _data, _engine) {
+    }
+    onThemeChange(theme, _engine) {
+      if (theme?.particleColors) {
+        this._recolorParticles(theme.particleColors);
+      }
+    }
+    dispose(engine2) {
+      if (this.mesh) {
+        engine2.scene.remove(this.mesh);
+        this.mesh.geometry.dispose();
+      }
+      if (this.material) this.material.dispose();
+    }
+  };
+  if (typeof window !== "undefined") {
+    window.ChimeraFX = window.ChimeraFX || {};
+    window.ChimeraFX.ShapableMatter = ShapableMatter;
+    window.ChimeraFX.MATTER_MODES = MATTER_MODES;
+    window.ChimeraFX.setMatterMode = function(name) {
+      const engine2 = window._chimeraFX;
+      if (!engine2) return;
+      const matter = engine2.components.find((c2) => c2 instanceof ShapableMatter);
+      if (matter) {
+        matter.setMatterMode(name);
+      }
+    };
+    window.ChimeraFX.getMatterMode = function() {
+      const engine2 = window._chimeraFX;
+      if (!engine2) return null;
+      const matter = engine2.components.find((c2) => c2 instanceof ShapableMatter);
+      return matter ? matter.getMatterMode() : null;
+    };
+    window.ChimeraFX.getMatterModes = function() {
+      return Object.keys(MATTER_MODES);
+    };
+    window.ChimeraFX.getMatterModeInfo = function(name) {
+      return MATTER_MODES[name] || null;
+    };
+  }
+
+  // flutter/assets/familiar/chimera-fx/core/AmbientColors.js
+  var REGIME_PALETTES = {
+    ranging: {
+      cool: { h: 210, s: 75, l: 55 },
+      // blue-grey neutral
+      warm: { h: 30, s: 60, l: 60 },
+      // amber neutral
+      accent: { h: 160, s: 80, l: 50 }
+      // teal
+    },
+    trending: {
+      cool: { h: 140, s: 90, l: 48 },
+      // green momentum
+      warm: { h: 280, s: 70, l: 55 },
+      // purple breakout
+      accent: { h: 200, s: 85, l: 52 }
+      // cyan
+    },
+    volatile: {
+      cool: { h: 0, s: 90, l: 55 },
+      // red danger
+      warm: { h: 45, s: 100, l: 50 },
+      // orange warning
+      accent: { h: 320, s: 80, l: 55 }
+      // magenta
+    },
+    calm: {
+      cool: { h: 220, s: 50, l: 60 },
+      // muted blue
+      warm: { h: 35, s: 45, l: 62 },
+      // soft gold
+      accent: { h: 170, s: 65, l: 50 }
+      // soft teal
+    }
+  };
+  var DEFAULT_PALETTE = REGIME_PALETTES.ranging;
+  function lerp(a2, b2, t2) {
+    return a2 + (b2 - a2) * t2;
+  }
+  function lerpHSL(base, target, strength) {
+    return {
+      h: Math.round(lerp(base.h, target.h, strength)),
+      s: Math.round(lerp(base.s, target.s, strength)),
+      l: Math.round(lerp(base.l, target.l, strength))
+    };
+  }
+  var AmbientColors = class {
+    /**
+     * @param {number} factor — influence strength 0.0–1.0 (default 0.45)
+     * @param {object} overrides — optionally pre-set signals
+     */
+    constructor(factor = 0.45, overrides = {}) {
+      this.factor = Math.min(1, Math.max(0, factor));
+      this._signals = {
+        regime: "ranging",
+        // ranging | trending | volatile | calm
+        momentum: 0.5,
+        // 0.0–1.0
+        fearGreed: 50,
+        // 0–100
+        volatility: 0.3,
+        // 0.0–1.0
+        ...overrides
+      };
+      this._lastPalette = null;
+      this._styleElement = null;
+      this._enabled = true;
+      this._cssVarsApplied = false;
+    }
+    /** Update with fresh market signal data. Call each time a new signal arrives. */
+    update(signals = {}) {
+      this._signals = { ...this._signals, ...signals };
+      this._apply();
+    }
+    /** Enable or disable ambient color influence. */
+    setEnabled(on2) {
+      this._enabled = !!on2;
+      if (!on2) this._revert();
+      else this._apply();
+    }
+    /** Set the influence factor. */
+    setFactor(f2) {
+      this.factor = Math.min(1, Math.max(0, f2));
+      this._apply();
+    }
+    /** Read the current influence factor. */
+    getFactor() {
+      return this.factor;
+    }
+    /** Return the live signal object. */
+    getSignals() {
+      return { ...this._signals };
+    }
+    // ── Internal ─────────────────────────────────────────────────────────────
+    _getPalette() {
+      const regime = this._signals.regime || "ranging";
+      return REGIME_PALETTES[regime] || DEFAULT_PALETTE;
+    }
+    _getSignalStrength() {
+      const mom = this._signals.momentum ?? 0.5;
+      const fear = (this._signals.fearGreed ?? 50) / 100;
+      const vol = this._signals.volatility ?? 0.3;
+      const regimeBoost = this._signals.regime === "volatile" ? 1.2 : 1;
+      return Math.min(1, (mom + fear + vol) / 3 * regimeBoost);
+    }
+    _buildCssVars(primary, secondary, accent) {
+      return `
+      html[data-ambient-colors="on"] {
+        --ambient-primary-h: ${primary.h};
+        --ambient-primary-s: ${primary.s}%;
+        --ambient-primary-l: ${primary.l}%;
+        --ambient-secondary-h: ${secondary.h};
+        --ambient-secondary-s: ${secondary.s}%;
+        --ambient-secondary-l: ${secondary.l}%;
+        --ambient-accent-h: ${accent.h};
+        --ambient-accent-s: ${accent.s}%;
+        --ambient-accent-l: ${accent.l}%;
+        --primary-h: ${primary.h};
+        --primary-s: ${primary.s}%;
+        --primary-l: ${primary.l}%;
+        --secondary-h: ${secondary.h};
+        --secondary-s: ${secondary.s}%;
+        --secondary-l: ${secondary.l}%;
+      }
+    `;
+    }
+    _apply() {
+      if (!this._enabled) return;
+      document.documentElement.dataset.ambientColors = "on";
+      const palette = this._getPalette();
+      const signalT = this._getSignalStrength();
+      const blend = this.factor * signalT;
+      const current = this._readCurrentHSL();
+      const primary = lerpHSL(current.primary, palette.cool, blend);
+      const secondary = lerpHSL(current.secondary, palette.warm, blend);
+      const accent = lerpHSL(current.accent, palette.accent, blend);
+      this._injectCss(this._buildCssVars(primary, secondary, accent));
+      this._syncChimeraVfx(primary, accent);
+      this._lastPalette = { primary, secondary, accent, signalT, blend };
+    }
+    _readCurrentHSL() {
+      const root = document.documentElement;
+      const get = (h2, s2, l2) => ({
+        h: parseInt(getComputedStyle(root).getPropertyValue(`--${h2}`) || "0"),
+        s: parseInt(getComputedStyle(root).getPropertyValue(`--${s2}`) || "50"),
+        l: parseInt(getComputedStyle(root).getPropertyValue(`--${l2}`) || "50")
+      });
+      return {
+        primary: { h: 168, s: 100, l: 45 },
+        secondary: { h: 210, s: 80, l: 56 },
+        accent: { h: 160, s: 80, l: 50 }
+      };
+    }
+    _injectCss(css) {
+      if (!this._styleElement) {
+        this._styleElement = document.createElement("style");
+        this._styleElement.id = "chimera-ambient-colors";
+        document.head.appendChild(this._styleElement);
+      }
+      this._styleElement.textContent = css;
+      this._cssVarsApplied = true;
+    }
+    _revert() {
+      delete document.documentElement.dataset.ambientColors;
+      if (this._styleElement) {
+        this._styleElement.textContent = "";
+      }
+      this._cssVarsApplied = false;
+    }
+    /** Notify the legacy VFX layer after CSS-driven ambient colors change. */
+    _syncChimeraVfx(_primary, _accent) {
+      try {
+        if (window.ChimeraVFX?.resolveColors) {
+          window.ChimeraVFX.resolveColors();
+        }
+      } catch (_2) {
+      }
+    }
+    /** Export current state as a JSON-serializable object. */
+    toJSON() {
+      return {
+        factor: this.factor,
+        enabled: this._enabled,
+        signals: this.getSignals()
+      };
+    }
+    /** Restore state from a JSON object (e.g. after page load). */
+    fromJSON(data) {
+      if (data.factor !== void 0) this.factor = data.factor;
+      if (data.enabled !== void 0) this._enabled = data.enabled;
+      if (data.signals) this._signals = { ...this._signals, ...data.signals };
+    }
+    dispose() {
+      this._revert();
+      if (this._styleElement) {
+        this._styleElement.remove();
+        this._styleElement = null;
+      }
+    }
+  };
+  if (typeof window !== "undefined") {
+    window.ChimeraFX = window.ChimeraFX || {};
+    window.ChimeraFX.initAmbientColors = function(factor = 0.45) {
+      if (window._chimeraAmbient) {
+        window._chimeraAmbient.dispose();
+      }
+      window._chimeraAmbient = new AmbientColors(factor);
+      try {
+        const stored = localStorage.getItem("chimera-ambient-state");
+        if (stored) {
+          const data = JSON.parse(stored);
+          window._chimeraAmbient.fromJSON(data);
+          if (window._chimeraAmbient._enabled) {
+            window._chimeraAmbient._apply();
+          }
+        }
+      } catch (_2) {
+      }
+      return window._chimeraAmbient;
+    };
+    window.ChimeraFX.getAmbientColors = function() {
+      return window._chimeraAmbient || null;
+    };
+    window.ChimeraFX.updateAmbient = function(signals) {
+      if (window._chimeraAmbient) {
+        window._chimeraAmbient.update(signals);
+        try {
+          localStorage.setItem("chimera-ambient-state", JSON.stringify(window._chimeraAmbient.toJSON()));
+        } catch (_2) {
+        }
+      }
+    };
+    window.ChimeraFX.setAmbientFactor = function(f2) {
+      if (window._chimeraAmbient) window._chimeraAmbient.setFactor(f2);
+    };
+    window.ChimeraFX.setAmbientEnabled = function(on2) {
+      if (window._chimeraAmbient) window._chimeraAmbient.setEnabled(on2);
+    };
+  }
+
+  // flutter/assets/familiar/chimera-fx/components/ParticleNebula.js
   var PARTICLE_VERT = (
     /* glsl */
     `
@@ -11904,6 +13279,16 @@
     onPulse(type, data, engine2) {
     }
     onThemeChange(theme, engine2) {
+      if (!this.mesh || !theme?.particleColors) return;
+      const colors = this.mesh.geometry.getAttribute("aColor");
+      if (!colors) return;
+      const palette = theme.particleColors;
+      const count = colors.count;
+      for (let i2 = 0; i2 < count; i2++) {
+        const col = palette[Math.floor(Math.random() * palette.length)];
+        colors.setXYZ(i2, col[0], col[1], col[2]);
+      }
+      colors.needsUpdate = true;
     }
     dispose(engine2) {
       if (this.mesh) {
@@ -11914,7 +13299,7 @@
     }
   };
 
-  // assets/familiar/chimera-fx/components/EnergyTendrils.js
+  // flutter/assets/familiar/chimera-fx/components/EnergyTendrils.js
   var TENDRIL_VERT = (
     /* glsl */
     `
@@ -12072,6 +13457,18 @@
     }
     onPulse(type, data, engine2) {
     }
+    onThemeChange(theme, engine2) {
+      if (!theme?.tendrilColors) return;
+      const palette = theme.tendrilColors;
+      this.meshes.forEach(({ mat }, idx) => {
+        const color = palette[idx % palette.length];
+        if (color instanceof Pr) {
+          mat.uniforms.uColor.value.copy(color);
+        } else if (Array.isArray(color) && color.length === 3) {
+          mat.uniforms.uColor.value.setRGB(color[0], color[1], color[2]);
+        }
+      });
+    }
     dispose(engine2) {
       this.meshes.forEach(({ line, mat, geo }) => {
         engine2.scene.remove(line);
@@ -12082,7 +13479,7 @@
     }
   };
 
-  // assets/familiar/chimera-fx/components/DataRivers.js
+  // flutter/assets/familiar/chimera-fx/components/DataRivers.js
   var RIVER_VERT = (
     /* glsl */
     `
@@ -12245,6 +13642,25 @@
         mat.uniforms.uFlowSpeed.value += (targetFlow - curr) * 0.05;
       });
     }
+    onThemeChange(theme, engine2) {
+      if (!theme?.riverColors) return;
+      const colors = theme.riverColors;
+      this.rivers.forEach(({ mat, geo }, idx) => {
+        const col = colors[idx % colors.length];
+        const attr = geo.getAttribute("aColor");
+        if (!attr) return;
+        const count = attr.count;
+        for (let i2 = 0; i2 < count; i2++) {
+          attr.setXYZ(
+            i2,
+            col[0] + (Math.random() - 0.5) * 0.1,
+            col[1] + (Math.random() - 0.5) * 0.1,
+            col[2] + (Math.random() - 0.5) * 0.1
+          );
+        }
+        attr.needsUpdate = true;
+      });
+    }
     dispose(engine2) {
       this.rivers.forEach(({ points, mat, geo }) => {
         engine2.scene.remove(points);
@@ -12255,7 +13671,7 @@
     }
   };
 
-  // assets/familiar/chimera-fx/components/VolumetricLight.js
+  // flutter/assets/familiar/chimera-fx/components/VolumetricLight.js
   var VOLUME_FRAG = (
     /* glsl */
     `
@@ -12321,7 +13737,7 @@
     // Subtle pulsing
     float pulse = 0.9 + 0.1 * sin(uTime * 0.5);
 
-    gl_FragColor = vec4(accumColor * radialFade * pulse * 0.12, 0.18);
+    gl_FragColor = vec4(accumColor * radialFade * pulse * 0.12, 1.0);
   }
 `
   );
@@ -12403,7 +13819,7 @@
     }
   };
 
-  // assets/familiar/chimera-fx/components/LiquidMetal.js
+  // flutter/assets/familiar/chimera-fx/components/LiquidMetal.js
   var METAL_FRAG = (
     /* glsl */
     `
@@ -12607,7 +14023,7 @@
     }
   };
 
-  // assets/familiar/chimera-fx/components/ReactionDiffusion.js
+  // flutter/assets/familiar/chimera-fx/components/ReactionDiffusion.js
   var COMPUTE_FRAG = (
     /* glsl */
     `
@@ -12853,7 +14269,7 @@
     }
   };
 
-  // assets/familiar/chimera-fx/components/VoronoiShatter.js
+  // flutter/assets/familiar/chimera-fx/components/VoronoiShatter.js
   var VORONOI_FRAG = (
     /* glsl */
     `
@@ -13035,7 +14451,7 @@
     }
   };
 
-  // assets/familiar/chimera-fx/components/HoloHUD.js
+  // flutter/assets/familiar/chimera-fx/components/HoloHUD.js
   var HUD_FRAG = (
     /* glsl */
     `
@@ -13198,7 +14614,7 @@
     }
   };
 
-  // assets/familiar/chimera-fx/components/EnergyBeams.js
+  // flutter/assets/familiar/chimera-fx/components/EnergyBeams.js
   var BEAM_FRAG = (
     /* glsl */
     `
@@ -13405,7 +14821,7 @@
     }
   };
 
-  // assets/familiar/chimera-fx/components/IridescentOrb.js
+  // flutter/assets/familiar/chimera-fx/components/IridescentOrb.js
   var ORB_FRAG = (
     /* glsl */
     `
@@ -13645,7 +15061,7 @@
     }
   };
 
-  // assets/familiar/chimera-fx/themes/cyberpunk-neon.js
+  // flutter/assets/familiar/chimera-fx/themes/cyberpunk-neon.js
   var CyberpunkNeon = {
     name: "cyberpunk-neon",
     // Core palette
@@ -13713,7 +15129,7 @@
     }
   };
 
-  // assets/familiar/chimera-fx/themes/organic-bioluminescent.js
+  // flutter/assets/familiar/chimera-fx/themes/organic-bioluminescent.js
   var OrganicBioluminescent = {
     name: "organic-bioluminescent",
     colors: {
@@ -13777,7 +15193,7 @@
     }
   };
 
-  // assets/familiar/chimera-fx/themes/quantum-void.js
+  // flutter/assets/familiar/chimera-fx/themes/quantum-void.js
   var QuantumVoid = {
     name: "quantum-void",
     colors: {
@@ -13841,7 +15257,7 @@
     }
   };
 
-  // assets/familiar/chimera-fx/themes/holographic-matrix.js
+  // flutter/assets/familiar/chimera-fx/themes/holographic-matrix.js
   var HolographicMatrix = {
     name: "holographic-matrix",
     colors: {
@@ -13907,7 +15323,7 @@
     }
   };
 
-  // assets/familiar/chimera-fx/themes/chimera-native.js
+  // flutter/assets/familiar/chimera-fx/themes/chimera-native.js
   var ChimeraNative = {
     name: "chimera-native",
     colors: {
@@ -13963,7 +15379,7 @@
       bloomStrength: 0.35,
       bloomRadius: 0.5,
       bloomThreshold: 0.35,
-      grainIntensity: 0.03,
+      grainIntensity: 5e-3,
       chromaBase: 5e-4
     },
     fogColor: new Pr(131587),
@@ -13978,245 +15394,7 @@
     }
   };
 
-  // assets/familiar/chimera-fx/themes/mindrecipe-core.js
-  var MindRecipeCore = {
-    name: "mindrecipe-core",
-    colors: {
-      primary: new Pr(55744),
-      secondary: new Pr(9133302),
-      tertiary: new Pr(16103746),
-      accent: new Pr(8253439),
-      background: new Pr(398619),
-      surface: new Pr(663591)
-    },
-    particleColors: [
-      [0, 0.851, 0.753],
-      [0.545, 0.361, 0.965],
-      [0.961, 0.725, 0.259],
-      [0.247, 0.608, 0.859]
-    ],
-    tendrilColors: [
-      new Pr(55744),
-      new Pr(9133302),
-      new Pr(16103746)
-    ],
-    riverColors: [
-      [0, 0.851, 0.753],
-      [0.545, 0.361, 0.965],
-      [0.961, 0.725, 0.259]
-    ],
-    metalColors: [
-      new Pr(55744),
-      new Pr(9133302)
-    ],
-    reactionColors: [
-      new Pr(55744),
-      new Pr(9133302),
-      new Pr(16103746)
-    ],
-    postfx: {
-      bloomStrength: 0.62,
-      bloomRadius: 0.54,
-      bloomThreshold: 0.24,
-      grainIntensity: 0.014,
-      chromaBase: 1e-3
-    },
-    fogColor: new Pr(398619),
-    fogDensity: 22e-4,
-    apply(engine2) {
-      engine2.scene.fog.color.copy(this.fogColor);
-      engine2.scene.fog.density = this.fogDensity;
-      engine2.bloomPass.strength = this.postfx.bloomStrength;
-      engine2.bloomPass.radius = this.postfx.bloomRadius;
-      engine2.bloomPass.threshold = this.postfx.bloomThreshold;
-      engine2.grainPass.uniforms.uIntensity.value = this.postfx.grainIntensity;
-    }
-  };
-
-  // assets/familiar/chimera-fx/themes/aurora-borealis.js
-  var AuroraBorealis = {
-    name: "aurora-borealis",
-    colors: {
-      primary: new Pr(7339986),
-      secondary: new Pr(10124543),
-      tertiary: new Pr(5495039),
-      accent: new Pr(16735439),
-      background: new Pr(266263),
-      surface: new Pr(530213)
-    },
-    particleColors: [
-      [0.435, 1, 0.824],
-      [0.604, 0.486, 1],
-      [0.325, 0.847, 1],
-      [1, 0.361, 0.812]
-    ],
-    tendrilColors: [
-      new Pr(7339986),
-      new Pr(10124543),
-      new Pr(16735439)
-    ],
-    riverColors: [
-      [0.435, 1, 0.824],
-      [0.604, 0.486, 1],
-      [0.325, 0.847, 1]
-    ],
-    metalColors: [
-      new Pr(7339986),
-      new Pr(10124543)
-    ],
-    reactionColors: [
-      new Pr(7339986),
-      new Pr(10124543),
-      new Pr(16735439)
-    ],
-    postfx: {
-      bloomStrength: 0.72,
-      bloomRadius: 0.55,
-      bloomThreshold: 0.22,
-      grainIntensity: 0.012,
-      chromaBase: 1e-3
-    },
-    fogColor: new Pr(266263),
-    fogDensity: 25e-4,
-    apply(engine2) {
-      engine2.scene.fog.color.copy(this.fogColor);
-      engine2.scene.fog.density = this.fogDensity;
-      engine2.bloomPass.strength = this.postfx.bloomStrength;
-      engine2.bloomPass.radius = this.postfx.bloomRadius;
-      engine2.bloomPass.threshold = this.postfx.bloomThreshold;
-      engine2.grainPass.uniforms.uIntensity.value = this.postfx.grainIntensity;
-    }
-  };
-
-  // assets/familiar/chimera-fx/themes/crystal-matrix.js
-  var CrystalMatrix = {
-    name: "crystal-matrix",
-    colors: {
-      primary: new Pr(10536191),
-      // ice blue
-      secondary: new Pr(14740223),
-      // pale holographic
-      tertiary: new Pr(4492031),
-      // medium blue
-      accent: new Pr(16777215),
-      // white
-      background: new Pr(330260),
-      // deep blue-black
-      surface: new Pr(528414)
-    },
-    particleColors: [
-      [0.627, 0.769, 1],
-      // ice blue
-      [0.878, 0.918, 1],
-      // pale holographic
-      [0.267, 0.541, 1],
-      // medium blue
-      [1, 1, 1]
-      // white
-    ],
-    tendrilColors: [
-      new Pr(10536191),
-      new Pr(14740223),
-      new Pr(4492031)
-    ],
-    riverColors: [
-      [0.627, 0.769, 1],
-      [0.878, 0.918, 1],
-      [1, 1, 1]
-    ],
-    metalColors: [
-      new Pr(10536191),
-      new Pr(14740223)
-    ],
-    reactionColors: [
-      new Pr(10536191),
-      new Pr(14740223),
-      new Pr(4492031)
-    ],
-    postfx: {
-      bloomStrength: 0.55,
-      bloomRadius: 0.45,
-      bloomThreshold: 0.3,
-      grainIntensity: 0.01,
-      chromaBase: 5e-4
-    },
-    fogColor: new Pr(330260),
-    fogDensity: 2e-3,
-    apply(engine2) {
-      engine2.scene.fog.color.copy(this.fogColor);
-      engine2.scene.fog.density = this.fogDensity;
-      engine2.bloomPass.strength = this.postfx.bloomStrength;
-      engine2.bloomPass.radius = this.postfx.bloomRadius;
-      engine2.bloomPass.threshold = this.postfx.bloomThreshold;
-      engine2.grainPass.uniforms.uIntensity.value = this.postfx.grainIntensity;
-    }
-  };
-
-  // assets/familiar/chimera-fx/themes/deep-ocean.js
-  var DeepOcean = {
-    name: "deep-ocean",
-    colors: {
-      primary: new Pr(46296),
-      // abyssal blue
-      secondary: new Pr(58879),
-      // bioluminescent cyan
-      tertiary: new Pr(30646),
-      // deep navy
-      accent: new Pr(9494767),
-      // light cyan
-      background: new Pr(133136),
-      // near-black ocean
-      surface: new Pr(265496)
-    },
-    particleColors: [
-      [0, 0.706, 0.847],
-      // abyssal blue
-      [0, 0.898, 1],
-      // bioluminescent
-      [0, 0.467, 0.725],
-      // deep navy
-      [0.565, 0.878, 0.937]
-      // light cyan
-    ],
-    tendrilColors: [
-      new Pr(46296),
-      new Pr(58879),
-      new Pr(30646)
-    ],
-    riverColors: [
-      [0, 0.706, 0.847],
-      [0, 0.898, 1],
-      [0.565, 0.878, 0.937]
-    ],
-    metalColors: [
-      new Pr(46296),
-      new Pr(58879)
-    ],
-    reactionColors: [
-      new Pr(46296),
-      new Pr(58879),
-      new Pr(30646)
-    ],
-    postfx: {
-      bloomStrength: 0.65,
-      bloomRadius: 0.6,
-      bloomThreshold: 0.22,
-      grainIntensity: 0.015,
-      chromaBase: 8e-4
-    },
-    fogColor: new Pr(133136),
-    fogDensity: 3e-3,
-    apply(engine2) {
-      engine2.scene.fog.color.copy(this.fogColor);
-      engine2.scene.fog.density = this.fogDensity;
-      engine2.bloomPass.strength = this.postfx.bloomStrength;
-      engine2.bloomPass.radius = this.postfx.bloomRadius;
-      engine2.bloomPass.threshold = this.postfx.bloomThreshold;
-      engine2.grainPass.uniforms.uIntensity.value = this.postfx.grainIntensity;
-    }
-  };
-
-  // assets/familiar/chimera-fx/themes/midnight-trading.js
+  // flutter/assets/familiar/chimera-fx/themes/midnight-trading.js
   var MidnightTrading = {
     name: "midnight-trading",
     colors: {
@@ -14280,7 +15458,7 @@
     }
   };
 
-  // assets/familiar/chimera-fx/themes/neon-samurai.js
+  // flutter/assets/familiar/chimera-fx/themes/neon-samurai.js
   var NeonSamurai = {
     name: "neon-samurai",
     colors: {
@@ -14344,50 +15522,59 @@
     }
   };
 
-  // assets/familiar/chimera-fx/themes/obsidian-forge.js
-  var ObsidianForge = {
-    name: "obsidian-forge",
+  // flutter/assets/familiar/chimera-fx/themes/deep-ocean.js
+  var DeepOcean = {
+    name: "deep-ocean",
     colors: {
-      primary: new Pr(16742936),
-      secondary: new Pr(10213375),
-      tertiary: new Pr(3093826),
-      accent: new Pr(16761182),
-      background: new Pr(328966),
-      surface: new Pr(1118743)
+      primary: new Pr(46296),
+      // abyssal blue
+      secondary: new Pr(58879),
+      // bioluminescent cyan
+      tertiary: new Pr(30646),
+      // deep navy
+      accent: new Pr(9494767),
+      // light cyan
+      background: new Pr(133136),
+      // near-black ocean
+      surface: new Pr(265496)
     },
     particleColors: [
-      [1, 0.478, 0.094],
-      [1, 0.757, 0.369],
-      [0.608, 0.843, 1],
-      [0.184, 0.208, 0.259]
+      [0, 0.706, 0.847],
+      // abyssal blue
+      [0, 0.898, 1],
+      // bioluminescent
+      [0, 0.467, 0.725],
+      // deep navy
+      [0.565, 0.878, 0.937]
+      // light cyan
     ],
     tendrilColors: [
-      new Pr(16742936),
-      new Pr(16761182),
-      new Pr(10213375)
+      new Pr(46296),
+      new Pr(58879),
+      new Pr(30646)
     ],
     riverColors: [
-      [1, 0.478, 0.094],
-      [0.608, 0.843, 1],
-      [1, 0.757, 0.369]
+      [0, 0.706, 0.847],
+      [0, 0.898, 1],
+      [0.565, 0.878, 0.937]
     ],
     metalColors: [
-      new Pr(16742936),
-      new Pr(10213375)
+      new Pr(46296),
+      new Pr(58879)
     ],
     reactionColors: [
-      new Pr(16742936),
-      new Pr(16761182),
-      new Pr(10213375)
+      new Pr(46296),
+      new Pr(58879),
+      new Pr(30646)
     ],
     postfx: {
-      bloomStrength: 0.82,
-      bloomRadius: 0.48,
-      bloomThreshold: 0.24,
-      grainIntensity: 0.018,
-      chromaBase: 12e-4
+      bloomStrength: 0.65,
+      bloomRadius: 0.6,
+      bloomThreshold: 0.22,
+      grainIntensity: 0.015,
+      chromaBase: 8e-4
     },
-    fogColor: new Pr(328966),
+    fogColor: new Pr(133136),
     fogDensity: 3e-3,
     apply(engine2) {
       engine2.scene.fog.color.copy(this.fogColor);
@@ -14399,62 +15586,7 @@
     }
   };
 
-  // assets/familiar/chimera-fx/themes/orchid-vapor.js
-  var OrchidVapor = {
-    name: "orchid-vapor",
-    colors: {
-      primary: new Pr(16734920),
-      secondary: new Pr(9437152),
-      tertiary: new Pr(6871295),
-      accent: new Pr(15251455),
-      background: new Pr(1049877),
-      surface: new Pr(1511455)
-    },
-    particleColors: [
-      [1, 0.353, 0.784],
-      [0.561, 1, 0.878],
-      [0.408, 0.847, 1],
-      [0.91, 0.718, 1]
-    ],
-    tendrilColors: [
-      new Pr(16734920),
-      new Pr(9437152),
-      new Pr(15251455)
-    ],
-    riverColors: [
-      [1, 0.353, 0.784],
-      [0.561, 1, 0.878],
-      [0.408, 0.847, 1]
-    ],
-    metalColors: [
-      new Pr(16734920),
-      new Pr(9437152)
-    ],
-    reactionColors: [
-      new Pr(16734920),
-      new Pr(9437152),
-      new Pr(15251455)
-    ],
-    postfx: {
-      bloomStrength: 0.66,
-      bloomRadius: 0.62,
-      bloomThreshold: 0.25,
-      grainIntensity: 0.01,
-      chromaBase: 1e-3
-    },
-    fogColor: new Pr(1049877),
-    fogDensity: 2e-3,
-    apply(engine2) {
-      engine2.scene.fog.color.copy(this.fogColor);
-      engine2.scene.fog.density = this.fogDensity;
-      engine2.bloomPass.strength = this.postfx.bloomStrength;
-      engine2.bloomPass.radius = this.postfx.bloomRadius;
-      engine2.bloomPass.threshold = this.postfx.bloomThreshold;
-      engine2.grainPass.uniforms.uIntensity.value = this.postfx.grainIntensity;
-    }
-  };
-
-  // assets/familiar/chimera-fx/themes/solar-flare.js
+  // flutter/assets/familiar/chimera-fx/themes/solar-flare.js
   var SolarFlare = {
     name: "solar-flare",
     colors: {
@@ -14518,62 +15650,7 @@
     }
   };
 
-  // assets/familiar/chimera-fx/themes/tidal-glass.js
-  var TidalGlass = {
-    name: "tidal-glass",
-    colors: {
-      primary: new Pr(4381183),
-      secondary: new Pr(5211647),
-      tertiary: new Pr(15980410),
-      accent: new Pr(14679039),
-      background: new Pr(200732),
-      surface: new Pr(464935)
-    },
-    particleColors: [
-      [0.259, 0.851, 1],
-      [0.31, 0.522, 1],
-      [0.953, 0.843, 0.478],
-      [0.875, 0.984, 1]
-    ],
-    tendrilColors: [
-      new Pr(4381183),
-      new Pr(5211647),
-      new Pr(15980410)
-    ],
-    riverColors: [
-      [0.259, 0.851, 1],
-      [0.31, 0.522, 1],
-      [0.953, 0.843, 0.478]
-    ],
-    metalColors: [
-      new Pr(4381183),
-      new Pr(14679039)
-    ],
-    reactionColors: [
-      new Pr(4381183),
-      new Pr(5211647),
-      new Pr(15980410)
-    ],
-    postfx: {
-      bloomStrength: 0.62,
-      bloomRadius: 0.52,
-      bloomThreshold: 0.28,
-      grainIntensity: 6e-3,
-      chromaBase: 8e-4
-    },
-    fogColor: new Pr(200732),
-    fogDensity: 22e-4,
-    apply(engine2) {
-      engine2.scene.fog.color.copy(this.fogColor);
-      engine2.scene.fog.density = this.fogDensity;
-      engine2.bloomPass.strength = this.postfx.bloomStrength;
-      engine2.bloomPass.radius = this.postfx.bloomRadius;
-      engine2.bloomPass.threshold = this.postfx.bloomThreshold;
-      engine2.grainPass.uniforms.uIntensity.value = this.postfx.grainIntensity;
-    }
-  };
-
-  // assets/familiar/chimera-fx/themes/void-walker.js
+  // flutter/assets/familiar/chimera-fx/themes/void-walker.js
   var VoidWalker = {
     name: "void-walker",
     colors: {
@@ -14637,48 +15714,468 @@
     }
   };
 
-  // assets/familiar/chimera-fx/chimera-fx-bundle.js
-  var COMPONENTS = { nebula: ParticleNebula, "particle-nebula": ParticleNebula, tendrils: EnergyTendrils, "energy-tendrils": EnergyTendrils, rivers: DataRivers, "data-rivers": DataRivers, volumetric: VolumetricLight, "volumetric-light": VolumetricLight, metal: LiquidMetal, "liquid-metal": LiquidMetal, reaction: ReactionDiffusion, "reaction-diffusion": ReactionDiffusion, voronoi: VoronoiShatter, "voronoi-shatter": VoronoiShatter, hud: HoloHUD, "holo-hud": HoloHUD, beams: EnergyBeams, "energy-beams": EnergyBeams, orb: IridescentOrb, "iridescent-orb": IridescentOrb };
+  // flutter/assets/familiar/chimera-fx/themes/crystal-matrix.js
+  var CrystalMatrix = {
+    name: "crystal-matrix",
+    colors: {
+      primary: new Pr(10536191),
+      // ice blue
+      secondary: new Pr(14740223),
+      // pale holographic
+      tertiary: new Pr(4492031),
+      // medium blue
+      accent: new Pr(16777215),
+      // white
+      background: new Pr(330260),
+      // deep blue-black
+      surface: new Pr(528414)
+    },
+    particleColors: [
+      [0.627, 0.769, 1],
+      // ice blue
+      [0.878, 0.918, 1],
+      // pale holographic
+      [0.267, 0.541, 1],
+      // medium blue
+      [1, 1, 1]
+      // white
+    ],
+    tendrilColors: [
+      new Pr(10536191),
+      new Pr(14740223),
+      new Pr(4492031)
+    ],
+    riverColors: [
+      [0.627, 0.769, 1],
+      [0.878, 0.918, 1],
+      [1, 1, 1]
+    ],
+    metalColors: [
+      new Pr(10536191),
+      new Pr(14740223)
+    ],
+    reactionColors: [
+      new Pr(10536191),
+      new Pr(14740223),
+      new Pr(4492031)
+    ],
+    postfx: {
+      bloomStrength: 0.55,
+      bloomRadius: 0.45,
+      bloomThreshold: 0.3,
+      grainIntensity: 0.01,
+      chromaBase: 5e-4
+    },
+    fogColor: new Pr(330260),
+    fogDensity: 2e-3,
+    apply(engine2) {
+      engine2.scene.fog.color.copy(this.fogColor);
+      engine2.scene.fog.density = this.fogDensity;
+      engine2.bloomPass.strength = this.postfx.bloomStrength;
+      engine2.bloomPass.radius = this.postfx.bloomRadius;
+      engine2.bloomPass.threshold = this.postfx.bloomThreshold;
+      engine2.grainPass.uniforms.uIntensity.value = this.postfx.grainIntensity;
+    }
+  };
+
+  // flutter/assets/familiar/chimera-fx/themes/aurora-borealis.js
+  var AuroraBorealis = {
+    name: "aurora-borealis",
+    colors: {
+      primary: new Pr(7339986),
+      secondary: new Pr(10124543),
+      tertiary: new Pr(5495039),
+      accent: new Pr(16735439),
+      background: new Pr(266263),
+      surface: new Pr(530213)
+    },
+    particleColors: [
+      [0.435, 1, 0.824],
+      [0.604, 0.486, 1],
+      [0.325, 0.847, 1],
+      [1, 0.361, 0.812]
+    ],
+    tendrilColors: [
+      new Pr(7339986),
+      new Pr(10124543),
+      new Pr(16735439)
+    ],
+    riverColors: [
+      [0.435, 1, 0.824],
+      [0.604, 0.486, 1],
+      [0.325, 0.847, 1]
+    ],
+    metalColors: [
+      new Pr(7339986),
+      new Pr(10124543)
+    ],
+    reactionColors: [
+      new Pr(7339986),
+      new Pr(10124543),
+      new Pr(16735439)
+    ],
+    postfx: {
+      bloomStrength: 0.72,
+      bloomRadius: 0.55,
+      bloomThreshold: 0.22,
+      grainIntensity: 0.012,
+      chromaBase: 1e-3
+    },
+    fogColor: new Pr(266263),
+    fogDensity: 25e-4,
+    apply(engine2) {
+      engine2.scene.fog.color.copy(this.fogColor);
+      engine2.scene.fog.density = this.fogDensity;
+      engine2.bloomPass.strength = this.postfx.bloomStrength;
+      engine2.bloomPass.radius = this.postfx.bloomRadius;
+      engine2.bloomPass.threshold = this.postfx.bloomThreshold;
+      engine2.grainPass.uniforms.uIntensity.value = this.postfx.grainIntensity;
+    }
+  };
+
+  // flutter/assets/familiar/chimera-fx/themes/obsidian-forge.js
+  var ObsidianForge = {
+    name: "obsidian-forge",
+    colors: {
+      primary: new Pr(16742936),
+      secondary: new Pr(10213375),
+      tertiary: new Pr(3093826),
+      accent: new Pr(16761182),
+      background: new Pr(328966),
+      surface: new Pr(1118743)
+    },
+    particleColors: [
+      [1, 0.478, 0.094],
+      [1, 0.757, 0.369],
+      [0.608, 0.843, 1],
+      [0.184, 0.208, 0.259]
+    ],
+    tendrilColors: [
+      new Pr(16742936),
+      new Pr(16761182),
+      new Pr(10213375)
+    ],
+    riverColors: [
+      [1, 0.478, 0.094],
+      [0.608, 0.843, 1],
+      [1, 0.757, 0.369]
+    ],
+    metalColors: [
+      new Pr(16742936),
+      new Pr(10213375)
+    ],
+    reactionColors: [
+      new Pr(16742936),
+      new Pr(16761182),
+      new Pr(10213375)
+    ],
+    postfx: {
+      bloomStrength: 0.82,
+      bloomRadius: 0.48,
+      bloomThreshold: 0.24,
+      grainIntensity: 0.018,
+      chromaBase: 12e-4
+    },
+    fogColor: new Pr(328966),
+    fogDensity: 3e-3,
+    apply(engine2) {
+      engine2.scene.fog.color.copy(this.fogColor);
+      engine2.scene.fog.density = this.fogDensity;
+      engine2.bloomPass.strength = this.postfx.bloomStrength;
+      engine2.bloomPass.radius = this.postfx.bloomRadius;
+      engine2.bloomPass.threshold = this.postfx.bloomThreshold;
+      engine2.grainPass.uniforms.uIntensity.value = this.postfx.grainIntensity;
+    }
+  };
+
+  // flutter/assets/familiar/chimera-fx/themes/orchid-vapor.js
+  var OrchidVapor = {
+    name: "orchid-vapor",
+    colors: {
+      primary: new Pr(16734920),
+      secondary: new Pr(9437152),
+      tertiary: new Pr(6871295),
+      accent: new Pr(15251455),
+      background: new Pr(1049877),
+      surface: new Pr(1511455)
+    },
+    particleColors: [
+      [1, 0.353, 0.784],
+      [0.561, 1, 0.878],
+      [0.408, 0.847, 1],
+      [0.91, 0.718, 1]
+    ],
+    tendrilColors: [
+      new Pr(16734920),
+      new Pr(9437152),
+      new Pr(15251455)
+    ],
+    riverColors: [
+      [1, 0.353, 0.784],
+      [0.561, 1, 0.878],
+      [0.408, 0.847, 1]
+    ],
+    metalColors: [
+      new Pr(16734920),
+      new Pr(9437152)
+    ],
+    reactionColors: [
+      new Pr(16734920),
+      new Pr(9437152),
+      new Pr(15251455)
+    ],
+    postfx: {
+      bloomStrength: 0.66,
+      bloomRadius: 0.62,
+      bloomThreshold: 0.25,
+      grainIntensity: 0.01,
+      chromaBase: 1e-3
+    },
+    fogColor: new Pr(1049877),
+    fogDensity: 2e-3,
+    apply(engine2) {
+      engine2.scene.fog.color.copy(this.fogColor);
+      engine2.scene.fog.density = this.fogDensity;
+      engine2.bloomPass.strength = this.postfx.bloomStrength;
+      engine2.bloomPass.radius = this.postfx.bloomRadius;
+      engine2.bloomPass.threshold = this.postfx.bloomThreshold;
+      engine2.grainPass.uniforms.uIntensity.value = this.postfx.grainIntensity;
+    }
+  };
+
+  // flutter/assets/familiar/chimera-fx/themes/tidal-glass.js
+  var TidalGlass = {
+    name: "tidal-glass",
+    colors: {
+      primary: new Pr(4381183),
+      secondary: new Pr(5211647),
+      tertiary: new Pr(15980410),
+      accent: new Pr(14679039),
+      background: new Pr(200732),
+      surface: new Pr(464935)
+    },
+    particleColors: [
+      [0.259, 0.851, 1],
+      [0.31, 0.522, 1],
+      [0.953, 0.843, 0.478],
+      [0.875, 0.984, 1]
+    ],
+    tendrilColors: [
+      new Pr(4381183),
+      new Pr(5211647),
+      new Pr(15980410)
+    ],
+    riverColors: [
+      [0.259, 0.851, 1],
+      [0.31, 0.522, 1],
+      [0.953, 0.843, 0.478]
+    ],
+    metalColors: [
+      new Pr(4381183),
+      new Pr(14679039)
+    ],
+    reactionColors: [
+      new Pr(4381183),
+      new Pr(5211647),
+      new Pr(15980410)
+    ],
+    postfx: {
+      bloomStrength: 0.62,
+      bloomRadius: 0.52,
+      bloomThreshold: 0.28,
+      grainIntensity: 6e-3,
+      chromaBase: 8e-4
+    },
+    fogColor: new Pr(200732),
+    fogDensity: 22e-4,
+    apply(engine2) {
+      engine2.scene.fog.color.copy(this.fogColor);
+      engine2.scene.fog.density = this.fogDensity;
+      engine2.bloomPass.strength = this.postfx.bloomStrength;
+      engine2.bloomPass.radius = this.postfx.bloomRadius;
+      engine2.bloomPass.threshold = this.postfx.bloomThreshold;
+      engine2.grainPass.uniforms.uIntensity.value = this.postfx.grainIntensity;
+    }
+  };
+
+  // flutter/assets/familiar/chimera-fx/chimera-fx-bundle.js
+  var COMPONENTS = {
+    nebula: ParticleNebula,
+    "particle-nebula": ParticleNebula,
+    tendrils: EnergyTendrils,
+    "energy-tendrils": EnergyTendrils,
+    rivers: DataRivers,
+    "data-rivers": DataRivers,
+    volumetric: VolumetricLight,
+    "volumetric-light": VolumetricLight,
+    metal: LiquidMetal,
+    "liquid-metal": LiquidMetal,
+    reaction: ReactionDiffusion,
+    "reaction-diffusion": ReactionDiffusion,
+    voronoi: VoronoiShatter,
+    "voronoi-shatter": VoronoiShatter,
+    hud: HoloHUD,
+    "holo-hud": HoloHUD,
+    beams: EnergyBeams,
+    "energy-beams": EnergyBeams,
+    orb: IridescentOrb,
+    "iridescent-orb": IridescentOrb,
+    matter: ShapableMatter,
+    "shapable-matter": ShapableMatter
+  };
   var THEMES = {
-    "mindrecipe-core": MindRecipeCore,
+    "mindrecipe-core": ChimeraNative,
     "cyberpunk-neon": CyberpunkNeon,
     "organic-bioluminescent": OrganicBioluminescent,
     "quantum-void": QuantumVoid,
     "holographic-matrix": HolographicMatrix,
     "chimera-native": ChimeraNative,
-    "aurora-borealis": AuroraBorealis,
-    "crystal-matrix": CrystalMatrix,
-    "deep-ocean": DeepOcean,
     "midnight-trading": MidnightTrading,
     "neon-samurai": NeonSamurai,
+    "deep-ocean": DeepOcean,
+    "solar-flare": SolarFlare,
+    "void-walker": VoidWalker,
+    "crystal-matrix": CrystalMatrix,
+    "aurora-borealis": AuroraBorealis,
     "obsidian-forge": ObsidianForge,
     "orchid-vapor": OrchidVapor,
-    "solar-flare": SolarFlare,
-    "tidal-glass": TidalGlass,
-    "void-walker": VoidWalker
+    "tidal-glass": TidalGlass
   };
-  var PRESETS2 = { full: ["nebula", "tendrils", "rivers", "volumetric", "reaction", "voronoi", "hud", "beams", "orb"], lite: ["nebula", "tendrils", "hud"], trading: ["rivers", "tendrils", "voronoi", "hud", "beams"], cinematic: ["nebula", "volumetric", "metal", "reaction", "orb"], holographic: ["orb", "hud", "beams", "tendrils", "rivers"], minimal: ["nebula"] };
+  var PRESETS2 = {
+    // Full experience — all components (powerful GPUs only)
+    full: ["nebula", "tendrils", "rivers", "volumetric", "reaction", "voronoi", "hud", "beams", "orb", "matter"],
+    // Performance-optimized — lighter components
+    lite: ["nebula", "tendrils", "hud", "matter"],
+    // Trading focused — data visualization emphasis
+    trading: ["rivers", "tendrils", "voronoi", "hud", "beams", "matter"],
+    // Cinematic — heavy visual feast
+    cinematic: ["nebula", "volumetric", "metal", "reaction", "orb", "matter"],
+    // Holographic — sci-fi control room
+    holographic: ["orb", "hud", "beams", "tendrils", "rivers", "matter"],
+    // Minimal — just ambient background (shapable matter for mode-switching)
+    minimal: ["matter"],
+    // Matter-only — single ShapableMatter component (all 11 modes available)
+    matter: ["matter"]
+  };
   function create(opts = {}) {
-    const theme = typeof opts.theme === "string" ? THEMES[opts.theme] : opts.theme;
-    const engine2 = new Engine({ container: opts.container || document.body, fps: opts.fps || 60, theme, bloomStrength: opts.bloomStrength, bloomRadius: opts.bloomRadius, bloomThreshold: opts.bloomThreshold });
-    const names = opts.preset ? PRESETS2[opts.preset] || PRESETS2.lite : opts.components || PRESETS2.lite;
-    for (const name of names) {
+    const engine2 = new Engine({
+      container: opts.container || document.body,
+      fps: opts.fps || 60,
+      theme: void 0,
+      // set after component init
+      bloomStrength: opts.bloomStrength,
+      bloomRadius: opts.bloomRadius,
+      bloomThreshold: opts.bloomThreshold
+    });
+    let componentNames;
+    if (opts.preset) {
+      componentNames = PRESETS2[opts.preset] || PRESETS2.lite;
+    } else if (opts.components) {
+      componentNames = opts.components;
+    } else {
+      componentNames = PRESETS2.lite;
+    }
+    for (const name of componentNames) {
       const Ctor = COMPONENTS[name];
-      if (Ctor) engine2.addComponent(new Ctor(opts[name] || {}));
-      else console.warn(`ChimeraFX: Unknown component "${name}"`);
+      if (Ctor) {
+        const compOpts = opts[name] || {};
+        engine2.addComponent(new Ctor(compOpts));
+      } else {
+        console.warn(`ChimeraFX: Unknown component "${name}"`);
+      }
+    }
+    if (opts.theme) {
+      const theme = typeof opts.theme === "string" ? THEMES[opts.theme] : opts.theme;
+      if (theme) engine2.setTheme(theme);
     }
     engine2.start();
     return engine2;
   }
-  var ChimeraFX = { create, Engine, StateMachine, ParticleNebula, EnergyTendrils, DataRivers, VolumetricLight, LiquidMetal, ReactionDiffusion, VoronoiShatter, HoloHUD, EnergyBeams, IridescentOrb, themes: THEMES, MindRecipeCore, CyberpunkNeon, OrganicBioluminescent, QuantumVoid, HolographicMatrix, ChimeraNative, AuroraBorealis, CrystalMatrix, DeepOcean, MidnightTrading, NeonSamurai, ObsidianForge, OrchidVapor, SolarFlare, TidalGlass, VoidWalker, presets: PRESETS2, components: COMPONENTS, registerComponent(name, Ctor) {
-    COMPONENTS[name] = Ctor;
-  }, registerTheme(name, theme) {
-    THEMES[name] = theme;
-  }, version: "1.1.0" };
-  window.ChimeraFX = ChimeraFX;
+  var ChimeraFX = {
+    // Factory
+    create,
+    // Classes (for advanced usage)
+    Engine,
+    StateMachine,
+    // Components
+    ParticleNebula,
+    ShapableMatter,
+    EnergyTendrils,
+    DataRivers,
+    VolumetricLight,
+    LiquidMetal,
+    ReactionDiffusion,
+    VoronoiShatter,
+    HoloHUD,
+    EnergyBeams,
+    IridescentOrb,
+    // Themes
+    themes: THEMES,
+    CyberpunkNeon,
+    OrganicBioluminescent,
+    QuantumVoid,
+    HolographicMatrix,
+    ChimeraNative,
+    MidnightTrading,
+    NeonSamurai,
+    DeepOcean,
+    SolarFlare,
+    VoidWalker,
+    CrystalMatrix,
+    AuroraBorealis,
+    ObsidianForge,
+    OrchidVapor,
+    TidalGlass,
+    // Presets
+    presets: PRESETS2,
+    // Component registry (extensible)
+    components: COMPONENTS,
+    // Register custom component
+    registerComponent(name, Ctor) {
+      COMPONENTS[name] = Ctor;
+    },
+    // Register custom theme
+    registerTheme(name, theme) {
+      THEMES[name] = theme;
+    },
+    // Version
+    version: "1.0.1",
+    // Shim: Engine.setTheme looks for ChimeraFX._themes
+    _themes: THEMES,
+    // Matter mode routing to active ShapableMatter component
+    setMatterMode(mode) {
+      const engine2 = window._chimeraFX;
+      if (!engine2) {
+        console.warn("[ChimeraFX] setMatterMode: engine not ready");
+        return;
+      }
+      const compNames = engine2.components.map((c2) => c2.constructor.name);
+      console.log("[ChimeraFX] setMatterMode:", mode, "| components:", compNames);
+      const matter = engine2.components.find((c2) => c2.constructor.name === "ShapableMatter");
+      if (matter && typeof matter.setMatterMode === "function") {
+        matter.setMatterMode(mode);
+        console.log("[ChimeraFX] setMatterMode:", mode, "\u2014 ShapableMatter found, mode applied");
+      } else {
+        console.warn("[ChimeraFX] setMatterMode:", mode, "\u2014 ShapableMatter not found in components:", compNames);
+        const matterByProto = engine2.components.find((c2) => c2.constructor?.prototype?.setMatterMode);
+        if (matterByProto) {
+          console.log("[ChimeraFX] setMatterMode: found by prototype fallback");
+          matterByProto.setMatterMode(mode);
+        }
+      }
+    },
+    // Get current matter mode
+    getMatterMode() {
+      const engine2 = window._chimeraFX;
+      if (!engine2) return "nebula";
+      const matter = engine2.components.find((c2) => c2.constructor.name === "ShapableMatter");
+      return matter?.getMatterMode?.() || "nebula";
+    }
+  };
+  window.ChimeraFX = { ...window.ChimeraFX || {}, ...ChimeraFX };
   var chimera_fx_bundle_default = ChimeraFX;
 
-  // assets/familiar/chimera-fx/mobile-scene.js
+  // flutter/assets/familiar/chimera-fx/mobile-scene.js
   var bridge = (value) => {
     for (const name of ["BackgroundBridge", "FamiliarBridge", "IntroBridge"]) {
       try {
@@ -14691,28 +16188,8 @@
   var host = document.getElementById("stage") || document.body;
   var engine = null;
   var activeTheme = "mindrecipe-core";
-  var activePreset = "mindrecipe-core";
   var activeSeed = 17;
   var lastState = {};
-  var sceneProfiles = {
-    "mindrecipe-core": { id: "mindrecipe-core", field: 0, components: ["nebula", "tendrils", "rivers", "volumetric", "voronoi", "hud", "beams"] },
-    "chimera-native": { id: "mindrecipe-core", field: 0, components: ["nebula", "tendrils", "rivers", "volumetric", "voronoi", "hud", "beams"] },
-    "cyberpunk-neon": { id: "neon-circuit", field: 1, components: ["hud", "beams", "tendrils", "rivers"] },
-    "organic-bioluminescent": { id: "bioluminescent", field: 2, components: ["nebula", "tendrils", "volumetric", "reaction"] },
-    "quantum-void": { id: "quantum-void", field: 3, components: ["nebula", "voronoi", "beams"] },
-    "holographic-matrix": { id: "holographic-matrix", field: 4, components: ["hud", "beams", "rivers", "voronoi"] },
-    "midnight-trading": { id: "midnight-signal", field: 5, components: ["rivers", "hud", "beams"] },
-    "neon-samurai": { id: "neon-ronin", field: 6, components: ["tendrils", "beams", "voronoi", "hud"] },
-    "deep-ocean": { id: "abyssal-current", field: 7, components: ["nebula", "volumetric", "tendrils", "rivers"] },
-    "solar-flare": { id: "solar-flare", field: 8, components: ["nebula", "volumetric", "metal", "reaction", "beams"] },
-    "void-walker": { id: "void-walker", field: 9, components: ["nebula"] },
-    "crystal-matrix": { id: "crystal-matrix", field: 10, components: ["voronoi", "beams", "hud"] },
-    "aurora-borealis": { id: "aurora", field: 11, components: ["nebula", "tendrils", "beams", "volumetric"] },
-    "obsidian-forge": { id: "obsidian-forge", field: 12, components: ["metal", "reaction", "voronoi", "beams"] },
-    "orchid-vapor": { id: "orchid-vapor", field: 13, components: ["nebula", "tendrils", "metal", "hud"] },
-    "tidal-glass": { id: "tidal-glass", field: 14, components: ["rivers", "volumetric", "tendrils", "hud", "reaction"] }
-  };
-  var profileFor = (name) => sceneProfiles[name] || sceneProfiles["mindrecipe-core"];
   var EvolvingOrb = class {
     constructor(seed = 17) {
       this.seed = Number(seed) || 17;
@@ -14869,9 +16346,7 @@
         container: host,
         fps: 30,
         theme: activeTheme,
-        // The full-screen matter field is provided by the source shader layer;
-        // this Three.js graph supplies its matching geometry and post effects.
-        components: profileFor(activeTheme).components
+        components: ["nebula", "tendrils", "hud", "matter"]
       };
     }
     return {
@@ -14926,41 +16401,21 @@
     engine?.dispose();
     createEngine();
   }
-  function syncMatterField(themeName, progress, activation) {
-    if (sceneKind !== "background") return;
-    const matter = window.MindRecipeMatterVFX;
-    const theme = chimera_fx_bundle_default.themes[themeName];
-    if (!matter || !theme) return;
-    const profile = profileFor(themeName);
-    matter.setPalette(
-      theme.colors.primary.toArray(),
-      theme.colors.secondary.toArray(),
-      theme.colors.tertiary.toArray()
-    );
-    matter.setVariant(profile.field);
-    matter.setIntensity(Math.max(0.72, Math.min(1, Number(activation) || 0.78)));
-    matter.setAI(Math.max(0, Math.min(1, (Number(progress) + Number(activation)) / 2)));
-    matter.setThinking(Number(progress) > 0.28 || Number(activation) > 0.72);
-  }
   function apply(state = {}) {
     lastState = { ...lastState, ...state };
     if (!engine) return;
     const nextTheme = chimera_fx_bundle_default.themes[lastState.theme] ? lastState.theme : "mindrecipe-core";
-    const nextRequestedPreset = profileFor(nextTheme).id;
     const nextSeed = normalizeSeed(lastState.seed);
     const themeChanged = nextTheme !== activeTheme;
-    const presetChanged = sceneKind === "background" && nextRequestedPreset !== activePreset;
     const seedChanged = sceneKind === "pulse" && nextSeed !== activeSeed;
     activeTheme = nextTheme;
-    activePreset = nextRequestedPreset;
     activeSeed = nextSeed;
-    if (themeChanged || presetChanged || seedChanged) rebuildEngine();
+    if (themeChanged || seedChanged) rebuildEngine();
     configureSurface();
     const growth = Math.max(0, Math.min(1, Number(lastState.growth ?? lastState.progress ?? 0)));
     const complexity = Math.max(0, Math.min(1, Number(lastState.complexity ?? growth)));
     const activation = Math.max(0, Math.min(1, Number(lastState.activation ?? lastState.intensity ?? 0.35)));
     const valence = Math.max(-1, Math.min(1, Number(lastState.valence ?? 0)));
-    syncMatterField(activeTheme, growth, activation);
     engine.setState(activation > 0.74 ? "thinking" : growth > 0.68 ? "success" : complexity > 0.34 ? "streaming" : "idle");
     const components = engine.components || [];
     components.find((component) => component instanceof EvolvingOrb)?.setEvolution({ growth, complexity, activation, valence });
@@ -14982,7 +16437,6 @@
   function start() {
     try {
       activeTheme = chimera_fx_bundle_default.themes[lastState.theme] ? lastState.theme : "mindrecipe-core";
-      activePreset = profileFor(activeTheme).id;
       activeSeed = normalizeSeed(lastState.seed);
       createEngine();
       apply(lastState);
@@ -15002,7 +16456,6 @@
   });
   window.setBackgroundPaused = (paused) => {
     paused ? engine?._pause() : engine?._resume();
-    window.MindRecipeMatterVFX?.toggle(!paused);
   };
   window.setFamiliarPaused = (paused) => paused ? engine?._pause() : engine?._resume();
   start();

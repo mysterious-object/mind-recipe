@@ -59,7 +59,7 @@ export const ChimeraNative = {
     bloomStrength: 0.35,
     bloomRadius: 0.5,
     bloomThreshold: 0.35,
-    grainIntensity: 0.03,
+    grainIntensity: 0.005,
     chromaBase: 0.0005,
   },
 

@@ -22,7 +22,7 @@ const _expectedThemes = <String, (String, String)>{
 };
 
 const _themeModules = <String, String>{
-  'mindrecipe-core': 'mindrecipe-core.js',
+  'mindrecipe-core': 'chimera-native.js',
   'cyberpunk-neon': 'cyberpunk-neon.js',
   'organic-bioluminescent': 'organic-bioluminescent.js',
   'quantum-void': 'quantum-void.js',
@@ -98,44 +98,44 @@ void main() {
       expect(source, isNot(contains('ChimeraFX.registerTheme(name')));
     });
 
-    test('all themes drive distinct source VFX and matter-field variants', () {
-      final scene = File('assets/familiar/chimera-fx/mobile-scene.js')
-          .readAsStringSync();
-      final engine = File('assets/familiar/chimera-fx/core/Engine.js')
-          .readAsStringSync();
-      final shader = File(
-        'assets/familiar/chimera-fx/mind-recipe-vfx-engine.js',
-      ).readAsStringSync();
-      final page = File('assets/familiar/background.html').readAsStringSync();
+    test(
+      'background runs the source ChimeraFX stack without a parallel shader',
+      () {
+        final scene = File('assets/familiar/chimera-fx/theme-scene.js')
+            .readAsStringSync();
+        final engine = File('assets/familiar/chimera-fx/core/Engine.js')
+            .readAsStringSync();
+        final matter = File('assets/familiar/chimera-fx/core/ShapableMatter.js')
+            .readAsStringSync();
+        final ambient = File('assets/familiar/chimera-fx/core/AmbientColors.js')
+            .readAsStringSync();
+        final page = File('assets/familiar/background.html').readAsStringSync();
 
-      for (var index = 0; index < visualThemes.length; index++) {
         expect(
           scene,
-          contains('field: $index'),
-          reason: '${visualThemes[index].id} needs its own shader field.',
+          contains("import ChimeraFX from './chimera-fx-bundle.js'"),
         );
-      }
-      expect(scene, contains('MindRecipeMatterVFX'));
-      expect(shader, contains('mod(u_variant, 15.0)'));
-      expect(shader, contains('variant == 14.0'));
-      expect(
-        shader,
-        contains('MAX_RENDERBUFFER_SIZE'),
-        reason: 'Tall phones must cap the WebGL canvas below GPU limits.',
-      );
-      expect(shader, contains('maxDimension = Math.min(reportedLimit, 1024)'));
-      expect(
-        engine,
-        contains('_safePixelRatio'),
-        reason: 'The shared Three familiar must also avoid oversized targets.',
-      );
-      expect(page, contains('mind-recipe-vfx-engine.js'));
-      expect(
-        page,
-        isNot(contains('mobile-scene.bundle.js')),
-        reason: 'Background must use one WebGL context on mobile.',
-      );
-    });
+        expect(scene, contains("preset: 'lite'"));
+        expect(scene, isNot(contains('field:')));
+        expect(scene, isNot(contains('MatterVFX')));
+        expect(page, contains('theme-scene.js'));
+        expect(page, isNot(contains('mind-recipe-vfx-engine.js')));
+        expect(engine, contains('EffectComposer'));
+        expect(engine, contains('UnrealBloomPass'));
+        expect(
+          matter,
+          contains('Unified particle engine with 11 swappable matter modes'),
+        );
+        expect(matter, contains("photonic"));
+        expect(ambient, contains('class AmbientColors'));
+        expect(
+          File('assets/familiar/chimera-fx/mind-recipe-vfx-engine.js')
+              .existsSync(),
+          isFalse,
+          reason: 'The synthetic parallel renderer must not ship.',
+        );
+      },
+    );
 
     test('user-visible source strings contain no retired product language', () {
       const banned = <String>[
