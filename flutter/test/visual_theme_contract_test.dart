@@ -101,6 +101,8 @@ void main() {
     test('all themes drive distinct source VFX and matter-field variants', () {
       final scene = File('assets/familiar/chimera-fx/mobile-scene.js')
           .readAsStringSync();
+      final engine = File('assets/familiar/chimera-fx/core/Engine.js')
+          .readAsStringSync();
       final shader = File(
         'assets/familiar/chimera-fx/mind-recipe-vfx-engine.js',
       ).readAsStringSync();
@@ -116,6 +118,16 @@ void main() {
       expect(scene, contains('MindRecipeMatterVFX'));
       expect(shader, contains('mod(u_variant, 15.0)'));
       expect(shader, contains('variant == 14.0'));
+      expect(
+        shader,
+        contains('MAX_RENDERBUFFER_SIZE'),
+        reason: 'Tall phones must cap the WebGL canvas below GPU limits.',
+      );
+      expect(
+        engine,
+        contains('_safePixelRatio'),
+        reason: 'The shared Three familiar must also avoid oversized targets.',
+      );
       expect(page, contains('mind-recipe-vfx-engine.js'));
       expect(
         page,

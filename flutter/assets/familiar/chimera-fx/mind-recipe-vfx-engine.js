@@ -601,8 +601,16 @@ const ChimeraVFX = (() => {
     }
 
     function resize() {
-        const dpr = Math.min(window.devicePixelRatio, 2);
         const w = window.innerWidth, h = window.innerHeight;
+        // Foldables and tall phones can exceed the GPU's largest drawable
+        // dimension at a nominal 2x DPR. Keep the local WebGL canvas below
+        // the hardware limit instead of allocating an incomplete framebuffer.
+        const maxDimension = gl ? (gl.getParameter(gl.MAX_RENDERBUFFER_SIZE) || 3072) : 3072;
+        const dpr = Math.max(.5, Math.min(
+            window.devicePixelRatio || 1,
+            1.25,
+            maxDimension / Math.max(w, h, 1)
+        ));
         if (glCanvas) { glCanvas.width=w*dpr; glCanvas.height=h*dpr; gl.viewport(0,0,glCanvas.width,glCanvas.height); }
         // Match text texture to canvas pixels for 1:1 crisp text
         if (glCanvas && textCanvas) {

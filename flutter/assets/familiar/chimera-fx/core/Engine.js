@@ -24,11 +24,18 @@ export class Engine {
   }
   _initRenderer() {
     this.renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true, powerPreference: 'high-performance', stencil: false, depth: true });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
+    this.renderer.setPixelRatio(this._safePixelRatio(this.container.clientWidth, this.container.clientHeight)); this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
     this.renderer.setClearColor(0x000000, 0); this.renderer.toneMapping = THREE.ACESFilmicToneMapping; this.renderer.toneMappingExposure = 1.0; this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     const canvas = this.renderer.domElement; canvas.id = 'chimera-fx-canvas';
     canvas.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:1;pointer-events:none;opacity:0.25;mix-blend-mode:screen;';
     if (this.container.firstChild) this.container.insertBefore(canvas, this.container.firstChild); else this.container.appendChild(canvas);
+  }
+  _safePixelRatio(width, height) {
+    // A 2x canvas on a tall folded display can exceed MAX_RENDERBUFFER_SIZE,
+    // which leaves Three's composer with an incomplete framebuffer. One
+    // native-resolution frame is preferable to a black or frozen renderer.
+    const maxDimension = Math.min(this.renderer.capabilities.maxTextureSize || 3072, 3072);
+    return Math.max(.5, Math.min(window.devicePixelRatio || 1, 1, maxDimension / Math.max(width, height, 1)));
   }
   _initScene() { this.scene = new THREE.Scene(); this.scene.fog = new THREE.FogExp2(0x000000, 0.0015); }
   _initCamera() { const aspect = this.container.clientWidth / this.container.clientHeight; this.camera = new THREE.PerspectiveCamera(60, aspect, 0.1, 1000); this.camera.position.set(0, 0, 30); this.camera.lookAt(0, 0, 0); }
@@ -59,7 +66,7 @@ export class Engine {
       if (e.matches) { this._pause(); this.renderOnce(); } else { this._resume(); }
     });
   }
-  _resize() { const w = this.container.clientWidth, h = this.container.clientHeight; this.camera.aspect = w / h; this.camera.updateProjectionMatrix(); this.renderer.setSize(w, h); this.composer.setSize(w, h); this.components.forEach(c => c.onResize?.(w, h, this)); }
+  _resize() { const w = this.container.clientWidth, h = this.container.clientHeight; this.camera.aspect = w / h; this.camera.updateProjectionMatrix(); this.renderer.setPixelRatio(this._safePixelRatio(w, h)); this.renderer.setSize(w, h); this.composer.setSize(w, h); this.components.forEach(c => c.onResize?.(w, h, this)); }
   addComponent(component) { component.init?.(this); this.components.push(component); return this; }
   removeComponent(component) { const i = this.components.indexOf(component); if (i >= 0) { component.dispose?.(this); this.components.splice(i, 1); } return this; }
   setTheme(theme) { this.theme = theme; if (theme) { theme.apply?.(this); this.components.forEach(c => c.onThemeChange?.(theme, this)); } return this; }
