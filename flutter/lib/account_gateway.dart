@@ -175,7 +175,7 @@ class _AccountGatewayState extends State<AccountGateway> {
                 : resetting
                 ? .67
                 : .16,
-            intensity: .78,
+            intensity: .92,
             theme: visualThemeFor(widget.appState.visualThemeId).engineTheme,
           ),
         ),

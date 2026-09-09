@@ -230,6 +230,14 @@ const ChimeraVFX = (() => {
         // Deep layer moves independently (different part of the body)
         vec2 deepSwim = vec2(sin(t*0.09)*0.06, cos(t*0.11)*0.05);
         float deepLayer = pow(fbm(st*2.5 + deepSwim - t*.01 + vec2(5.,2.)), 1.3) * 1.5;
+        // The third color is intentionally a visual actor, not just picker
+        // decoration. A moving highlight gives every live profile a distinct
+        // spectral identity in addition to its field geometry.
+        float accentWave = .5 + .5 * sin(
+            st.x * (8.0 + mod(variant, 5.0) * 2.0) -
+            st.y * (3.0 + mod(variant, 4.0)) + t * (.22 + variant * .011));
+        float accent = pow(accentWave, 8.0) *
+            (.22 + .26 * smoothstep(.28, .72, massField));
 
         // Smooth pulsation — slow breathing, not a heartbeat flash
         float breathe = 0.88 + 0.12 * sin(t * 0.3);
@@ -278,6 +286,7 @@ const ChimeraVFX = (() => {
         col += u_c2 * veins * 0.8;         // brighter veins within the mass
         col += u_c1 * deepLayer * 0.2;     // cyan accent depth layer
         col += u_c2 * fog * 0.6;           // green fog fills remaining space
+        col += u_c3 * accent;               // theme-specific spectral ribbon
 
         // Creature shadows: massive dark shapes swimming through the green mass
         float creatureEdge = smoothstep(0.01, 0.12, creatureShadow) - smoothstep(0.12, 0.45, creatureShadow);
@@ -424,7 +433,7 @@ const ChimeraVFX = (() => {
         for (const p of particles) {
             if (p.life <= 0) continue;
             const a = p.life * 0.4;
-            ctx2d.fillStyle = `rgba(0,200,100,${a})`;
+            ctx2d.fillStyle = `rgba(${Math.round(C2[0]*255)},${Math.round(C2[1]*255)},${Math.round(C2[2]*255)},${a})`;
             ctx2d.beginPath();
             ctx2d.arc(p.x, p.y, p.size*p.life, 0, Math.PI*2);
             ctx2d.fill();

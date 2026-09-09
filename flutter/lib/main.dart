@@ -23,6 +23,7 @@ import 'on_device_inference.dart';
 import 'notification_scheduler.dart';
 import 'practitioner_sharing.dart';
 import 'visual_theme.dart';
+import 'live_visual_theme_picker.dart';
 import 'pulse_screen.dart';
 import 'recipes_screen.dart';
 import 'voice_interface.dart';
@@ -549,7 +550,7 @@ class _MemberHomeState extends State<MemberHome> {
                           progress: progress,
                           variant: visualThemeFor(widget.appState.visualThemeId)
                               .composition,
-                          intensity: .78,
+                          intensity: .96,
                           theme: visualThemeFor(widget.appState.visualThemeId)
                               .engineTheme,
                         ),
@@ -1835,44 +1836,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
         'Settings',
         style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
       ),
-      Card(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const ListTile(
-              leading: Icon(Icons.palette_outlined),
-              title: Text('Visual theme'),
-              subtitle: Text(
-                'Each selection changes the app palette and its live local WebGL scene together.',
-              ),
-            ),
-            const Divider(height: 1),
-            for (final theme in visualThemes)
-              RadioListTile<String>(
-                value: theme.id,
-                groupValue: widget.appState.visualThemeId,
-                onChanged: (value) => widget.appState.setVisualTheme(value!),
-                title: Text(theme.name),
-                subtitle: Text(theme.description),
-                secondary: SizedBox(
-                  width: 42,
-                  child: Stack(
-                    children: [
-                      CircleAvatar(radius: 13, backgroundColor: theme.primary),
-                      Positioned(
-                        left: 16,
-                        top: 8,
-                        child: CircleAvatar(
-                          radius: 13,
-                          backgroundColor: theme.secondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-          ],
-        ),
+      LiveVisualThemePicker(
+        selectedThemeId: widget.appState.visualThemeId,
+        onSelected: (theme) => widget.appState.setVisualTheme(theme.id),
       ),
       Card(
         child: ListTile(
