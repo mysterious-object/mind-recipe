@@ -186,7 +186,9 @@ class _PulseScreenState extends State<PulseScreen> with WidgetsBindingObserver {
     try {
       final controller = WebViewController()
         ..setJavaScriptMode(JavaScriptMode.unrestricted)
-        ..setBackgroundColor(Colors.transparent)
+        // Transparent Android WebViews can produce incomplete WebGL
+        // framebuffers on supported Samsung devices. Pulse owns this surface.
+        ..setBackgroundColor(const Color(0xff06151b))
         ..setNavigationDelegate(
           NavigationDelegate(
             // The renderer is bundled with the app. Allow only Flutter's

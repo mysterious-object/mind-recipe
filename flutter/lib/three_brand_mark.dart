@@ -31,7 +31,9 @@ class _ThreeBrandMarkState extends State<ThreeBrandMark> {
     try {
       final c = WebViewController()
         ..setJavaScriptMode(JavaScriptMode.unrestricted)
-        ..setBackgroundColor(Colors.transparent)
+        // Keep the familiar WebGL target opaque on Android. The surrounding
+        // card supplies its own surface color and the renderer remains local.
+        ..setBackgroundColor(const Color(0xff111323))
         ..setNavigationDelegate(
           NavigationDelegate(
             onNavigationRequest: (r) {

@@ -49,7 +49,11 @@ class _ThreeBackgroundState extends State<ThreeBackground>
     try {
       final controller = WebViewController()
         ..setJavaScriptMode(JavaScriptMode.unrestricted)
-        ..setBackgroundColor(Colors.transparent)
+        // Android WebView cannot reliably attach a WebGL framebuffer to a
+        // transparent surface on some Samsung GPUs. This renderer is the
+        // complete background layer, so an opaque base preserves the visual
+        // while allowing the GPU to allocate a valid target.
+        ..setBackgroundColor(const Color(0xff06151b))
         ..setNavigationDelegate(
           NavigationDelegate(
             onNavigationRequest: (r) {
