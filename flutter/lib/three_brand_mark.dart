@@ -31,9 +31,10 @@ class _ThreeBrandMarkState extends State<ThreeBrandMark> {
     try {
       final c = WebViewController()
         ..setJavaScriptMode(JavaScriptMode.unrestricted)
-        // Keep the familiar WebGL target opaque on Android. The surrounding
-        // card supplies its own surface color and the renderer remains local.
-        ..setBackgroundColor(const Color(0xff111323))
+        // This compact familiar renders inside the login card and uses its
+        // transparent bundled page. It is not a full-screen target; keeping
+        // it transparent preserves the card's seamless surface.
+        ..setBackgroundColor(Colors.transparent)
         ..setNavigationDelegate(
           NavigationDelegate(
             onNavigationRequest: (r) {

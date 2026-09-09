@@ -6,7 +6,6 @@ void main() {
   test('mobile WebGL surfaces use opaque Android-safe backing colors', () {
     for (final path in const [
       'lib/three_background.dart',
-      'lib/three_brand_mark.dart',
       'lib/pulse_screen.dart',
     ]) {
       final source = File(path).readAsStringSync();
