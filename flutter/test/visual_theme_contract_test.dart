@@ -123,7 +123,7 @@ void main() {
         contains('MAX_RENDERBUFFER_SIZE'),
         reason: 'Tall phones must cap the WebGL canvas below GPU limits.',
       );
-      expect(shader, contains('maxDimension = Math.min(reportedLimit, 2048)'));
+      expect(shader, contains('maxDimension = Math.min(reportedLimit, 1024)'));
       expect(
         engine,
         contains('_safePixelRatio'),

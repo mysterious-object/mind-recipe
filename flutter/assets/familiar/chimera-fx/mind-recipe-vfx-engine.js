@@ -606,10 +606,11 @@ const ChimeraVFX = (() => {
         // dimension at a nominal 2x DPR. Keep the local WebGL canvas below
         // the hardware limit instead of allocating an incomplete framebuffer.
         // Some Android WebViews report a larger limit than the compositor can
-        // actually attach. 2048 is the reliable maximum on the Samsung test
-        // path and still leaves a high-density render on ordinary phones.
-        const reportedLimit = gl ? (gl.getParameter(gl.MAX_RENDERBUFFER_SIZE) || 2048) : 2048;
-        const maxDimension = Math.min(reportedLimit, 2048);
+        // actually attach. Full-screen mobile WebViews also need room for
+        // compositor targets, so constrain the animated field to 1024px on
+        // its longest side and let CSS scale it cleanly.
+        const reportedLimit = gl ? (gl.getParameter(gl.MAX_RENDERBUFFER_SIZE) || 1024) : 1024;
+        const maxDimension = Math.min(reportedLimit, 1024);
         const dpr = Math.max(.25, Math.min(
             window.devicePixelRatio || 1,
             1.25,

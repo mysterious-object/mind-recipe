@@ -34,8 +34,8 @@ export class Engine {
     // A 2x canvas on a tall folded display can exceed MAX_RENDERBUFFER_SIZE,
     // which leaves Three's composer with an incomplete framebuffer. One
     // native-resolution frame is preferable to a black or frozen renderer.
-    const reportedLimit = this.renderer.capabilities.maxTextureSize || 2048;
-    const maxDimension = Math.min(reportedLimit, 2048);
+    const reportedLimit = this.renderer.capabilities.maxTextureSize || 1024;
+    const maxDimension = Math.min(reportedLimit, 1024);
     return Math.max(.25, Math.min(window.devicePixelRatio || 1, 1, maxDimension / Math.max(width, height, 1)));
   }
   _initScene() { this.scene = new THREE.Scene(); this.scene.fog = new THREE.FogExp2(0x000000, 0.0015); }
