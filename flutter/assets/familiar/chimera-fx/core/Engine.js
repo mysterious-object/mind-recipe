@@ -68,7 +68,7 @@ export class Engine {
       stencil: false,
       depth: true,
     });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.renderer.setPixelRatio(this._safePixelRatio());
     this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
     this.renderer.setClearColor(0x000000, 0);
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -85,6 +85,22 @@ export class Engine {
     } else {
       this.container.appendChild(canvas);
     }
+  }
+
+  // Android WebView can advertise a high devicePixelRatio while its GPU cannot
+  // allocate a matching full-screen post-processing framebuffer. Keep the
+  // authoritative theme/component pipeline, but negotiate a render size that
+  // is valid for the current GPU instead of leaving every EffectComposer pass
+  // attached to an incomplete framebuffer.
+  _safePixelRatio() {
+    const gl = this.renderer.getContext();
+    const width = Math.max(1, this.container.clientWidth);
+    const height = Math.max(1, this.container.clientHeight);
+    const longestEdge = Math.max(width, height);
+    const maxRenderbuffer = gl.getParameter(gl.MAX_RENDERBUFFER_SIZE) || 2048;
+    const maxTexture = gl.getParameter(gl.MAX_TEXTURE_SIZE) || 2048;
+    const gpuLimit = Math.max(1, Math.min(maxRenderbuffer, maxTexture, 2048));
+    return Math.max(0.5, Math.min(window.devicePixelRatio || 1, 2, gpuLimit / longestEdge));
   }
 
   // ─── Scene ──────────────────────────────────────────────────────────────
@@ -229,6 +245,7 @@ export class Engine {
   _resize() {
     const w = this.container.clientWidth;
     const h = this.container.clientHeight;
+    this.renderer.setPixelRatio(this._safePixelRatio());
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h);

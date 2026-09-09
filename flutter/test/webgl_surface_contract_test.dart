@@ -16,4 +16,19 @@ void main() {
       );
     }
   });
+
+  test('DarkStar-derived engine negotiates Android-safe framebuffers', () {
+    final engine = File(
+      'assets/familiar/chimera-fx/core/Engine.js',
+    ).readAsStringSync();
+    final composer = File(
+      'assets/familiar/three-addons/postprocessing/EffectComposer.js',
+    ).readAsStringSync();
+
+    expect(engine, contains('MAX_RENDERBUFFER_SIZE'));
+    expect(engine, contains('MAX_TEXTURE_SIZE'));
+    expect(engine, contains('this._safePixelRatio()'));
+    expect(composer, contains('UnsignedByteType'));
+    expect(composer, contains('/Android/i.test( navigator.userAgent )'));
+  });
 }

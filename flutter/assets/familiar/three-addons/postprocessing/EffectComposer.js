@@ -1,5 +1,6 @@
 import {
 	HalfFloatType,
+	UnsignedByteType,
 	NoBlending,
 	Timer,
 	Vector2,
@@ -66,7 +67,13 @@ class EffectComposer {
 			this._width = size.width;
 			this._height = size.height;
 
-			renderTarget = new WebGLRenderTarget( this._width * this._pixelRatio, this._height * this._pixelRatio, { type: HalfFloatType } );
+			// Half-float color attachments are incomplete on several Android
+			// WebView/GPU combinations even when an extension is advertised. Use
+			// the universally renderable byte target there; desktop/iOS retain the
+			// original half-float pipeline.
+			const isAndroid = /Android/i.test( navigator.userAgent );
+			const targetType = isAndroid ? UnsignedByteType : HalfFloatType;
+			renderTarget = new WebGLRenderTarget( this._width * this._pixelRatio, this._height * this._pixelRatio, { type: targetType } );
 			renderTarget.texture.name = 'EffectComposer.rt1';
 
 		} else {
