@@ -79,9 +79,11 @@ class _ThreeBackgroundState extends State<ThreeBackground>
             if (message.message == 'context_lost' ||
                 message.message == 'engine_error' ||
                 message.message.startsWith('shader_error')) {
+              debugPrint('[MindRecipe WebGL] ${message.message}');
               if (mounted) setState(() => _failed = true);
               return;
             }
+            final firstReady = !_ready;
             _deadline?.cancel();
             if (mounted) {
               // A renderer that completes after the watchdog fired is still a
@@ -94,7 +96,11 @@ class _ThreeBackgroundState extends State<ThreeBackground>
             } else {
               _ready = true;
             }
-            unawaited(_send());
+            // The page emits `ready` after constructing a renderer. Sending
+            // state in response to every ready event used to create a
+            // ready -> rebuild -> ready loop that eventually removed the
+            // WebView on physical Android devices.
+            if (firstReady) unawaited(_send());
           },
         );
       if (mounted) {

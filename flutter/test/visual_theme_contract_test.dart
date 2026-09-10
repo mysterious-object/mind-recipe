@@ -116,6 +116,12 @@ void main() {
           contains("import ChimeraFX from './chimera-fx-bundle.js'"),
         );
         expect(scene, contains("preset: 'lite'"));
+        expect(scene, contains('if (!engine || activeTheme !== theme)'));
+        expect(
+          RegExp(r'notify\(`ready:\$\{theme\}`\)').allMatches(scene),
+          hasLength(1),
+          reason: 'Theme state updates must not trigger a renderer-ready loop.',
+        );
         expect(scene, isNot(contains('field:')));
         expect(scene, isNot(contains('MatterVFX')));
         expect(page, contains('theme-scene.js'));
