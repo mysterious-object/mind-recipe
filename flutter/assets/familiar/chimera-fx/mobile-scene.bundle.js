@@ -9657,7 +9657,8 @@
         const size = renderer.getSize(new ti());
         this._width = size.width;
         this._height = size.height;
-        renderTarget = new wi(this._width * this._pixelRatio, this._height * this._pixelRatio, { type: Ut });
+        const targetType = typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent) ? wt : Ut;
+        renderTarget = new wi(this._width * this._pixelRatio, this._height * this._pixelRatio, { type: targetType });
         renderTarget.texture.name = "EffectComposer.rt1";
       } else {
         this._width = renderTarget.width;
@@ -9890,15 +9891,16 @@
       this.nMips = 5;
       let resx = Math.round(this.resolution.x / 2);
       let resy = Math.round(this.resolution.y / 2);
-      this.renderTargetBright = new wi(resx, resy, { type: Ut });
+      const targetType = typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent) ? wt : Ut;
+      this.renderTargetBright = new wi(resx, resy, { type: targetType });
       this.renderTargetBright.texture.name = "UnrealBloomPass.bright";
       this.renderTargetBright.texture.generateMipmaps = false;
       for (let i = 0; i < this.nMips; i++) {
-        const renderTargetHorizonal = new wi(resx, resy, { type: Ut });
+        const renderTargetHorizonal = new wi(resx, resy, { type: targetType });
         renderTargetHorizonal.texture.name = "UnrealBloomPass.h" + i;
         renderTargetHorizonal.texture.generateMipmaps = false;
         this.renderTargetsHorizontal.push(renderTargetHorizonal);
-        const renderTargetVertical = new wi(resx, resy, { type: Ut });
+        const renderTargetVertical = new wi(resx, resy, { type: targetType });
         renderTargetVertical.texture.name = "UnrealBloomPass.v" + i;
         renderTargetVertical.texture.generateMipmaps = false;
         this.renderTargetsVertical.push(renderTargetVertical);

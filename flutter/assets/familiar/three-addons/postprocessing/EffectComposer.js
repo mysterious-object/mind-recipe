@@ -2,6 +2,7 @@ import {
 	Clock,
 	HalfFloatType,
 	NoBlending,
+	UnsignedByteType,
 	Vector2,
 	WebGLRenderTarget
 } from '../../three.module.min.js';
@@ -23,8 +24,9 @@ class EffectComposer {
 			const size = renderer.getSize( new Vector2() );
 			this._width = size.width;
 			this._height = size.height;
+			const targetType = typeof navigator !== 'undefined' && /Android/i.test( navigator.userAgent ) ? UnsignedByteType : HalfFloatType;
 
-			renderTarget = new WebGLRenderTarget( this._width * this._pixelRatio, this._height * this._pixelRatio, { type: HalfFloatType } );
+			renderTarget = new WebGLRenderTarget( this._width * this._pixelRatio, this._height * this._pixelRatio, { type: targetType } );
 			renderTarget.texture.name = 'EffectComposer.rt1';
 
 		} else {

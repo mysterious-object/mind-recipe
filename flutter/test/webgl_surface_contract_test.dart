@@ -34,6 +34,10 @@ void main() {
       expect(engine, contains('new UnrealBloomPass('));
       expect(composer, contains('class EffectComposer'));
       expect(bloom, contains('class UnrealBloomPass'));
+      for (final source in [composer, bloom]) {
+        expect(source, contains("/Android/i.test( navigator.userAgent )"));
+        expect(source, contains('UnsignedByteType : HalfFloatType'));
+      }
       expect(
         File('assets/familiar/three.module.min.js').readAsStringSync(),
         contains('const t="160"'),
