@@ -1,6 +1,6 @@
 "use strict";
 (() => {
-  // assets/familiar/three.module.min.js
+  // flutter/assets/familiar/three.module.min.js
   var t = "160";
   var l = 1;
   var c = 2;
@@ -9467,7 +9467,7 @@
   var Hm = new Ui();
   "undefined" != typeof __THREE_DEVTOOLS__ && __THREE_DEVTOOLS__.dispatchEvent(new CustomEvent("register", { detail: { revision: t } })), "undefined" != typeof window && (window.__THREE__ ? console.warn("WARNING: Multiple instances of Three.js being imported.") : window.__THREE__ = t);
 
-  // assets/familiar/three-addons/shaders/CopyShader.js
+  // flutter/assets/familiar/three-addons/shaders/CopyShader.js
   var CopyShader = {
     name: "CopyShader",
     uniforms: {
@@ -9507,7 +9507,7 @@
     )
   };
 
-  // assets/familiar/three-addons/postprocessing/Pass.js
+  // flutter/assets/familiar/three-addons/postprocessing/Pass.js
   var Pass = class {
     constructor() {
       this.isPass = true;
@@ -9551,7 +9551,7 @@
     }
   };
 
-  // assets/familiar/three-addons/postprocessing/ShaderPass.js
+  // flutter/assets/familiar/three-addons/postprocessing/ShaderPass.js
   var ShaderPass = class extends Pass {
     constructor(shader, textureID) {
       super();
@@ -9591,7 +9591,7 @@
     }
   };
 
-  // assets/familiar/three-addons/postprocessing/MaskPass.js
+  // flutter/assets/familiar/three-addons/postprocessing/MaskPass.js
   var MaskPass = class extends Pass {
     constructor(scene, camera) {
       super();
@@ -9648,7 +9648,7 @@
     }
   };
 
-  // assets/familiar/three-addons/postprocessing/EffectComposer.js
+  // flutter/assets/familiar/three-addons/postprocessing/EffectComposer.js
   var EffectComposer = class {
     constructor(renderer, renderTarget) {
       this.renderer = renderer;
@@ -9771,7 +9771,7 @@
     }
   };
 
-  // assets/familiar/three-addons/postprocessing/RenderPass.js
+  // flutter/assets/familiar/three-addons/postprocessing/RenderPass.js
   var RenderPass = class extends Pass {
     constructor(scene, camera, overrideMaterial = null, clearColor = null, clearAlpha = null) {
       super();
@@ -9822,7 +9822,7 @@
     }
   };
 
-  // assets/familiar/three-addons/shaders/LuminosityHighPassShader.js
+  // flutter/assets/familiar/three-addons/shaders/LuminosityHighPassShader.js
   var LuminosityHighPassShader = {
     name: "LuminosityHighPassShader",
     shaderID: "luminosityHighPass",
@@ -9877,7 +9877,7 @@
     )
   };
 
-  // assets/familiar/three-addons/postprocessing/UnrealBloomPass.js
+  // flutter/assets/familiar/three-addons/postprocessing/UnrealBloomPass.js
   var UnrealBloomPass = class _UnrealBloomPass extends Pass {
     constructor(resolution, strength, radius, threshold) {
       super();
@@ -10134,7 +10134,7 @@
   UnrealBloomPass.BlurDirectionX = new ti(1, 0);
   UnrealBloomPass.BlurDirectionY = new ti(0, 1);
 
-  // assets/familiar/chimera-fx/core/StateMachine.js
+  // flutter/assets/familiar/chimera-fx/core/StateMachine.js
   var StateMachine = class {
     constructor(opts = {}) {
       this.states = opts.states || {};
@@ -10179,7 +10179,7 @@
     }
   };
 
-  // assets/familiar/chimera-fx/postfx/ChromaticAberrationShader.js
+  // flutter/assets/familiar/chimera-fx/postfx/ChromaticAberrationShader.js
   var ChromaticAberrationShader = {
     name: "ChromaticAberration",
     uniforms: {
@@ -10217,7 +10217,7 @@
     )
   };
 
-  // assets/familiar/chimera-fx/postfx/FilmGrainShader.js
+  // flutter/assets/familiar/chimera-fx/postfx/FilmGrainShader.js
   var FilmGrainShader = {
     name: "FilmGrain",
     uniforms: {
@@ -10270,7 +10270,7 @@
     )
   };
 
-  // assets/familiar/chimera-fx/postfx/GlitchShader.js
+  // flutter/assets/familiar/chimera-fx/postfx/GlitchShader.js
   var GlitchShader = {
     name: "Glitch",
     uniforms: {
@@ -10341,7 +10341,7 @@
     )
   };
 
-  // assets/familiar/chimera-fx/core/Engine.js
+  // flutter/assets/familiar/chimera-fx/core/Engine.js
   var Engine = class {
     constructor(opts = {}) {
       this.container = typeof opts.container === "string" ? document.querySelector(opts.container) : opts.container || document.body;
@@ -10760,7 +10760,7 @@
     window.ChimeraFX._themes = window.ChimeraFX._themes || {};
   }
 
-  // assets/familiar/chimera-fx/core/ShapableMatter.js
+  // flutter/assets/familiar/chimera-fx/core/ShapableMatter.js
   var SHARED_VERT = (
     /* glsl */
     `
@@ -11576,7 +11576,7 @@
     };
   }
 
-  // assets/familiar/chimera-fx/core/AmbientColors.js
+  // flutter/assets/familiar/chimera-fx/core/AmbientColors.js
   var REGIME_PALETTES = {
     ranging: {
       cool: { h: 210, s: 75, l: 55 },
@@ -11816,7 +11816,7 @@
     };
   }
 
-  // assets/familiar/chimera-fx/components/ParticleNebula.js
+  // flutter/assets/familiar/chimera-fx/components/ParticleNebula.js
   var PARTICLE_VERT = (
     /* glsl */
     `
@@ -12030,7 +12030,7 @@
     }
   };
 
-  // assets/familiar/chimera-fx/components/EnergyTendrils.js
+  // flutter/assets/familiar/chimera-fx/components/EnergyTendrils.js
   var TENDRIL_VERT = (
     /* glsl */
     `
@@ -12210,7 +12210,7 @@
     }
   };
 
-  // assets/familiar/chimera-fx/components/DataRivers.js
+  // flutter/assets/familiar/chimera-fx/components/DataRivers.js
   var RIVER_VERT = (
     /* glsl */
     `
@@ -12402,7 +12402,7 @@
     }
   };
 
-  // assets/familiar/chimera-fx/components/VolumetricLight.js
+  // flutter/assets/familiar/chimera-fx/components/VolumetricLight.js
   var VOLUME_FRAG = (
     /* glsl */
     `
@@ -12550,7 +12550,7 @@
     }
   };
 
-  // assets/familiar/chimera-fx/components/LiquidMetal.js
+  // flutter/assets/familiar/chimera-fx/components/LiquidMetal.js
   var METAL_FRAG = (
     /* glsl */
     `
@@ -12754,7 +12754,7 @@
     }
   };
 
-  // assets/familiar/chimera-fx/components/ReactionDiffusion.js
+  // flutter/assets/familiar/chimera-fx/components/ReactionDiffusion.js
   var COMPUTE_FRAG = (
     /* glsl */
     `
@@ -13000,7 +13000,7 @@
     }
   };
 
-  // assets/familiar/chimera-fx/components/VoronoiShatter.js
+  // flutter/assets/familiar/chimera-fx/components/VoronoiShatter.js
   var VORONOI_FRAG = (
     /* glsl */
     `
@@ -13182,7 +13182,7 @@
     }
   };
 
-  // assets/familiar/chimera-fx/components/HoloHUD.js
+  // flutter/assets/familiar/chimera-fx/components/HoloHUD.js
   var HUD_FRAG = (
     /* glsl */
     `
@@ -13345,7 +13345,7 @@
     }
   };
 
-  // assets/familiar/chimera-fx/components/EnergyBeams.js
+  // flutter/assets/familiar/chimera-fx/components/EnergyBeams.js
   var BEAM_FRAG = (
     /* glsl */
     `
@@ -13552,7 +13552,7 @@
     }
   };
 
-  // assets/familiar/chimera-fx/components/IridescentOrb.js
+  // flutter/assets/familiar/chimera-fx/components/IridescentOrb.js
   var ORB_FRAG = (
     /* glsl */
     `
@@ -13792,7 +13792,7 @@
     }
   };
 
-  // assets/familiar/chimera-fx/themes/cyberpunk-neon.js
+  // flutter/assets/familiar/chimera-fx/themes/cyberpunk-neon.js
   var CyberpunkNeon = {
     name: "cyberpunk-neon",
     // Core palette
@@ -13860,7 +13860,7 @@
     }
   };
 
-  // assets/familiar/chimera-fx/themes/organic-bioluminescent.js
+  // flutter/assets/familiar/chimera-fx/themes/organic-bioluminescent.js
   var OrganicBioluminescent = {
     name: "organic-bioluminescent",
     colors: {
@@ -13924,7 +13924,7 @@
     }
   };
 
-  // assets/familiar/chimera-fx/themes/quantum-void.js
+  // flutter/assets/familiar/chimera-fx/themes/quantum-void.js
   var QuantumVoid = {
     name: "quantum-void",
     colors: {
@@ -13988,7 +13988,7 @@
     }
   };
 
-  // assets/familiar/chimera-fx/themes/holographic-matrix.js
+  // flutter/assets/familiar/chimera-fx/themes/holographic-matrix.js
   var HolographicMatrix = {
     name: "holographic-matrix",
     colors: {
@@ -14054,7 +14054,7 @@
     }
   };
 
-  // assets/familiar/chimera-fx/themes/chimera-native.js
+  // flutter/assets/familiar/chimera-fx/themes/chimera-native.js
   var ChimeraNative = {
     name: "chimera-native",
     colors: {
@@ -14125,7 +14125,7 @@
     }
   };
 
-  // assets/familiar/chimera-fx/themes/midnight-trading.js
+  // flutter/assets/familiar/chimera-fx/themes/midnight-trading.js
   var MidnightTrading = {
     name: "midnight-trading",
     colors: {
@@ -14189,7 +14189,7 @@
     }
   };
 
-  // assets/familiar/chimera-fx/themes/neon-samurai.js
+  // flutter/assets/familiar/chimera-fx/themes/neon-samurai.js
   var NeonSamurai = {
     name: "neon-samurai",
     colors: {
@@ -14253,7 +14253,7 @@
     }
   };
 
-  // assets/familiar/chimera-fx/themes/deep-ocean.js
+  // flutter/assets/familiar/chimera-fx/themes/deep-ocean.js
   var DeepOcean = {
     name: "deep-ocean",
     colors: {
@@ -14317,7 +14317,7 @@
     }
   };
 
-  // assets/familiar/chimera-fx/themes/solar-flare.js
+  // flutter/assets/familiar/chimera-fx/themes/solar-flare.js
   var SolarFlare = {
     name: "solar-flare",
     colors: {
@@ -14381,7 +14381,7 @@
     }
   };
 
-  // assets/familiar/chimera-fx/themes/void-walker.js
+  // flutter/assets/familiar/chimera-fx/themes/void-walker.js
   var VoidWalker = {
     name: "void-walker",
     colors: {
@@ -14445,7 +14445,7 @@
     }
   };
 
-  // assets/familiar/chimera-fx/themes/crystal-matrix.js
+  // flutter/assets/familiar/chimera-fx/themes/crystal-matrix.js
   var CrystalMatrix = {
     name: "crystal-matrix",
     colors: {
@@ -14509,7 +14509,7 @@
     }
   };
 
-  // assets/familiar/chimera-fx/themes/aurora-borealis.js
+  // flutter/assets/familiar/chimera-fx/themes/aurora-borealis.js
   var AuroraBorealis = {
     name: "aurora-borealis",
     colors: {
@@ -14564,7 +14564,7 @@
     }
   };
 
-  // assets/familiar/chimera-fx/themes/obsidian-forge.js
+  // flutter/assets/familiar/chimera-fx/themes/obsidian-forge.js
   var ObsidianForge = {
     name: "obsidian-forge",
     colors: {
@@ -14619,7 +14619,7 @@
     }
   };
 
-  // assets/familiar/chimera-fx/themes/orchid-vapor.js
+  // flutter/assets/familiar/chimera-fx/themes/orchid-vapor.js
   var OrchidVapor = {
     name: "orchid-vapor",
     colors: {
@@ -14674,7 +14674,7 @@
     }
   };
 
-  // assets/familiar/chimera-fx/themes/tidal-glass.js
+  // flutter/assets/familiar/chimera-fx/themes/tidal-glass.js
   var TidalGlass = {
     name: "tidal-glass",
     colors: {
@@ -14729,7 +14729,7 @@
     }
   };
 
-  // assets/familiar/chimera-fx/chimera-fx-bundle.js
+  // flutter/assets/familiar/chimera-fx/chimera-fx-bundle.js
   var COMPONENTS = {
     nebula: ParticleNebula,
     "particle-nebula": ParticleNebula,
@@ -14905,7 +14905,7 @@
   window.ChimeraFX = { ...window.ChimeraFX || {}, ...ChimeraFX };
   var chimera_fx_bundle_default = ChimeraFX;
 
-  // assets/familiar/chimera-fx/mobile-scene.js
+  // flutter/assets/familiar/chimera-fx/mobile-scene.js
   var bridge = (value) => {
     for (const name of ["BackgroundBridge", "FamiliarBridge", "IntroBridge"]) {
       try {
@@ -14916,8 +14916,9 @@
   };
   var sceneKind = document.body?.dataset.sceneMode || window.MIND_RECIPE_SCENE_MODE || "pulse";
   var host = document.getElementById("stage") || document.body;
+  var targetFPS = 30;
   var engine = null;
-  var activeTheme = "mindrecipe-core";
+  var activeTheme = "chimera-native";
   var activeSeed = 17;
   var lastState = {};
   var EvolvingOrb = class {
@@ -14936,7 +14937,7 @@
         const value = Math.sin((this.seed + index * 7919) * 12.9898) * 43758.5453;
         return value - Math.floor(value);
       };
-      const theme = engine2.theme || chimera_fx_bundle_default.themes["mindrecipe-core"];
+      const theme = engine2.theme || chimera_fx_bundle_default.themes["chimera-native"];
       const primary = theme.colors.primary.clone();
       const secondary = theme.colors.secondary.clone();
       const geometry = new Xu(4.25, 4);
@@ -15074,14 +15075,16 @@
     if (kind === "background") {
       return {
         container: host,
-        fps: 30,
+        // The factory starts immediately. Delay its first frame until the
+        // render-target capability check below has selected a safe pipeline.
+        fps: 1e-3,
         theme: activeTheme,
         components: ["nebula", "tendrils", "hud", "matter"]
       };
     }
     return {
       container: host,
-      fps: 30,
+      fps: 1e-3,
       theme: activeTheme,
       // The mobile-safe geometry orb is added after the engine starts.
       // Avoid creating the unsupported ray-marched shader orb on this route.
@@ -15091,6 +15094,38 @@
       rivers: { rivers: 3, particles: 150 },
       hud: { scanSpeed: 0.7 }
     };
+  }
+  function configureRenderPipeline() {
+    const renderer = engine?.renderer;
+    const composer = engine?.composer;
+    const gl2 = renderer?.getContext?.();
+    if (!renderer || !composer || !gl2) return "unavailable";
+    const targets = [
+      composer.renderTarget1,
+      composer.renderTarget2,
+      engine.bloomPass?.renderTargetBright,
+      ...engine.bloomPass?.renderTargetsHorizontal || [],
+      ...engine.bloomPass?.renderTargetsVertical || []
+    ].filter(Boolean);
+    let complete = true;
+    for (const target of targets) {
+      renderer.setRenderTarget(target);
+      if (gl2.checkFramebufferStatus(gl2.FRAMEBUFFER) !== gl2.FRAMEBUFFER_COMPLETE) {
+        complete = false;
+        break;
+      }
+    }
+    renderer.setRenderTarget(null);
+    if (!complete) {
+      composer.render = () => {
+        renderer.setRenderTarget(null);
+        renderer.render(engine.scene, engine.camera);
+      };
+    }
+    engine.frameInterval = 1e3 / targetFPS;
+    engine.lastFrame = 0;
+    engine.renderPipeline = complete ? "composer" : "direct-webgl";
+    return engine.renderPipeline;
   }
   function configureCanvas() {
     const canvas = engine?.renderer?.domElement;
@@ -15116,12 +15151,34 @@
   }
   function createEngine() {
     engine = seededCreate(activeSeed, () => chimera_fx_bundle_default.create(optionsFor(sceneKind)));
+    window._mindRecipeFX = engine;
+    configureRenderPipeline();
     if (sceneKind === "pulse") engine.addComponent(new EvolvingOrb(activeSeed));
     configureCanvas();
     configureSurface();
     attachContextHandler();
     engine.renderer.compile(engine.scene, engine.camera);
     engine.renderOnce?.();
+    setTimeout(() => {
+      if (!engine || engine.disposed) return;
+      const canvas = engine.renderer?.domElement;
+      const gl2 = engine.renderer?.getContext?.();
+      const details = [
+        `theme=${activeTheme}`,
+        `canvas=${canvas?.width || 0}x${canvas?.height || 0}`,
+        `host=${host.clientWidth}x${host.clientHeight}`,
+        `components=${engine.components?.length || 0}`,
+        `running=${Boolean(engine.running)}`,
+        `reducedMotion=${Boolean(engine.reducedMotion)}`,
+        `pipeline=${engine.renderPipeline || "unknown"}`,
+        `frame=${engine.renderer?.info?.render?.frame || 0}`,
+        `calls=${engine.renderer?.info?.render?.calls || 0}`,
+        `programs=${engine.renderer?.info?.programs?.length || 0}`,
+        `gl=${gl2?.getError?.() ?? -1}`
+      ].join(" ");
+      console.info(`[MindRecipe FX] ${details}`);
+      bridge(`health:${details}`);
+    }, 750);
   }
   function normalizeSeed(value) {
     const parsed = Number(value);
@@ -15134,7 +15191,7 @@
   function apply(state = {}) {
     lastState = { ...lastState, ...state };
     if (!engine) return;
-    const nextTheme = chimera_fx_bundle_default.themes[lastState.theme] ? lastState.theme : "mindrecipe-core";
+    const nextTheme = chimera_fx_bundle_default.themes[lastState.theme] ? lastState.theme : "chimera-native";
     const nextSeed = normalizeSeed(lastState.seed);
     const themeChanged = nextTheme !== activeTheme;
     const seedChanged = sceneKind === "pulse" && nextSeed !== activeSeed;
@@ -15166,7 +15223,7 @@
   }
   function start() {
     try {
-      activeTheme = chimera_fx_bundle_default.themes[lastState.theme] ? lastState.theme : "mindrecipe-core";
+      activeTheme = chimera_fx_bundle_default.themes[lastState.theme] ? lastState.theme : "chimera-native";
       activeSeed = normalizeSeed(lastState.seed);
       createEngine();
       apply(lastState);
@@ -15182,7 +15239,7 @@
     growth: 0.08,
     complexity: 0.12,
     activation: 0.45,
-    theme: "mindrecipe-core"
+    theme: "chimera-native"
   });
   window.setBackgroundPaused = (paused) => {
     paused ? engine?._pause() : engine?._resume();

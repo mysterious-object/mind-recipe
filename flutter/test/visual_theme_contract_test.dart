@@ -101,7 +101,7 @@ void main() {
     test(
       'background runs the source ChimeraFX stack without a parallel shader',
       () {
-        final scene = File('assets/familiar/chimera-fx/theme-scene.js')
+        final scene = File('assets/familiar/chimera-fx/mobile-scene.js')
             .readAsStringSync();
         final engine = File('assets/familiar/chimera-fx/core/Engine.js')
             .readAsStringSync();
@@ -115,16 +115,24 @@ void main() {
           scene,
           contains("import ChimeraFX from './chimera-fx-bundle.js'"),
         );
-        expect(scene, contains("preset: 'lite'"));
-        expect(scene, contains('if (!engine || activeTheme !== theme)'));
         expect(
-          RegExp(r'notify\(`ready:\$\{theme\}:').allMatches(scene),
-          hasLength(1),
-          reason: 'Theme state updates must not trigger a renderer-ready loop.',
+          scene,
+          contains("components: ['nebula', 'tendrils', 'hud', 'matter']"),
+        );
+        expect(
+          scene,
+          contains('if (themeChanged || seedChanged) rebuildEngine()'),
+        );
+        expect(
+          scene,
+          contains(
+            "engine.renderPipeline = complete ? 'composer' : 'direct-webgl'",
+          ),
         );
         expect(scene, isNot(contains('field:')));
         expect(scene, isNot(contains('MatterVFX')));
-        expect(page, contains('theme-scene.js'));
+        expect(page, contains('mobile-scene.bundle.js'));
+        expect(page, isNot(contains('type="module"')));
         expect(page, isNot(contains('mind-recipe-vfx-engine.js')));
         expect(engine, contains('EffectComposer'));
         expect(engine, contains('UnrealBloomPass'));

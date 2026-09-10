@@ -12,8 +12,9 @@ const bridge = value => {
 
 const sceneKind = document.body?.dataset.sceneMode || window.MIND_RECIPE_SCENE_MODE || 'pulse';
 const host = document.getElementById('stage') || document.body;
+const targetFPS = 30;
 let engine = null;
-let activeTheme = 'mindrecipe-core';
+let activeTheme = 'chimera-native';
 let activeSeed = 17;
 let lastState = {};
 
@@ -39,7 +40,7 @@ class EvolvingOrb {
       const value = Math.sin((this.seed + index * 7919) * 12.9898) * 43758.5453;
       return value - Math.floor(value);
     };
-    const theme = engine.theme || ChimeraFX.themes['mindrecipe-core'];
+    const theme = engine.theme || ChimeraFX.themes['chimera-native'];
     const primary = theme.colors.primary.clone();
     const secondary = theme.colors.secondary.clone();
     const geometry = new THREE.IcosahedronGeometry(4.25, 4);
@@ -151,14 +152,16 @@ function optionsFor(kind) {
   if (kind === 'background') {
     return {
       container: host,
-      fps: 30,
+      // The factory starts immediately. Delay its first frame until the
+      // render-target capability check below has selected a safe pipeline.
+      fps: .001,
       theme: activeTheme,
       components: ['nebula', 'tendrils', 'hud', 'matter'],
     };
   }
   return {
     container: host,
-    fps: 30,
+    fps: .001,
     theme: activeTheme,
     // The mobile-safe geometry orb is added after the engine starts.
     // Avoid creating the unsupported ray-marched shader orb on this route.
@@ -168,6 +171,43 @@ function optionsFor(kind) {
     rivers: { rivers: 3, particles: 150 },
     hud: { scanSpeed: .7 },
   };
+}
+
+function configureRenderPipeline() {
+  const renderer = engine?.renderer;
+  const composer = engine?.composer;
+  const gl = renderer?.getContext?.();
+  if (!renderer || !composer || !gl) return 'unavailable';
+  const targets = [
+    composer.renderTarget1,
+    composer.renderTarget2,
+    engine.bloomPass?.renderTargetBright,
+    ...(engine.bloomPass?.renderTargetsHorizontal || []),
+    ...(engine.bloomPass?.renderTargetsVertical || []),
+  ].filter(Boolean);
+  let complete = true;
+  for (const target of targets) {
+    renderer.setRenderTarget(target);
+    if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) {
+      complete = false;
+      break;
+    }
+  }
+  renderer.setRenderTarget(null);
+  if (!complete) {
+    // Some Android WebViews expose WebGL2 but cannot complete the bloom
+    // framebuffer stack. Keep the copied Three.js components and theme
+    // shaders live by rendering the same scene directly to the onscreen
+    // framebuffer instead of presenting a blank/frozen Flutter fallback.
+    composer.render = () => {
+      renderer.setRenderTarget(null);
+      renderer.render(engine.scene, engine.camera);
+    };
+  }
+  engine.frameInterval = 1000 / targetFPS;
+  engine.lastFrame = 0;
+  engine.renderPipeline = complete ? 'composer' : 'direct-webgl';
+  return engine.renderPipeline;
 }
 
 function configureCanvas() {
@@ -197,12 +237,34 @@ function attachContextHandler() {
 
 function createEngine() {
   engine = seededCreate(activeSeed, () => ChimeraFX.create(optionsFor(sceneKind)));
+  window._mindRecipeFX = engine;
+  configureRenderPipeline();
   if (sceneKind === 'pulse') engine.addComponent(new EvolvingOrb(activeSeed));
   configureCanvas();
   configureSurface();
   attachContextHandler();
   engine.renderer.compile(engine.scene, engine.camera);
   engine.renderOnce?.();
+  setTimeout(() => {
+    if (!engine || engine.disposed) return;
+    const canvas = engine.renderer?.domElement;
+    const gl = engine.renderer?.getContext?.();
+    const details = [
+      `theme=${activeTheme}`,
+      `canvas=${canvas?.width || 0}x${canvas?.height || 0}`,
+      `host=${host.clientWidth}x${host.clientHeight}`,
+      `components=${engine.components?.length || 0}`,
+      `running=${Boolean(engine.running)}`,
+      `reducedMotion=${Boolean(engine.reducedMotion)}`,
+      `pipeline=${engine.renderPipeline || 'unknown'}`,
+      `frame=${engine.renderer?.info?.render?.frame || 0}`,
+      `calls=${engine.renderer?.info?.render?.calls || 0}`,
+      `programs=${engine.renderer?.info?.programs?.length || 0}`,
+      `gl=${gl?.getError?.() ?? -1}`,
+    ].join(' ');
+    console.info(`[MindRecipe FX] ${details}`);
+    bridge(`health:${details}`);
+  }, 750);
 }
 
 function normalizeSeed(value) {
@@ -218,7 +280,7 @@ function rebuildEngine() {
 function apply(state = {}) {
   lastState = { ...lastState, ...state };
   if (!engine) return;
-  const nextTheme = ChimeraFX.themes[lastState.theme] ? lastState.theme : 'mindrecipe-core';
+  const nextTheme = ChimeraFX.themes[lastState.theme] ? lastState.theme : 'chimera-native';
   const nextSeed = normalizeSeed(lastState.seed);
   const themeChanged = nextTheme !== activeTheme;
   const seedChanged = sceneKind === 'pulse' && nextSeed !== activeSeed;
@@ -256,7 +318,7 @@ function apply(state = {}) {
 
 function start() {
   try {
-    activeTheme = ChimeraFX.themes[lastState.theme] ? lastState.theme : 'mindrecipe-core';
+    activeTheme = ChimeraFX.themes[lastState.theme] ? lastState.theme : 'chimera-native';
     activeSeed = normalizeSeed(lastState.seed);
     createEngine();
     apply(lastState);
@@ -273,7 +335,7 @@ window.setIntroVariant = variant => apply({
   growth: .08,
   complexity: .12,
   activation: .45,
-  theme: 'mindrecipe-core',
+  theme: 'chimera-native',
 });
 window.setBackgroundPaused = paused => {
   paused ? engine?._pause() : engine?._resume();

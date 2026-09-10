@@ -76,7 +76,8 @@ class _ThreeBackgroundState extends State<ThreeBackground>
         ..addJavaScriptChannel(
           'BackgroundBridge',
           onMessageReceived: (message) {
-            if (message.message.startsWith('ready:')) {
+            if (message.message.startsWith('ready:') ||
+                message.message.startsWith('health:')) {
               debugPrint('[MindRecipe WebGL] ${message.message}');
             }
             if (message.message == 'context_lost' ||
@@ -86,6 +87,9 @@ class _ThreeBackgroundState extends State<ThreeBackground>
               if (mounted) setState(() => _failed = true);
               return;
             }
+            // Health reports are diagnostics from an already-created engine,
+            // not a second readiness signal.
+            if (message.message.startsWith('health:')) return;
             final firstReady = !_ready;
             _deadline?.cancel();
             if (mounted) {

@@ -63,17 +63,15 @@ void main() {
     }
   });
 
-  test('background bridge waits for real WebView bounds before ready', () {
-    final source = File(
-      'assets/familiar/chimera-fx/theme-scene.js',
+  test('background uses the offline classic bundle on file-scheme WebViews', () {
+    final page = File('assets/familiar/background.html').readAsStringSync();
+    final scene = File(
+      'assets/familiar/chimera-fx/mobile-scene.js',
     ).readAsStringSync();
-    expect(source, contains('host.clientWidth'));
-    expect(source, contains('host.clientHeight'));
-    expect(source, contains('createdEngine._resize?.()'));
-    expect(source, contains('createdEngine._resume?.()'));
-    expect(source, contains(r'ready:${theme}:'));
-    expect(source, contains('renderer?.info?.render?.calls'));
-    expect(source, contains('renderer?.info?.programs?.length'));
-    expect(source, contains('gl?.getError?.()'));
+    expect(page, contains('data-scene-mode="background"'));
+    expect(page, contains('chimera-fx/mobile-scene.bundle.js'));
+    expect(page, isNot(contains('type="module"')));
+    expect(scene, contains("let activeTheme = 'chimera-native'"));
+    expect(scene, contains("components: ['nebula', 'tendrils', 'hud', 'matter']"));
   });
 }
