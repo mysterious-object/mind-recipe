@@ -72,5 +72,8 @@ void main() {
     expect(source, contains('createdEngine._resize?.()'));
     expect(source, contains('createdEngine._resume?.()'));
     expect(source, contains(r'ready:${theme}:'));
+    expect(source, contains('renderer?.info?.render?.calls'));
+    expect(source, contains('renderer?.info?.programs?.length'));
+    expect(source, contains('gl?.getError?.()'));
   });
 }

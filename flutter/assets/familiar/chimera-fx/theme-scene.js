@@ -32,6 +32,22 @@ function announceReady(theme, createdEngine, attempt = 0) {
     if (!paused) createdEngine._resume?.();
     const canvas = createdEngine.renderer?.domElement;
     notify(`ready:${theme}:${canvas?.width || 0}x${canvas?.height || 0}:${createdEngine.components?.length || 0}`);
+    setTimeout(() => {
+      if (engine !== createdEngine || activeTheme !== theme) return;
+      const gl = createdEngine.renderer?.getContext?.();
+      const details = [
+        `theme=${theme}`,
+        `canvas=${canvas?.width || 0}x${canvas?.height || 0}`,
+        `host=${host.clientWidth}x${host.clientHeight}`,
+        `components=${createdEngine.components?.length || 0}`,
+        `running=${Boolean(createdEngine.running)}`,
+        `reducedMotion=${Boolean(createdEngine.reducedMotion)}`,
+        `calls=${createdEngine.renderer?.info?.render?.calls || 0}`,
+        `programs=${createdEngine.renderer?.info?.programs?.length || 0}`,
+        `gl=${gl?.getError?.() ?? -1}`,
+      ].join(' ');
+      console.info(`[MindRecipe FX] ${details}`);
+    }, 750);
   });
 }
 
