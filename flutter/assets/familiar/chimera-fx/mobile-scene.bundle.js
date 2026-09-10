@@ -15197,7 +15197,7 @@
       `canvas=${canvas?.width || 0}x${canvas?.height || 0}`,
       `host=${host.clientWidth}x${host.clientHeight}`,
       `components=${components.map((component) => component.constructor?.name).join(",") || "none"}`,
-      `familiar=${Boolean(familiar?.core?.visible !== false && familiar?.group?.visible !== false)}`,
+      `familiar=${Boolean(familiar && familiar.core?.visible !== false && familiar.group?.visible !== false)}`,
       `running=${Boolean(engine.running)}`,
       `reducedMotion=${Boolean(engine.reducedMotion)}`,
       `pipeline=${engine.renderPipeline || "unknown"}`,
@@ -15290,9 +15290,23 @@
     const parsed = Number(value);
     return Number.isFinite(parsed) && parsed !== 0 ? Math.abs(Math.trunc(parsed)) : 17;
   }
-  function rebuildEngine() {
-    engine?.dispose();
-    createEngine();
+  function applyBackgroundComposition() {
+    const composition = COMPOSITIONS[activeComposition];
+    engine.setComponentPreset(composition.components);
+    engine.setTheme(chimera_fx_bundle_default.themes[activeTheme]);
+    const matter = engine.components?.find(
+      (component) => component.constructor?.name === "ShapableMatter"
+    );
+    matter?.setMatterMode?.(composition.matter);
+    engine.renderer.compile(engine.scene, engine.camera);
+  }
+  function applyPulseGenome(seedChanged) {
+    engine.setTheme(chimera_fx_bundle_default.themes[activeTheme]);
+    if (!seedChanged) return;
+    const familiar = engine.components?.find((component) => component instanceof EvolvingOrb);
+    if (familiar) engine.removeComponent(familiar);
+    engine.addComponent(new EvolvingOrb(activeSeed));
+    engine.renderer.compile(engine.scene, engine.camera);
   }
   function apply(state = {}) {
     lastState = { ...lastState, ...state };
@@ -15306,7 +15320,11 @@
     activeTheme = nextTheme;
     activeComposition = nextComposition;
     activeSeed = nextSeed;
-    if (themeChanged || compositionChanged || seedChanged) rebuildEngine();
+    if (sceneKind === "background" && (themeChanged || compositionChanged)) {
+      applyBackgroundComposition();
+    } else if (sceneKind === "pulse" && (themeChanged || seedChanged)) {
+      applyPulseGenome(seedChanged);
+    }
     configureSurface();
     syncRendererSize();
     const growth = Math.max(0, Math.min(1, Number(lastState.growth ?? lastState.progress ?? 0)));
@@ -15330,6 +15348,8 @@
       lastState._lastMilestone = growth;
     }
     engine.renderOnce?.();
+    lastHealthSignature = "";
+    setTimeout(reportHealth, 250);
   }
   function start() {
     try {
@@ -15356,6 +15376,13 @@
     paused ? engine?._pause() : engine?._resume();
   };
   window.setFamiliarPaused = (paused) => paused ? engine?._pause() : engine?._resume();
+  window.disposeMindRecipeScene = () => {
+    sizeObserver?.disconnect();
+    sizeObserver = null;
+    engine?.dispose();
+    engine = null;
+    window._mindRecipeFX = null;
+  };
   start();
 })();
 /**

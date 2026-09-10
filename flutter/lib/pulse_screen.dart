@@ -86,10 +86,16 @@ class MoodState {
 /// Pulse is the visual memory of the member's journey. Daily Nav owns mood
 /// input and regulation activities; this screen observes and explains change.
 class PulseScreen extends StatefulWidget {
-  const PulseScreen({super.key, required this.checkIn, required this.appState});
+  const PulseScreen({
+    super.key,
+    required this.checkIn,
+    required this.appState,
+    required this.active,
+  });
 
   final CheckInState checkIn;
   final SecureAppState appState;
+  final bool active;
 
   @override
   State<PulseScreen> createState() => _PulseScreenState();
@@ -117,7 +123,7 @@ class _PulseScreenState extends State<PulseScreen> with WidgetsBindingObserver {
       widget.appState.session?.email ?? 'local-member',
     );
     unawaited(_load());
-    _initRenderer();
+    if (widget.active) _initRenderer();
   }
 
   @override
@@ -125,7 +131,7 @@ class _PulseScreenState extends State<PulseScreen> with WidgetsBindingObserver {
     _rendererDeadline?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     widget.appState.removeListener(_onActivityChanged);
-    _controller?.runJavaScript('window.setFamiliarPaused(true)');
+    _disposeRenderer();
     super.dispose();
   }
 
@@ -139,6 +145,16 @@ class _PulseScreenState extends State<PulseScreen> with WidgetsBindingObserver {
   void didUpdateWidget(covariant PulseScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     final nextTheme = visualThemeFor(widget.appState.visualThemeId).engineTheme;
+    if (!widget.active) {
+      if (oldWidget.active) _disposeRenderer();
+      _lastVfxTheme = nextTheme;
+      return;
+    }
+    if (!oldWidget.active) {
+      _lastVfxTheme = nextTheme;
+      _initRenderer();
+      return;
+    }
     if (nextTheme == _lastVfxTheme) return;
     _lastVfxTheme = nextTheme;
     unawaited(_sendState());
@@ -146,8 +162,25 @@ class _PulseScreenState extends State<PulseScreen> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!widget.active) return;
     final paused = state != AppLifecycleState.resumed;
     _controller?.runJavaScript('window.setFamiliarPaused($paused)');
+  }
+
+  void _disposeRenderer() {
+    _rendererDeadline?.cancel();
+    _rendererDeadline = null;
+    final controller = _controller;
+    if (controller != null) {
+      unawaited(
+        controller
+            .runJavaScript('window.disposeMindRecipeScene?.()')
+            .catchError((_) {}),
+      );
+    }
+    _controller = null;
+    _webReady = false;
+    _useFallback = false;
   }
 
   Future<void> _load() async {
@@ -183,6 +216,7 @@ class _PulseScreenState extends State<PulseScreen> with WidgetsBindingObserver {
   }
 
   void _initRenderer() {
+    if (!widget.active || _controller != null) return;
     try {
       final controller = WebViewController()
         ..setJavaScriptMode(JavaScriptMode.unrestricted)

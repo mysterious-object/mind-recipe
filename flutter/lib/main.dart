@@ -30,9 +30,7 @@ import 'voice_interface.dart';
 import 'three_intro_screen.dart';
 import 'three_background.dart';
 
-const _themeLiveCheck = bool.fromEnvironment(
-  'MIND_RECIPE_THEME_LIVE_CHECK',
-);
+const _themeLiveCheck = bool.fromEnvironment('MIND_RECIPE_THEME_LIVE_CHECK');
 
 void main() => runApp(const MindRecipeApp());
 
@@ -508,7 +506,11 @@ class _MemberHomeState extends State<MemberHome> {
         ),
       ),
       _KeepAlivePage(
-        child: PulseScreen(checkIn: checkIn, appState: widget.appState),
+        child: PulseScreen(
+          checkIn: checkIn,
+          appState: widget.appState,
+          active: index == 2,
+        ),
       ),
       _KeepAlivePage(child: ActionsScreen(appState: widget.appState)),
       _KeepAlivePage(

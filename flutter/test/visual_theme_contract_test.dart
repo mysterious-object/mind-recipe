@@ -149,16 +149,14 @@ void main() {
           scene,
           contains("import ChimeraFX from './chimera-fx-bundle.js'"),
         );
+        expect(scene, contains('components: composition.components'));
         expect(
           scene,
-          contains('components: composition.components'),
+          contains('engine.setComponentPreset(composition.components)'),
         );
-        expect(
-          scene,
-          contains(
-            'if (themeChanged || compositionChanged || seedChanged) rebuildEngine()',
-          ),
-        );
+        expect(scene, contains('applyBackgroundComposition()'));
+        expect(scene, isNot(contains('function rebuildEngine()')));
+        expect(scene, contains('window.disposeMindRecipeScene'));
         expect(
           scene,
           contains(
