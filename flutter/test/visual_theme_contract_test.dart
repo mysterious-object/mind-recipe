@@ -155,7 +155,9 @@ void main() {
         );
         expect(
           scene,
-          contains('if (themeChanged || seedChanged) rebuildEngine()'),
+          contains(
+            'if (themeChanged || compositionChanged || seedChanged) rebuildEngine()',
+          ),
         );
         expect(
           scene,
