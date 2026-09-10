@@ -23,6 +23,10 @@ import 'on_device_inference.dart';
 import 'notification_scheduler.dart';
 import 'practitioner_sharing.dart';
 import 'visual_theme.dart';
+
+const _themeLiveCheck = bool.fromEnvironment(
+  'MIND_RECIPE_THEME_LIVE_CHECK',
+);
 import 'live_visual_theme_picker.dart';
 import 'pulse_screen.dart';
 import 'recipes_screen.dart';
@@ -74,6 +78,13 @@ class _MindRecipeAppState extends State<MindRecipeApp> {
         } else {
           await appState.setSession(verified);
         }
+      }
+      // The separately identified live-check package must remain testable
+      // when the staging identity service is unavailable. This flag is set
+      // only by its dedicated workflow; release APKs and IPAs never receive
+      // the local session.
+      if (_themeLiveCheck && appState.session == null) {
+        appState.useLocalDemo();
       }
       await appState.flushPendingCheckIns(api);
       appState.setManagedAiAvailable(await api.aiAvailable());
