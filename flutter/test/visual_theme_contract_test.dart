@@ -118,7 +118,7 @@ void main() {
         expect(scene, contains("preset: 'lite'"));
         expect(scene, contains('if (!engine || activeTheme !== theme)'));
         expect(
-          RegExp(r'notify\(`ready:\$\{theme\}`\)').allMatches(scene),
+          RegExp(r'notify\(`ready:\$\{theme\}:').allMatches(scene),
           hasLength(1),
           reason: 'Theme state updates must not trigger a renderer-ready loop.',
         );

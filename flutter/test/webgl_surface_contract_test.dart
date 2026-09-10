@@ -62,4 +62,15 @@ void main() {
       expect(loaded, greaterThan(frame), reason: path);
     }
   });
+
+  test('background bridge waits for real WebView bounds before ready', () {
+    final source = File(
+      'assets/familiar/chimera-fx/theme-scene.js',
+    ).readAsStringSync();
+    expect(source, contains('host.clientWidth'));
+    expect(source, contains('host.clientHeight'));
+    expect(source, contains('createdEngine._resize?.()'));
+    expect(source, contains('createdEngine._resume?.()'));
+    expect(source, contains(r'ready:${theme}:'));
+  });
 }

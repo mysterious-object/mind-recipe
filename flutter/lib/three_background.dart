@@ -76,6 +76,9 @@ class _ThreeBackgroundState extends State<ThreeBackground>
         ..addJavaScriptChannel(
           'BackgroundBridge',
           onMessageReceived: (message) {
+            if (message.message.startsWith('ready:')) {
+              debugPrint('[MindRecipe WebGL] ${message.message}');
+            }
             if (message.message == 'context_lost' ||
                 message.message == 'engine_error' ||
                 message.message.startsWith('shader_error')) {

@@ -16,6 +16,25 @@ function supportedTheme(value) {
     : 'chimera-native';
 }
 
+function announceReady(theme, createdEngine, attempt = 0) {
+  requestAnimationFrame(() => {
+    if (engine !== createdEngine || activeTheme !== theme) return;
+    const width = host.clientWidth;
+    const height = host.clientHeight;
+    if ((!width || !height) && attempt < 12) {
+      announceReady(theme, createdEngine, attempt + 1);
+      return;
+    }
+    // Android can execute the module before the platform WebView has its
+    // final bounds. Re-size and resume after attachment so the copied
+    // renderer draws into the real surface instead of a zero-sized target.
+    createdEngine._resize?.();
+    if (!paused) createdEngine._resume?.();
+    const canvas = createdEngine.renderer?.domElement;
+    notify(`ready:${theme}:${canvas?.width || 0}x${canvas?.height || 0}:${createdEngine.components?.length || 0}`);
+  });
+}
+
 function render(state = {}) {
   lastState = { ...lastState, ...state };
   const theme = supportedTheme(lastState.theme);
@@ -40,7 +59,7 @@ function render(state = {}) {
           notify('context_lost');
         }, { once: true });
       }
-      notify(`ready:${theme}`);
+      announceReady(theme, engine);
     }
     const activation = Math.max(0, Math.min(1, Number(lastState.intensity) || 0));
     const progress = Math.max(0, Math.min(1, Number(lastState.progress) || 0));
