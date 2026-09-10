@@ -15,8 +15,69 @@ const host = document.getElementById('stage') || document.body;
 const targetFPS = 30;
 let engine = null;
 let activeTheme = 'chimera-native';
+let activeComposition = 'mindrecipe-core';
 let activeSeed = 17;
 let lastState = {};
+let sizeObserver = null;
+let lastHealthSignature = '';
+
+// One saved MindRecipe theme selects one complete source-renderer
+// composition. Every entry below is assembled exclusively from the copied
+// ChimeraFX components and ShapableMatter modes; there is no Flutter painter
+// or parallel shader involved. Keeping the stacks intentionally different is
+// what makes a selection change the scene itself instead of merely recoloring
+// the same four effects.
+const COMPOSITIONS = {
+  'mindrecipe-core': {
+    components: ['nebula', 'tendrils', 'hud', 'matter'], matter: 'cellular',
+  },
+  'neon-circuit': {
+    components: ['rivers', 'beams', 'hud', 'matter'], matter: 'electric',
+  },
+  'bioluminescent': {
+    components: ['nebula', 'volumetric', 'tendrils', 'matter'], matter: 'cellular',
+  },
+  'quantum-void': {
+    components: ['nebula', 'voronoi', 'matter'], matter: 'photonic',
+  },
+  'holographic-matrix': {
+    components: ['hud', 'beams', 'rivers', 'matter'], matter: 'electric',
+  },
+  'midnight-signal': {
+    components: ['rivers', 'hud', 'tendrils', 'matter'], matter: 'ionstorm',
+  },
+  'neon-ronin': {
+    components: ['tendrils', 'beams', 'voronoi', 'matter'], matter: 'plasma',
+  },
+  'abyssal-current': {
+    components: ['nebula', 'volumetric', 'rivers', 'matter'], matter: 'superfluid',
+  },
+  'solar-flare': {
+    components: ['volumetric', 'tendrils', 'reaction', 'matter'], matter: 'plasma',
+  },
+  'void-walker': {
+    components: ['nebula', 'voronoi', 'matter'], matter: 'ionstorm',
+  },
+  'crystal-matrix': {
+    components: ['voronoi', 'beams', 'hud', 'matter'], matter: 'crystalline',
+  },
+  'aurora': {
+    components: ['nebula', 'tendrils', 'volumetric', 'matter'], matter: 'aerogel',
+  },
+  'obsidian-forge': {
+    components: ['metal', 'volumetric', 'beams', 'matter'], matter: 'ferrofluid',
+  },
+  'orchid-vapor': {
+    components: ['reaction', 'tendrils', 'nebula', 'matter'], matter: 'fluid',
+  },
+  'tidal-glass': {
+    components: ['rivers', 'volumetric', 'matter'], matter: 'superfluid',
+  },
+};
+
+function compositionFor(value) {
+  return COMPOSITIONS[value] ? value : 'mindrecipe-core';
+}
 
 // The original ray-marched IridescentOrb is retained in the engine,
 // but some mobile WebViews compile it without drawing its surface. This is a
@@ -150,13 +211,15 @@ function seededCreate(seed, create) {
 
 function optionsFor(kind) {
   if (kind === 'background') {
+    const composition = COMPOSITIONS[activeComposition];
     return {
       container: host,
       // The factory starts immediately. Delay its first frame until the
       // render-target capability check below has selected a safe pipeline.
       fps: .001,
       theme: activeTheme,
-      components: ['nebula', 'tendrils', 'hud', 'matter'],
+      components: composition.components,
+      matter: { mode: composition.matter },
     };
   }
   return {
@@ -165,12 +228,61 @@ function optionsFor(kind) {
     theme: activeTheme,
     // The mobile-safe geometry orb is added after the engine starts.
     // Avoid creating the unsupported ray-marched shader orb on this route.
-    components: ['nebula', 'tendrils', 'rivers', 'hud'],
-    nebula: { count: 1350, spread: 31 },
-    tendrils: { count: 5, segments: 34, height: 15 },
-    rivers: { rivers: 3, particles: 150 },
-    hud: { scanSpeed: .7 },
+    // Pulse is deliberately sparse so the shared evolving familiar remains
+    // the focal object instead of being hidden behind background components.
+    components: ['nebula'],
+    nebula: { count: 720, spread: 35 },
   };
+}
+
+function syncRendererSize() {
+  if (!engine || engine.disposed) return false;
+  const width = host.clientWidth;
+  const height = host.clientHeight;
+  if (width < 2 || height < 2) return false;
+  const canvas = engine.renderer?.domElement;
+  const pixelRatio = engine.renderer?.getPixelRatio?.() || 1;
+  const expectedWidth = Math.floor(width * pixelRatio);
+  const expectedHeight = Math.floor(height * pixelRatio);
+  if (canvas?.width !== expectedWidth || canvas?.height !== expectedHeight) {
+    engine._resize();
+    engine.renderOnce?.();
+    setTimeout(reportHealth, 80);
+  }
+  return Boolean(canvas?.width && canvas?.height);
+}
+
+function observeRendererSize() {
+  if (sizeObserver || typeof ResizeObserver === 'undefined') return;
+  sizeObserver = new ResizeObserver(() => syncRendererSize());
+  sizeObserver.observe(host);
+}
+
+function reportHealth() {
+  if (!engine || engine.disposed) return;
+  const canvas = engine.renderer?.domElement;
+  const gl = engine.renderer?.getContext?.();
+  const components = engine.components || [];
+  const familiar = components.find(component => component instanceof EvolvingOrb);
+  const details = [
+    `theme=${activeTheme}`,
+    `composition=${sceneKind === 'background' ? activeComposition : 'pulse-familiar'}`,
+    `canvas=${canvas?.width || 0}x${canvas?.height || 0}`,
+    `host=${host.clientWidth}x${host.clientHeight}`,
+    `components=${components.map(component => component.constructor?.name).join(',') || 'none'}`,
+    `familiar=${Boolean(familiar?.core?.visible !== false && familiar?.group?.visible !== false)}`,
+    `running=${Boolean(engine.running)}`,
+    `reducedMotion=${Boolean(engine.reducedMotion)}`,
+    `pipeline=${engine.renderPipeline || 'unknown'}`,
+    `frame=${engine.renderer?.info?.render?.frame || 0}`,
+    `calls=${engine.renderer?.info?.render?.calls || 0}`,
+    `programs=${engine.renderer?.info?.programs?.length || 0}`,
+    `gl=${gl?.getError?.() ?? -1}`,
+  ].join(' ');
+  if (details === lastHealthSignature) return;
+  lastHealthSignature = details;
+  console.info(`[MindRecipe FX] ${details}`);
+  bridge(`health:${details}`);
 }
 
 function configureRenderPipeline() {
@@ -240,31 +352,24 @@ function createEngine() {
   window._mindRecipeFX = engine;
   configureRenderPipeline();
   if (sceneKind === 'pulse') engine.addComponent(new EvolvingOrb(activeSeed));
+  if (sceneKind === 'background') {
+    const matter = engine.components?.find(
+      component => component.constructor?.name === 'ShapableMatter',
+    );
+    matter?.setMatterMode?.(COMPOSITIONS[activeComposition].matter);
+  }
   configureCanvas();
   configureSurface();
   attachContextHandler();
+  observeRendererSize();
+  syncRendererSize();
   engine.renderer.compile(engine.scene, engine.camera);
   engine.renderOnce?.();
-  setTimeout(() => {
-    if (!engine || engine.disposed) return;
-    const canvas = engine.renderer?.domElement;
-    const gl = engine.renderer?.getContext?.();
-    const details = [
-      `theme=${activeTheme}`,
-      `canvas=${canvas?.width || 0}x${canvas?.height || 0}`,
-      `host=${host.clientWidth}x${host.clientHeight}`,
-      `components=${engine.components?.length || 0}`,
-      `running=${Boolean(engine.running)}`,
-      `reducedMotion=${Boolean(engine.reducedMotion)}`,
-      `pipeline=${engine.renderPipeline || 'unknown'}`,
-      `frame=${engine.renderer?.info?.render?.frame || 0}`,
-      `calls=${engine.renderer?.info?.render?.calls || 0}`,
-      `programs=${engine.renderer?.info?.programs?.length || 0}`,
-      `gl=${gl?.getError?.() ?? -1}`,
-    ].join(' ');
-    console.info(`[MindRecipe FX] ${details}`);
-    bridge(`health:${details}`);
-  }, 750);
+  // A kept-alive Flutter page may load its WebView while it is still
+  // offscreen, producing a 0x0 drawing buffer. Recheck after layout without
+  // requiring a browser resize event; this is what restores the Pulse orb.
+  [0, 60, 180, 420, 900].forEach(delay => setTimeout(syncRendererSize, delay));
+  setTimeout(reportHealth, 750);
 }
 
 function normalizeSeed(value) {
@@ -281,16 +386,20 @@ function apply(state = {}) {
   lastState = { ...lastState, ...state };
   if (!engine) return;
   const nextTheme = ChimeraFX.themes[lastState.theme] ? lastState.theme : 'chimera-native';
+  const nextComposition = compositionFor(lastState.variant);
   const nextSeed = normalizeSeed(lastState.seed);
   const themeChanged = nextTheme !== activeTheme;
+  const compositionChanged = sceneKind === 'background' && nextComposition !== activeComposition;
   const seedChanged = sceneKind === 'pulse' && nextSeed !== activeSeed;
   activeTheme = nextTheme;
+  activeComposition = nextComposition;
   activeSeed = nextSeed;
   // Most source components read their palette while constructing GPU
   // buffers. Recreate the local renderer when its theme, composition, or
   // visual genome changes so the selection changes real geometry and shaders.
-  if (themeChanged || seedChanged) rebuildEngine();
+  if (themeChanged || compositionChanged || seedChanged) rebuildEngine();
   configureSurface();
+  syncRendererSize();
 
   const growth = Math.max(0, Math.min(1, Number(lastState.growth ?? lastState.progress ?? 0)));
   const complexity = Math.max(0, Math.min(1, Number(lastState.complexity ?? growth)));
@@ -319,6 +428,7 @@ function apply(state = {}) {
 function start() {
   try {
     activeTheme = ChimeraFX.themes[lastState.theme] ? lastState.theme : 'chimera-native';
+    activeComposition = compositionFor(lastState.variant);
     activeSeed = normalizeSeed(lastState.seed);
     createEngine();
     apply(lastState);

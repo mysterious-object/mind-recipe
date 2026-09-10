@@ -215,6 +215,10 @@ class _PulseScreenState extends State<PulseScreen> with WidgetsBindingObserver {
           'FamiliarBridge',
           onMessageReceived: (message) {
             if (!mounted) return;
+            if (message.message.startsWith('health:')) {
+              debugPrint('[MindRecipe Pulse WebGL] ${message.message}');
+              return;
+            }
             if (message.message == 'ready') {
               _rendererDeadline?.cancel();
               if (mounted) {

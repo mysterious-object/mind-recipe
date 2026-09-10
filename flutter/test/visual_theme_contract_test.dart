@@ -98,6 +98,40 @@ void main() {
       expect(source, isNot(contains('ChimeraFX.registerTheme(name')));
     });
 
+    test('every picker theme selects a real source component composition', () {
+      final source = File('assets/familiar/chimera-fx/mobile-scene.js')
+          .readAsStringSync();
+
+      expect(source, contains('const COMPOSITIONS = {'));
+      for (final theme in visualThemes) {
+        expect(
+          source,
+          contains("'${theme.composition}':"),
+          reason: '${theme.id} must select a packaged WebGL composition.',
+        );
+      }
+      for (final component in const [
+        'nebula',
+        'tendrils',
+        'rivers',
+        'volumetric',
+        'metal',
+        'reaction',
+        'voronoi',
+        'hud',
+        'beams',
+        'matter',
+      ]) {
+        expect(
+          source,
+          contains("'$component'"),
+          reason: 'The copied $component renderer must be reachable.',
+        );
+      }
+      expect(source, contains('matter?.setMatterMode?.('));
+      expect(source, contains('compositionChanged'));
+    });
+
     test(
       'background runs the source ChimeraFX stack without a parallel shader',
       () {
@@ -117,7 +151,7 @@ void main() {
         );
         expect(
           scene,
-          contains("components: ['nebula', 'tendrils', 'hud', 'matter']"),
+          contains('components: composition.components'),
         );
         expect(
           scene,
@@ -131,6 +165,8 @@ void main() {
         );
         expect(scene, isNot(contains('field:')));
         expect(scene, isNot(contains('MatterVFX')));
+        expect(scene, contains('new ResizeObserver'));
+        expect(scene, contains('engine._resize()'));
         expect(page, contains('mobile-scene.bundle.js'));
         expect(page, isNot(contains('type="module"')));
         expect(page, isNot(contains('mind-recipe-vfx-engine.js')));

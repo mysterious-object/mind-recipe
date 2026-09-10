@@ -2,7 +2,7 @@ name: MindRecipe checks
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'codex/mobile-build-*']
   pull_request:
 
 permissions:

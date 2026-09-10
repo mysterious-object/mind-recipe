@@ -1,6 +1,6 @@
 "use strict";
 (() => {
-  // flutter/assets/familiar/three.module.min.js
+  // assets/familiar/three.module.min.js
   var t = "160";
   var l = 1;
   var c = 2;
@@ -9467,7 +9467,7 @@
   var Hm = new Ui();
   "undefined" != typeof __THREE_DEVTOOLS__ && __THREE_DEVTOOLS__.dispatchEvent(new CustomEvent("register", { detail: { revision: t } })), "undefined" != typeof window && (window.__THREE__ ? console.warn("WARNING: Multiple instances of Three.js being imported.") : window.__THREE__ = t);
 
-  // flutter/assets/familiar/three-addons/shaders/CopyShader.js
+  // assets/familiar/three-addons/shaders/CopyShader.js
   var CopyShader = {
     name: "CopyShader",
     uniforms: {
@@ -9507,7 +9507,7 @@
     )
   };
 
-  // flutter/assets/familiar/three-addons/postprocessing/Pass.js
+  // assets/familiar/three-addons/postprocessing/Pass.js
   var Pass = class {
     constructor() {
       this.isPass = true;
@@ -9551,7 +9551,7 @@
     }
   };
 
-  // flutter/assets/familiar/three-addons/postprocessing/ShaderPass.js
+  // assets/familiar/three-addons/postprocessing/ShaderPass.js
   var ShaderPass = class extends Pass {
     constructor(shader, textureID) {
       super();
@@ -9591,7 +9591,7 @@
     }
   };
 
-  // flutter/assets/familiar/three-addons/postprocessing/MaskPass.js
+  // assets/familiar/three-addons/postprocessing/MaskPass.js
   var MaskPass = class extends Pass {
     constructor(scene, camera) {
       super();
@@ -9648,7 +9648,7 @@
     }
   };
 
-  // flutter/assets/familiar/three-addons/postprocessing/EffectComposer.js
+  // assets/familiar/three-addons/postprocessing/EffectComposer.js
   var EffectComposer = class {
     constructor(renderer, renderTarget) {
       this.renderer = renderer;
@@ -9771,7 +9771,7 @@
     }
   };
 
-  // flutter/assets/familiar/three-addons/postprocessing/RenderPass.js
+  // assets/familiar/three-addons/postprocessing/RenderPass.js
   var RenderPass = class extends Pass {
     constructor(scene, camera, overrideMaterial = null, clearColor = null, clearAlpha = null) {
       super();
@@ -9822,7 +9822,7 @@
     }
   };
 
-  // flutter/assets/familiar/three-addons/shaders/LuminosityHighPassShader.js
+  // assets/familiar/three-addons/shaders/LuminosityHighPassShader.js
   var LuminosityHighPassShader = {
     name: "LuminosityHighPassShader",
     shaderID: "luminosityHighPass",
@@ -9877,7 +9877,7 @@
     )
   };
 
-  // flutter/assets/familiar/three-addons/postprocessing/UnrealBloomPass.js
+  // assets/familiar/three-addons/postprocessing/UnrealBloomPass.js
   var UnrealBloomPass = class _UnrealBloomPass extends Pass {
     constructor(resolution, strength, radius, threshold) {
       super();
@@ -10134,7 +10134,7 @@
   UnrealBloomPass.BlurDirectionX = new ti(1, 0);
   UnrealBloomPass.BlurDirectionY = new ti(0, 1);
 
-  // flutter/assets/familiar/chimera-fx/core/StateMachine.js
+  // assets/familiar/chimera-fx/core/StateMachine.js
   var StateMachine = class {
     constructor(opts = {}) {
       this.states = opts.states || {};
@@ -10179,7 +10179,7 @@
     }
   };
 
-  // flutter/assets/familiar/chimera-fx/postfx/ChromaticAberrationShader.js
+  // assets/familiar/chimera-fx/postfx/ChromaticAberrationShader.js
   var ChromaticAberrationShader = {
     name: "ChromaticAberration",
     uniforms: {
@@ -10217,7 +10217,7 @@
     )
   };
 
-  // flutter/assets/familiar/chimera-fx/postfx/FilmGrainShader.js
+  // assets/familiar/chimera-fx/postfx/FilmGrainShader.js
   var FilmGrainShader = {
     name: "FilmGrain",
     uniforms: {
@@ -10270,7 +10270,7 @@
     )
   };
 
-  // flutter/assets/familiar/chimera-fx/postfx/GlitchShader.js
+  // assets/familiar/chimera-fx/postfx/GlitchShader.js
   var GlitchShader = {
     name: "Glitch",
     uniforms: {
@@ -10341,7 +10341,7 @@
     )
   };
 
-  // flutter/assets/familiar/chimera-fx/core/Engine.js
+  // assets/familiar/chimera-fx/core/Engine.js
   var Engine = class {
     constructor(opts = {}) {
       this.container = typeof opts.container === "string" ? document.querySelector(opts.container) : opts.container || document.body;
@@ -10760,7 +10760,7 @@
     window.ChimeraFX._themes = window.ChimeraFX._themes || {};
   }
 
-  // flutter/assets/familiar/chimera-fx/core/ShapableMatter.js
+  // assets/familiar/chimera-fx/core/ShapableMatter.js
   var SHARED_VERT = (
     /* glsl */
     `
@@ -11576,7 +11576,7 @@
     };
   }
 
-  // flutter/assets/familiar/chimera-fx/core/AmbientColors.js
+  // assets/familiar/chimera-fx/core/AmbientColors.js
   var REGIME_PALETTES = {
     ranging: {
       cool: { h: 210, s: 75, l: 55 },
@@ -11816,7 +11816,7 @@
     };
   }
 
-  // flutter/assets/familiar/chimera-fx/components/ParticleNebula.js
+  // assets/familiar/chimera-fx/components/ParticleNebula.js
   var PARTICLE_VERT = (
     /* glsl */
     `
@@ -12030,7 +12030,7 @@
     }
   };
 
-  // flutter/assets/familiar/chimera-fx/components/EnergyTendrils.js
+  // assets/familiar/chimera-fx/components/EnergyTendrils.js
   var TENDRIL_VERT = (
     /* glsl */
     `
@@ -12210,7 +12210,7 @@
     }
   };
 
-  // flutter/assets/familiar/chimera-fx/components/DataRivers.js
+  // assets/familiar/chimera-fx/components/DataRivers.js
   var RIVER_VERT = (
     /* glsl */
     `
@@ -12402,7 +12402,7 @@
     }
   };
 
-  // flutter/assets/familiar/chimera-fx/components/VolumetricLight.js
+  // assets/familiar/chimera-fx/components/VolumetricLight.js
   var VOLUME_FRAG = (
     /* glsl */
     `
@@ -12550,7 +12550,7 @@
     }
   };
 
-  // flutter/assets/familiar/chimera-fx/components/LiquidMetal.js
+  // assets/familiar/chimera-fx/components/LiquidMetal.js
   var METAL_FRAG = (
     /* glsl */
     `
@@ -12754,7 +12754,7 @@
     }
   };
 
-  // flutter/assets/familiar/chimera-fx/components/ReactionDiffusion.js
+  // assets/familiar/chimera-fx/components/ReactionDiffusion.js
   var COMPUTE_FRAG = (
     /* glsl */
     `
@@ -13000,7 +13000,7 @@
     }
   };
 
-  // flutter/assets/familiar/chimera-fx/components/VoronoiShatter.js
+  // assets/familiar/chimera-fx/components/VoronoiShatter.js
   var VORONOI_FRAG = (
     /* glsl */
     `
@@ -13182,7 +13182,7 @@
     }
   };
 
-  // flutter/assets/familiar/chimera-fx/components/HoloHUD.js
+  // assets/familiar/chimera-fx/components/HoloHUD.js
   var HUD_FRAG = (
     /* glsl */
     `
@@ -13345,7 +13345,7 @@
     }
   };
 
-  // flutter/assets/familiar/chimera-fx/components/EnergyBeams.js
+  // assets/familiar/chimera-fx/components/EnergyBeams.js
   var BEAM_FRAG = (
     /* glsl */
     `
@@ -13552,7 +13552,7 @@
     }
   };
 
-  // flutter/assets/familiar/chimera-fx/components/IridescentOrb.js
+  // assets/familiar/chimera-fx/components/IridescentOrb.js
   var ORB_FRAG = (
     /* glsl */
     `
@@ -13792,7 +13792,7 @@
     }
   };
 
-  // flutter/assets/familiar/chimera-fx/themes/cyberpunk-neon.js
+  // assets/familiar/chimera-fx/themes/cyberpunk-neon.js
   var CyberpunkNeon = {
     name: "cyberpunk-neon",
     // Core palette
@@ -13860,7 +13860,7 @@
     }
   };
 
-  // flutter/assets/familiar/chimera-fx/themes/organic-bioluminescent.js
+  // assets/familiar/chimera-fx/themes/organic-bioluminescent.js
   var OrganicBioluminescent = {
     name: "organic-bioluminescent",
     colors: {
@@ -13924,7 +13924,7 @@
     }
   };
 
-  // flutter/assets/familiar/chimera-fx/themes/quantum-void.js
+  // assets/familiar/chimera-fx/themes/quantum-void.js
   var QuantumVoid = {
     name: "quantum-void",
     colors: {
@@ -13988,7 +13988,7 @@
     }
   };
 
-  // flutter/assets/familiar/chimera-fx/themes/holographic-matrix.js
+  // assets/familiar/chimera-fx/themes/holographic-matrix.js
   var HolographicMatrix = {
     name: "holographic-matrix",
     colors: {
@@ -14054,7 +14054,7 @@
     }
   };
 
-  // flutter/assets/familiar/chimera-fx/themes/chimera-native.js
+  // assets/familiar/chimera-fx/themes/chimera-native.js
   var ChimeraNative = {
     name: "chimera-native",
     colors: {
@@ -14125,7 +14125,7 @@
     }
   };
 
-  // flutter/assets/familiar/chimera-fx/themes/midnight-trading.js
+  // assets/familiar/chimera-fx/themes/midnight-trading.js
   var MidnightTrading = {
     name: "midnight-trading",
     colors: {
@@ -14189,7 +14189,7 @@
     }
   };
 
-  // flutter/assets/familiar/chimera-fx/themes/neon-samurai.js
+  // assets/familiar/chimera-fx/themes/neon-samurai.js
   var NeonSamurai = {
     name: "neon-samurai",
     colors: {
@@ -14253,7 +14253,7 @@
     }
   };
 
-  // flutter/assets/familiar/chimera-fx/themes/deep-ocean.js
+  // assets/familiar/chimera-fx/themes/deep-ocean.js
   var DeepOcean = {
     name: "deep-ocean",
     colors: {
@@ -14317,7 +14317,7 @@
     }
   };
 
-  // flutter/assets/familiar/chimera-fx/themes/solar-flare.js
+  // assets/familiar/chimera-fx/themes/solar-flare.js
   var SolarFlare = {
     name: "solar-flare",
     colors: {
@@ -14381,7 +14381,7 @@
     }
   };
 
-  // flutter/assets/familiar/chimera-fx/themes/void-walker.js
+  // assets/familiar/chimera-fx/themes/void-walker.js
   var VoidWalker = {
     name: "void-walker",
     colors: {
@@ -14445,7 +14445,7 @@
     }
   };
 
-  // flutter/assets/familiar/chimera-fx/themes/crystal-matrix.js
+  // assets/familiar/chimera-fx/themes/crystal-matrix.js
   var CrystalMatrix = {
     name: "crystal-matrix",
     colors: {
@@ -14509,7 +14509,7 @@
     }
   };
 
-  // flutter/assets/familiar/chimera-fx/themes/aurora-borealis.js
+  // assets/familiar/chimera-fx/themes/aurora-borealis.js
   var AuroraBorealis = {
     name: "aurora-borealis",
     colors: {
@@ -14564,7 +14564,7 @@
     }
   };
 
-  // flutter/assets/familiar/chimera-fx/themes/obsidian-forge.js
+  // assets/familiar/chimera-fx/themes/obsidian-forge.js
   var ObsidianForge = {
     name: "obsidian-forge",
     colors: {
@@ -14619,7 +14619,7 @@
     }
   };
 
-  // flutter/assets/familiar/chimera-fx/themes/orchid-vapor.js
+  // assets/familiar/chimera-fx/themes/orchid-vapor.js
   var OrchidVapor = {
     name: "orchid-vapor",
     colors: {
@@ -14674,7 +14674,7 @@
     }
   };
 
-  // flutter/assets/familiar/chimera-fx/themes/tidal-glass.js
+  // assets/familiar/chimera-fx/themes/tidal-glass.js
   var TidalGlass = {
     name: "tidal-glass",
     colors: {
@@ -14729,7 +14729,7 @@
     }
   };
 
-  // flutter/assets/familiar/chimera-fx/chimera-fx-bundle.js
+  // assets/familiar/chimera-fx/chimera-fx-bundle.js
   var COMPONENTS = {
     nebula: ParticleNebula,
     "particle-nebula": ParticleNebula,
@@ -14905,7 +14905,7 @@
   window.ChimeraFX = { ...window.ChimeraFX || {}, ...ChimeraFX };
   var chimera_fx_bundle_default = ChimeraFX;
 
-  // flutter/assets/familiar/chimera-fx/mobile-scene.js
+  // assets/familiar/chimera-fx/mobile-scene.js
   var bridge = (value) => {
     for (const name of ["BackgroundBridge", "FamiliarBridge", "IntroBridge"]) {
       try {
@@ -14919,8 +14919,76 @@
   var targetFPS = 30;
   var engine = null;
   var activeTheme = "chimera-native";
+  var activeComposition = "mindrecipe-core";
   var activeSeed = 17;
   var lastState = {};
+  var sizeObserver = null;
+  var lastHealthSignature = "";
+  var COMPOSITIONS = {
+    "mindrecipe-core": {
+      components: ["nebula", "tendrils", "hud", "matter"],
+      matter: "cellular"
+    },
+    "neon-circuit": {
+      components: ["rivers", "beams", "hud", "matter"],
+      matter: "electric"
+    },
+    "bioluminescent": {
+      components: ["nebula", "volumetric", "tendrils", "matter"],
+      matter: "cellular"
+    },
+    "quantum-void": {
+      components: ["nebula", "voronoi", "matter"],
+      matter: "photonic"
+    },
+    "holographic-matrix": {
+      components: ["hud", "beams", "rivers", "matter"],
+      matter: "electric"
+    },
+    "midnight-signal": {
+      components: ["rivers", "hud", "tendrils", "matter"],
+      matter: "ionstorm"
+    },
+    "neon-ronin": {
+      components: ["tendrils", "beams", "voronoi", "matter"],
+      matter: "plasma"
+    },
+    "abyssal-current": {
+      components: ["nebula", "volumetric", "rivers", "matter"],
+      matter: "superfluid"
+    },
+    "solar-flare": {
+      components: ["volumetric", "tendrils", "reaction", "matter"],
+      matter: "plasma"
+    },
+    "void-walker": {
+      components: ["nebula", "voronoi", "matter"],
+      matter: "ionstorm"
+    },
+    "crystal-matrix": {
+      components: ["voronoi", "beams", "hud", "matter"],
+      matter: "crystalline"
+    },
+    "aurora": {
+      components: ["nebula", "tendrils", "volumetric", "matter"],
+      matter: "aerogel"
+    },
+    "obsidian-forge": {
+      components: ["metal", "volumetric", "beams", "matter"],
+      matter: "ferrofluid"
+    },
+    "orchid-vapor": {
+      components: ["reaction", "tendrils", "nebula", "matter"],
+      matter: "fluid"
+    },
+    "tidal-glass": {
+      components: ["rivers", "volumetric", "matter"],
+      matter: "superfluid"
+    }
+  };
+  function compositionFor(value) {
+    return COMPOSITIONS[value] ? value : "mindrecipe-core";
+  }
   var EvolvingOrb = class {
     constructor(seed = 17) {
       this.seed = Number(seed) || 17;
@@ -15073,13 +15141,15 @@
   }
   function optionsFor(kind) {
     if (kind === "background") {
+      const composition = COMPOSITIONS[activeComposition];
       return {
         container: host,
         // The factory starts immediately. Delay its first frame until the
         // render-target capability check below has selected a safe pipeline.
         fps: 1e-3,
         theme: activeTheme,
-        components: ["nebula", "tendrils", "hud", "matter"]
+        components: composition.components,
+        matter: { mode: composition.matter }
       };
     }
     return {
@@ -15088,12 +15158,58 @@
       theme: activeTheme,
       // The mobile-safe geometry orb is added after the engine starts.
       // Avoid creating the unsupported ray-marched shader orb on this route.
-      components: ["nebula", "tendrils", "rivers", "hud"],
-      nebula: { count: 1350, spread: 31 },
-      tendrils: { count: 5, segments: 34, height: 15 },
-      rivers: { rivers: 3, particles: 150 },
-      hud: { scanSpeed: 0.7 }
+      // Pulse is deliberately sparse so the shared evolving familiar remains
+      // the focal object instead of being hidden behind background components.
+      components: ["nebula"],
+      nebula: { count: 720, spread: 35 }
     };
+  }
+  function syncRendererSize() {
+    if (!engine || engine.disposed) return false;
+    const width = host.clientWidth;
+    const height = host.clientHeight;
+    if (width < 2 || height < 2) return false;
+    const canvas = engine.renderer?.domElement;
+    const pixelRatio = engine.renderer?.getPixelRatio?.() || 1;
+    const expectedWidth = Math.floor(width * pixelRatio);
+    const expectedHeight = Math.floor(height * pixelRatio);
+    if (canvas?.width !== expectedWidth || canvas?.height !== expectedHeight) {
+      engine._resize();
+      engine.renderOnce?.();
+      setTimeout(reportHealth, 80);
+    }
+    return Boolean(canvas?.width && canvas?.height);
+  }
+  function observeRendererSize() {
+    if (sizeObserver || typeof ResizeObserver === "undefined") return;
+    sizeObserver = new ResizeObserver(() => syncRendererSize());
+    sizeObserver.observe(host);
+  }
+  function reportHealth() {
+    if (!engine || engine.disposed) return;
+    const canvas = engine.renderer?.domElement;
+    const gl2 = engine.renderer?.getContext?.();
+    const components = engine.components || [];
+    const familiar = components.find((component) => component instanceof EvolvingOrb);
+    const details = [
+      `theme=${activeTheme}`,
+      `composition=${sceneKind === "background" ? activeComposition : "pulse-familiar"}`,
+      `canvas=${canvas?.width || 0}x${canvas?.height || 0}`,
+      `host=${host.clientWidth}x${host.clientHeight}`,
+      `components=${components.map((component) => component.constructor?.name).join(",") || "none"}`,
+      `familiar=${Boolean(familiar?.core?.visible !== false && familiar?.group?.visible !== false)}`,
+      `running=${Boolean(engine.running)}`,
+      `reducedMotion=${Boolean(engine.reducedMotion)}`,
+      `pipeline=${engine.renderPipeline || "unknown"}`,
+      `frame=${engine.renderer?.info?.render?.frame || 0}`,
+      `calls=${engine.renderer?.info?.render?.calls || 0}`,
+      `programs=${engine.renderer?.info?.programs?.length || 0}`,
+      `gl=${gl2?.getError?.() ?? -1}`
+    ].join(" ");
+    if (details === lastHealthSignature) return;
+    lastHealthSignature = details;
+    console.info(`[MindRecipe FX] ${details}`);
+    bridge(`health:${details}`);
   }
   function configureRenderPipeline() {
     const renderer = engine?.renderer;
@@ -15154,31 +15270,21 @@
     window._mindRecipeFX = engine;
     configureRenderPipeline();
     if (sceneKind === "pulse") engine.addComponent(new EvolvingOrb(activeSeed));
+    if (sceneKind === "background") {
+      const matter = engine.components?.find(
+        (component) => component.constructor?.name === "ShapableMatter"
+      );
+      matter?.setMatterMode?.(COMPOSITIONS[activeComposition].matter);
+    }
     configureCanvas();
     configureSurface();
     attachContextHandler();
+    observeRendererSize();
+    syncRendererSize();
     engine.renderer.compile(engine.scene, engine.camera);
     engine.renderOnce?.();
-    setTimeout(() => {
-      if (!engine || engine.disposed) return;
-      const canvas = engine.renderer?.domElement;
-      const gl2 = engine.renderer?.getContext?.();
-      const details = [
-        `theme=${activeTheme}`,
-        `canvas=${canvas?.width || 0}x${canvas?.height || 0}`,
-        `host=${host.clientWidth}x${host.clientHeight}`,
-        `components=${engine.components?.length || 0}`,
-        `running=${Boolean(engine.running)}`,
-        `reducedMotion=${Boolean(engine.reducedMotion)}`,
-        `pipeline=${engine.renderPipeline || "unknown"}`,
-        `frame=${engine.renderer?.info?.render?.frame || 0}`,
-        `calls=${engine.renderer?.info?.render?.calls || 0}`,
-        `programs=${engine.renderer?.info?.programs?.length || 0}`,
-        `gl=${gl2?.getError?.() ?? -1}`
-      ].join(" ");
-      console.info(`[MindRecipe FX] ${details}`);
-      bridge(`health:${details}`);
-    }, 750);
+    [0, 60, 180, 420, 900].forEach((delay) => setTimeout(syncRendererSize, delay));
+    setTimeout(reportHealth, 750);
   }
   function normalizeSeed(value) {
     const parsed = Number(value);
@@ -15192,13 +15298,17 @@
     lastState = { ...lastState, ...state };
     if (!engine) return;
     const nextTheme = chimera_fx_bundle_default.themes[lastState.theme] ? lastState.theme : "chimera-native";
+    const nextComposition = compositionFor(lastState.variant);
     const nextSeed = normalizeSeed(lastState.seed);
     const themeChanged = nextTheme !== activeTheme;
+    const compositionChanged = sceneKind === "background" && nextComposition !== activeComposition;
     const seedChanged = sceneKind === "pulse" && nextSeed !== activeSeed;
     activeTheme = nextTheme;
+    activeComposition = nextComposition;
     activeSeed = nextSeed;
-    if (themeChanged || seedChanged) rebuildEngine();
+    if (themeChanged || compositionChanged || seedChanged) rebuildEngine();
     configureSurface();
+    syncRendererSize();
     const growth = Math.max(0, Math.min(1, Number(lastState.growth ?? lastState.progress ?? 0)));
     const complexity = Math.max(0, Math.min(1, Number(lastState.complexity ?? growth)));
     const activation = Math.max(0, Math.min(1, Number(lastState.activation ?? lastState.intensity ?? 0.35)));
@@ -15224,6 +15334,7 @@
   function start() {
     try {
       activeTheme = chimera_fx_bundle_default.themes[lastState.theme] ? lastState.theme : "chimera-native";
+      activeComposition = compositionFor(lastState.variant);
       activeSeed = normalizeSeed(lastState.seed);
       createEngine();
       apply(lastState);
