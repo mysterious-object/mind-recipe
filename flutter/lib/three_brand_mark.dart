@@ -54,11 +54,13 @@ class _ThreeBrandMarkState extends State<ThreeBrandMark> {
               setState(() => _webReady = true);
             }
           },
-        )
-        ..loadFlutterAsset('assets/familiar/brand.html');
+        );
+      if (!mounted) return;
+      setState(() => controller = c);
+      await WidgetsBinding.instance.endOfFrame;
+      await c.loadFlutterAsset('assets/familiar/brand.html');
       await Future<void>.delayed(const Duration(milliseconds: 120));
       await c.runJavaScript('window.setBrandSceneVariant?.(${widget.variant})');
-      if (mounted) setState(() => controller = c);
     } catch (_) {}
   }
 

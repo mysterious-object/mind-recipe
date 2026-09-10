@@ -51,10 +51,12 @@ class _ThreeIntroScreenState extends State<ThreeIntroScreen> {
             if (mounted) setState(() => ready = true);
           },
         );
+      if (!mounted) return;
+      setState(() => controller = c);
+      await WidgetsBinding.instance.endOfFrame;
       await c.loadFlutterAsset('assets/familiar/intro.html');
       await Future<void>.delayed(const Duration(milliseconds: 120));
       await c.runJavaScript('window.setIntroVariant(${widget.variant})');
-      if (mounted) setState(() => controller = c);
     } catch (_) {
       // The branded native mark remains visible when WebGL is unavailable.
     }

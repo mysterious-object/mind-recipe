@@ -96,10 +96,11 @@ class _ThreeBackgroundState extends State<ThreeBackground>
             }
             unawaited(_send());
           },
-        )
-        ..loadFlutterAsset('assets/familiar/background.html');
+        );
       if (mounted) {
         setState(() => _controller = controller);
+        await WidgetsBinding.instance.endOfFrame;
+        await controller.loadFlutterAsset('assets/familiar/background.html');
         // The page can report ready before the cascade assigns the controller.
         // Send once here as well so the saved theme is never missed.
         if (_ready) unawaited(_send());
