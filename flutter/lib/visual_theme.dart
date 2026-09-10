@@ -36,7 +36,10 @@ const visualThemes = <VisualThemeDefinition>[
     secondary: Color(0xff8b5cf6),
     tertiary: Color(0xfff5b942),
     background: Color(0xff06151b),
-    engineTheme: 'mindrecipe-core',
+    // The working source renderer registers this composition as
+    // `chimera-native`. Keep the MindRecipe-facing id/name while passing the
+    // exact source theme key through to WebGL.
+    engineTheme: 'chimera-native',
     composition: 'mindrecipe-core',
   ),
   VisualThemeDefinition(

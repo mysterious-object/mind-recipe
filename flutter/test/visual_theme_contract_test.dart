@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mind_recipe/visual_theme.dart';
 
 const _expectedThemes = <String, (String, String)>{
-  'mindrecipe-core': ('MindRecipe Core', 'mindrecipe-core'),
+  'mindrecipe-core': ('MindRecipe Core', 'chimera-native'),
   'neon-circuit': ('Neon Circuit', 'cyberpunk-neon'),
   'bioluminescent': ('Bioluminescent', 'organic-bioluminescent'),
   'quantum-void': ('Quantum Void', 'quantum-void'),
@@ -22,7 +22,7 @@ const _expectedThemes = <String, (String, String)>{
 };
 
 const _themeModules = <String, String>{
-  'mindrecipe-core': 'chimera-native.js',
+  'chimera-native': 'chimera-native.js',
   'cyberpunk-neon': 'cyberpunk-neon.js',
   'organic-bioluminescent': 'organic-bioluminescent.js',
   'quantum-void': 'quantum-void.js',

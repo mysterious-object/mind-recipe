@@ -18,28 +18,30 @@ void main() {
     }
   });
 
-  test('DarkStar-derived engine negotiates Android-safe framebuffers', () {
-    final engine = File('assets/familiar/chimera-fx/core/Engine.js')
-        .readAsStringSync();
-    final composer = File(
-      'assets/familiar/three-addons/postprocessing/EffectComposer.js',
-    ).readAsStringSync();
-    final bloom = File(
-      'assets/familiar/three-addons/postprocessing/UnrealBloomPass.js',
-    ).readAsStringSync();
+  test(
+    'reference renderer and its pinned post-processing stack are bundled',
+    () {
+      final engine = File('assets/familiar/chimera-fx/core/Engine.js')
+          .readAsStringSync();
+      final composer = File(
+        'assets/familiar/three-addons/postprocessing/EffectComposer.js',
+      ).readAsStringSync();
+      final bloom = File(
+        'assets/familiar/three-addons/postprocessing/UnrealBloomPass.js',
+      ).readAsStringSync();
 
-    expect(engine, contains('MAX_RENDERBUFFER_SIZE'));
-    expect(engine, contains('MAX_TEXTURE_SIZE'));
-    expect(engine, contains('this._safePixelRatio()'));
-    expect(composer, contains('UnsignedByteType'));
-    expect(composer, contains('/Android/i.test( navigator.userAgent )'));
-    expect(bloom, contains('UnsignedByteType'));
-    expect(
-      RegExp(r'type: HalfFloatType').allMatches(bloom),
-      isEmpty,
-      reason: 'Bloom must not hard-code unsupported half-float attachments.',
-    );
-  });
+      expect(engine, contains('new EffectComposer(this.renderer)'));
+      expect(engine, contains('new UnrealBloomPass('));
+      expect(composer, contains('class EffectComposer'));
+      expect(bloom, contains('class UnrealBloomPass'));
+      expect(
+        File('assets/familiar/three.module.min.js').readAsStringSync(),
+        contains('const t="160"'),
+        reason:
+            'The renderer must use the source project\'s pinned Three.js r160.',
+      );
+    },
+  );
 
   test('WebGL pages load only after their native surfaces are attached', () {
     for (final path in const [

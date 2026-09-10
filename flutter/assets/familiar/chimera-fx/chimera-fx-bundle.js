@@ -73,7 +73,6 @@ const COMPONENTS = {
 
 // ─── Theme Registry ───────────────────────────────────────────────────────
 const THEMES = {
-  'mindrecipe-core': ChimeraNative,
   'cyberpunk-neon': CyberpunkNeon,
   'organic-bioluminescent': OrganicBioluminescent,
   'quantum-void': QuantumVoid,
