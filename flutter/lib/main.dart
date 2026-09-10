@@ -23,16 +23,16 @@ import 'on_device_inference.dart';
 import 'notification_scheduler.dart';
 import 'practitioner_sharing.dart';
 import 'visual_theme.dart';
-
-const _themeLiveCheck = bool.fromEnvironment(
-  'MIND_RECIPE_THEME_LIVE_CHECK',
-);
 import 'live_visual_theme_picker.dart';
 import 'pulse_screen.dart';
 import 'recipes_screen.dart';
 import 'voice_interface.dart';
 import 'three_intro_screen.dart';
 import 'three_background.dart';
+
+const _themeLiveCheck = bool.fromEnvironment(
+  'MIND_RECIPE_THEME_LIVE_CHECK',
+);
 
 void main() => runApp(const MindRecipeApp());
 
