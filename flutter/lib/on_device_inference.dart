@@ -94,6 +94,12 @@ class OnDeviceModelManifest {
 
 enum PrivatePromptFormat { qwenChatMl, gemmaTurns }
 
+/// llama.cpp requires a negative GPU index when a model is intentionally
+/// CPU-only. Passing its default index (0) with no GPU backend makes model
+/// loading fail before the GGUF is opened.
+@visibleForTesting
+int mindRecipeMainGpuForLayers(int gpuLayers) => gpuLayers > 0 ? 0 : -1;
+
 /// A member-facing description of the private model. Keeping this separate
 /// from the download manifest lets the setup screen explain the trade-offs
 /// without implying that a model is installed before its checksum verifies.
@@ -905,18 +911,11 @@ class OnDeviceInference implements LocalInference {
       final device = await MindRecipeDeviceHarness().capabilities();
       final totalMem = device.totalMemoryMiB ?? 8192;
       if (totalMem >= 8192) {
-        // High memory device: try GPU first
+        // This Android package currently bundles the llama.cpp CPU backend.
+        // Keep the larger context on capable phones without pretending a GPU
+        // backend is available; a GPU index with zero registered devices is a
+        // hard model-load error in the pinned runtime.
         attempts = [
-          (
-            'GPU accelerated',
-            99,
-            nCtx,
-            256,
-            4,
-            448,
-            LlamaFlashAttnType.enabled,
-            LlamaKvCacheType.q8_0,
-          ),
           (
             'CPU · balanced',
             0,
@@ -1025,7 +1024,7 @@ class OnDeviceInference implements LocalInference {
       try {
         final model = ModelParams()
           ..nGpuLayers = gpuLayers
-          ..mainGpu = 0
+          ..mainGpu = mindRecipeMainGpuForLayers(gpuLayers)
           ..useMemorymap = true
           ..useMemoryLock = false;
         final context = ContextParams()
