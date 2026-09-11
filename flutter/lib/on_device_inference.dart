@@ -253,6 +253,17 @@ class OnDeviceInference implements LocalInference {
         );
   Future<File> _modelFile([OnDeviceModelManifest? manifest]) async {
     final target = manifest ?? _activeManifest;
+    // The disposable live-check package can exercise the native runtime with
+    // a model staged by ADB. Production builds never enable this compile-time
+    // flag and always use private application storage below.
+    if (Platform.isAndroid &&
+        const bool.fromEnvironment('MIND_RECIPE_EXTERNAL_MODEL_TEST')) {
+      final external = await getExternalStorageDirectory();
+      if (external != null) {
+        final staged = File('${external.path}/${target.id}.gguf');
+        if (await staged.exists()) return staged;
+      }
+    }
     final base = await getApplicationSupportDirectory();
     final directory = Directory('${base.path}/private-models');
     if (!await directory.exists()) await directory.create(recursive: true);
