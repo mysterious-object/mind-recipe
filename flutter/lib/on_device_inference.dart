@@ -196,6 +196,7 @@ class OnDeviceInference implements LocalInference {
   );
   LlamaParent? _engine;
   bool _refreshing = false;
+  Completer<LocalInferenceSnapshot>? _refreshCompleter;
 
   /// True only while a download loop is actually running in this process.
   /// A `.partial` on disk from a previous session must not block a new
@@ -320,11 +321,8 @@ class OnDeviceInference implements LocalInference {
       // Activation and the Settings poller can request status at the same
       // time. Returning the transient `verifying`/`initializing` snapshot made
       // activateModel report failure even though the first refresh completed
-      // moments later. Join that refresh instead and return its final state.
-      for (var attempt = 0; attempt < 1200 && _refreshing; attempt++) {
-        await Future<void>.delayed(const Duration(milliseconds: 50));
-      }
-      return _snapshot;
+      // moments later. Join that exact refresh without polling timers.
+      return _refreshCompleter?.future ?? _snapshot;
     }
     // Do not clobber an active download/verify — the UI timer polls this
     // every 500ms and would otherwise reset `downloading` → `notInstalled`
@@ -340,6 +338,8 @@ class OnDeviceInference implements LocalInference {
       return _snapshot;
     }
     _refreshing = true;
+    final completer = Completer<LocalInferenceSnapshot>();
+    _refreshCompleter = completer;
     try {
       var file = await _modelFile();
       if (!await file.exists()) {
@@ -417,6 +417,8 @@ class OnDeviceInference implements LocalInference {
       );
     } finally {
       _refreshing = false;
+      if (!completer.isCompleted) completer.complete(_snapshot);
+      if (identical(_refreshCompleter, completer)) _refreshCompleter = null;
     }
   }
 
