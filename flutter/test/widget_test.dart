@@ -179,6 +179,28 @@ void main() {
     expect(loggedIn.displayName, 'Navigator');
   });
 
+  test(
+    'API client reports a temporarily unavailable account service',
+    () async {
+      final api = MindRecipeApiClient(
+        client: MockClient(
+          (_) async => http.Response('no available server', 503),
+        ),
+      );
+
+      await expectLater(
+        api.login(email: 'navigator@example.com', password: 'long-passphrase'),
+        throwsA(
+          isA<ApiException>().having(
+            (exception) => exception.message,
+            'message',
+            'The account service is temporarily unavailable. Please try again shortly.',
+          ),
+        ),
+      );
+    },
+  );
+
   test('API client syncs an authenticated, idempotent check-in', () async {
     final client = MockClient((request) async {
       expect(request.url.path, '/v1/checkins');

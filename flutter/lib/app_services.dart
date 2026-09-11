@@ -109,7 +109,12 @@ class MindRecipeApiClient {
     Map<String, dynamic> decoded;
     try {
       decoded = jsonDecode(response.body) as Map<String, dynamic>;
-    } on FormatException {
+    } on Object {
+      if (response.statusCode >= 500) {
+        throw const ApiException(
+          'The account service is temporarily unavailable. Please try again shortly.',
+        );
+      }
       throw const ApiException(
         'The account service returned an invalid response.',
       );

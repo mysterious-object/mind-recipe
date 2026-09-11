@@ -10,6 +10,7 @@ kubectl --context "$KUBE_CONTEXT" -n mind-recipe-staging create configmap mind-r
   --from-file="$ROOT_DIR/backend/app" \
   --dry-run=client -o yaml \
   | kubectl --context "$KUBE_CONTEXT" apply -f -
+kubectl --context "$KUBE_CONTEXT" apply -f "$ROOT_DIR/deploy/staging/data-pvc.yaml"
 kubectl --context "$KUBE_CONTEXT" apply -f "$ROOT_DIR/deploy/staging/api.yaml"
 kubectl --context "$KUBE_CONTEXT" -n mind-recipe-staging rollout status deployment/mind-recipe-api --timeout=180s
 curl --fail --silent --show-error --max-time 20 \

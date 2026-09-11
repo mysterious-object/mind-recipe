@@ -40,12 +40,45 @@ spec:
         runAsNonRoot: true
         fsGroup: 1000
         seccompProfile: {type: RuntimeDefault}
+      # The previous deployment referenced a node-local image that vanished
+      # after a node restart, leaving authentication behind an ImagePullBackOff.
+      # Prepare the small Python dependency layer from pinned public packages so
+      # a fresh node can always recreate staging without a private registry.
+      initContainers:
+        - name: prepare-python-dependencies
+          image: python:3.12-slim@sha256:2c941e860699f878900b0edc2403613c234d4b32eda3cc9fa7036991a2a63c4a
+          imagePullPolicy: IfNotPresent
+          command: ["python", "-m", "pip", "install"]
+          args:
+            - --disable-pip-version-check
+            - --no-cache-dir
+            - --target
+            - /tmp/site
+            - fastapi==0.141.1
+            - pydantic==2.13.5
+            - uvicorn[standard]==0.52.4
+            - httpx==0.28.1
+            - psycopg[binary]==3.3.5
+          env:
+            - name: HOME
+              value: /tmp
+          volumeMounts:
+            - name: python-site
+              mountPath: /tmp/site
+            - name: tmp
+              mountPath: /tmp
+          securityContext:
+            runAsUser: 1000
+            runAsGroup: 1000
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
       containers:
         - name: api
-          image: docker.io/library/mind-nav-api:staging-20260822
+          image: python:3.12-slim@sha256:2c941e860699f878900b0edc2403613c234d4b32eda3cc9fa7036991a2a63c4a
           imagePullPolicy: IfNotPresent
-          command: ["sh", "-c"]
-          args: ["uvicorn app.main:app --host 0.0.0.0 --port 8080"]
+          command: ["python", "-m", "uvicorn"]
+          args: ["app.main:app", "--host", "0.0.0.0", "--port", "8080"]
           ports: [{name: http, containerPort: 8080}]
           env:
             - name: MIND_RECIPE_ENV
@@ -87,8 +120,11 @@ spec:
         - name: source
           configMap:
             name: mind-recipe-api-source
-        - name: staging-data
+        - name: python-site
           emptyDir: {}
+        - name: staging-data
+          persistentVolumeClaim:
+            claimName: mind-recipe-staging-data
         - name: tmp
           emptyDir: {}
 ---
