@@ -224,9 +224,9 @@ const ChimeraFX = {
   setMatterMode(mode) {
     const engine = window._chimeraFX;
     if (!engine) { console.warn('[ChimeraFX] setMatterMode: engine not ready'); return; }
-    const compNames = engine.getEnabledComponents();
+    const compNames = engine.components.map(c => c.constructor.name);
     console.log('[ChimeraFX] setMatterMode:', mode, '| components:', compNames);
-    const matter = engine.components.find(c => c instanceof ShapableMatter);
+    const matter = engine.components.find(c => c.constructor.name === 'ShapableMatter');
     if (matter && typeof matter.setMatterMode === 'function') {
       matter.setMatterMode(mode);
       console.log('[ChimeraFX] setMatterMode:', mode, '— ShapableMatter found, mode applied');
@@ -245,7 +245,7 @@ const ChimeraFX = {
   getMatterMode() {
     const engine = window._chimeraFX;
     if (!engine) return 'nebula';
-    const matter = engine.components.find(c => c instanceof ShapableMatter);
+    const matter = engine.components.find(c => c.constructor.name === 'ShapableMatter');
     return matter?.getMatterMode?.() || 'nebula';
   },
 };
