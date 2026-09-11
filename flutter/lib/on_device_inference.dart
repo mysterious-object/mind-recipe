@@ -100,6 +100,9 @@ enum PrivatePromptFormat { qwenChatMl, gemmaTurns }
 @visibleForTesting
 int mindRecipeMainGpuForLayers(int gpuLayers) => gpuLayers > 0 ? 0 : -1;
 
+@visibleForTesting
+int mindRecipeLogicalPromptBatch(int contextTokens) => contextTokens;
+
 /// A member-facing description of the private model. Keeping this separate
 /// from the download manifest lets the setup screen explain the trade-offs
 /// without implying that a model is installed before its checksum verifies.
@@ -1029,7 +1032,12 @@ class OnDeviceInference implements LocalInference {
           ..useMemoryLock = false;
         final context = ContextParams()
           ..nCtx = ctx
-          ..nBatch = batch
+          // nBatch is the logical prompt capacity. Keep it aligned with the
+          // context so the Navigator's system prompt can be evaluated in
+          // chunks instead of being rejected before generation starts.
+          ..nBatch = mindRecipeLogicalPromptBatch(ctx)
+          // nUbatch is the physical CPU work unit and remains deliberately
+          // small for mobile memory/thermal safety.
           ..nUbatch = batch
           // Performance cores only — little cores add contention and slow
           // token generation on big.LITTLE phones.

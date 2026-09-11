@@ -10,4 +10,9 @@ void main() {
     expect(mindRecipeMainGpuForLayers(1), 0);
     expect(mindRecipeMainGpuForLayers(99), 0);
   });
+
+  test('logical prompt batch spans the configured context', () {
+    expect(mindRecipeLogicalPromptBatch(1024), 1024);
+    expect(mindRecipeLogicalPromptBatch(4096), 4096);
+  });
 }
