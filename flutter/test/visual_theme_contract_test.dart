@@ -130,6 +130,12 @@ void main() {
       }
       expect(source, contains('matter?.setMatterMode?.('));
       expect(source, contains('compositionChanged'));
+      expect(
+        source,
+        contains('component instanceof ChimeraFX.ShapableMatter'),
+        reason: 'Minified class names must not break live matter-mode swaps.',
+      );
+      expect(source, isNot(contains("constructor?.name === 'ShapableMatter'")));
     });
 
     test('every theme has a distinct WebGL component and matter signature', () {

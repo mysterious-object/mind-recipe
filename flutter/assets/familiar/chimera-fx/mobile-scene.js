@@ -79,6 +79,24 @@ function compositionFor(value) {
   return COMPOSITIONS[value] ? value : 'mindrecipe-core';
 }
 
+const COMPONENT_TYPES = [
+  ['nebula', ChimeraFX.ParticleNebula],
+  ['tendrils', ChimeraFX.EnergyTendrils],
+  ['rivers', ChimeraFX.DataRivers],
+  ['volumetric', ChimeraFX.VolumetricLight],
+  ['metal', ChimeraFX.LiquidMetal],
+  ['reaction', ChimeraFX.ReactionDiffusion],
+  ['voronoi', ChimeraFX.VoronoiShatter],
+  ['hud', ChimeraFX.HoloHUD],
+  ['beams', ChimeraFX.EnergyBeams],
+  ['matter', ChimeraFX.ShapableMatter],
+];
+
+function componentLabel(component) {
+  return COMPONENT_TYPES.find(([, Type]) => component instanceof Type)?.[0]
+    || 'unknown';
+}
+
 // The original ray-marched IridescentOrb is retained in the engine,
 // but some mobile WebViews compile it without drawing its surface. This is a
 // geometry-backed Three.js familiar that runs in that same Three.js scene and
@@ -265,14 +283,14 @@ function reportHealth() {
   const components = engine.components || [];
   const familiar = components.find(component => component instanceof EvolvingOrb);
   const matter = components.find(
-    component => component.constructor?.name === 'ShapableMatter',
+    component => component instanceof ChimeraFX.ShapableMatter,
   );
   const details = [
     `theme=${activeTheme}`,
     `composition=${sceneKind === 'background' ? activeComposition : 'pulse-familiar'}`,
     `canvas=${canvas?.width || 0}x${canvas?.height || 0}`,
     `host=${host.clientWidth}x${host.clientHeight}`,
-    `components=${components.map(component => component.constructor?.name).join(',') || 'none'}`,
+    `components=${components.map(componentLabel).join(',') || 'none'}`,
     `matter=${matter?.getMatterMode?.() || 'none'}`,
     `familiar=${Boolean(familiar && familiar.core?.visible !== false && familiar.group?.visible !== false)}`,
     `running=${Boolean(engine.running)}`,
@@ -358,7 +376,7 @@ function createEngine() {
   if (sceneKind === 'pulse') engine.addComponent(new EvolvingOrb(activeSeed));
   if (sceneKind === 'background') {
     const matter = engine.components?.find(
-      component => component.constructor?.name === 'ShapableMatter',
+      component => component instanceof ChimeraFX.ShapableMatter,
     );
     matter?.setMatterMode?.(COMPOSITIONS[activeComposition].matter);
   }
@@ -390,7 +408,7 @@ function applyBackgroundComposition() {
   engine.setComponentPreset(composition.components);
   engine.setTheme(ChimeraFX.themes[activeTheme]);
   const matter = engine.components?.find(
-    component => component.constructor?.name === 'ShapableMatter',
+    component => component instanceof ChimeraFX.ShapableMatter,
   );
   matter?.setMatterMode?.(composition.matter);
   engine.renderer.compile(engine.scene, engine.camera);
@@ -435,12 +453,16 @@ function apply(state = {}) {
   engine.setState(activation > .74 ? 'thinking' : growth > .68 ? 'success' : complexity > .34 ? 'streaming' : 'idle');
   const components = engine.components || [];
   components.find(component => component instanceof EvolvingOrb)?.setEvolution({ growth, complexity, activation, valence });
-  const tendrils = components.find(component => component.constructor?.name === 'EnergyTendrils');
+  const tendrils = components.find(
+    component => component instanceof ChimeraFX.EnergyTendrils,
+  );
   tendrils?.meshes?.forEach(({ line }, index) => {
     line.visible = index < 2 + Math.ceil(complexity * 3);
     line.scale.setScalar(.78 + growth * .3);
   });
-  const rivers = components.find(component => component.constructor?.name === 'DataRivers');
+  const rivers = components.find(
+    component => component instanceof ChimeraFX.DataRivers,
+  );
   rivers?.rivers?.forEach(({ mesh }, index) => { mesh.visible = index < 1 + Math.ceil(complexity * 2); });
   if (growth >= .8 && lastState._lastMilestone !== growth) {
     engine.pulse('success');
