@@ -316,7 +316,16 @@ class OnDeviceInference implements LocalInference {
   @override
   Future<LocalInferenceSnapshot> refreshStatus() async {
     await _restoreActiveSelection();
-    if (_refreshing) return _snapshot;
+    if (_refreshing) {
+      // Activation and the Settings poller can request status at the same
+      // time. Returning the transient `verifying`/`initializing` snapshot made
+      // activateModel report failure even though the first refresh completed
+      // moments later. Join that refresh instead and return its final state.
+      for (var attempt = 0; attempt < 1200 && _refreshing; attempt++) {
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+      }
+      return _snapshot;
+    }
     // Do not clobber an active download/verify — the UI timer polls this
     // every 500ms and would otherwise reset `downloading` → `notInstalled`
     // while the .partial file is still being written (tab switch bug).

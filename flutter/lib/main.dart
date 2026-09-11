@@ -1582,11 +1582,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _progressTimer = Timer.periodic(const Duration(milliseconds: 500), (_) {
       if (!mounted) return;
       final current = OnDeviceInference().snapshot;
+      if (current.status != _privateModel.status ||
+          current.detail != _privateModel.detail) {
+        setState(() => _privateModel = current);
+      }
       if (_modelActionInProgress ||
           current.status == OnDeviceStatus.downloading ||
           current.status == OnDeviceStatus.verifying ||
           current.status == OnDeviceStatus.initializing) {
-        setState(() => _privateModel = current);
         return;
       }
       // While downloading/verifying, just repaint progress from the
@@ -1595,7 +1598,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (_privateModel.status == OnDeviceStatus.downloading ||
           _privateModel.status == OnDeviceStatus.verifying ||
           _privateModel.status == OnDeviceStatus.initializing) {
-        if (mounted) setState(() {});
+        setState(() => _privateModel = current);
         return;
       }
       if (_privateModel.status == OnDeviceStatus.notInstalled ||
