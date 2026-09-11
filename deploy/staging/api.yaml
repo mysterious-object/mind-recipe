@@ -53,7 +53,7 @@ spec:
             - --disable-pip-version-check
             - --no-cache-dir
             - --target
-            - /tmp/site
+            - /opt/python-site
             - fastapi==0.141.1
             - pydantic==2.13.5
             - uvicorn[standard]==0.52.4
@@ -64,7 +64,7 @@ spec:
               value: /tmp
           volumeMounts:
             - name: python-site
-              mountPath: /tmp/site
+              mountPath: /opt/python-site
             - name: tmp
               mountPath: /tmp
           securityContext:
@@ -86,7 +86,7 @@ spec:
             - name: MIND_RECIPE_DB_PATH
               value: /data/mind-recipe-staging.sqlite3
             - name: PYTHONPATH
-              value: /tmp/site:/app
+              value: /opt/python-site:/app
           envFrom:
             - secretRef:
                 name: mind-recipe-runtime
@@ -94,6 +94,9 @@ spec:
           volumeMounts:
             - name: source
               mountPath: /app/app
+              readOnly: true
+            - name: python-site
+              mountPath: /opt/python-site
               readOnly: true
             - name: staging-data
               mountPath: /data
