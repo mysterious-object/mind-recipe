@@ -457,7 +457,11 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
       // Anti-loop guard: if the reply mostly repeats the previous Navigator
       // turn ("consider the next step…" circles), retry ONCE with an explicit
       // variation instruction so the model moves somewhere new.
-      if (reply != null && _isRepetitiveOfLastAssistant(reply)) {
+      if (reply != null &&
+          _isRepetitiveOfLastAssistant(
+            reply,
+            beforeMessageIndex: placeholderIndex,
+          )) {
         await _log('REPETITION detected — retrying with variation nudge');
         if (mounted && placeholderIndex < widget.messages.length) {
           setState(
@@ -737,9 +741,17 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
 
   /// Word-overlap similarity between a candidate reply and the most recent
   /// Navigator turn. Used to break "consider the next step…" circles.
-  bool _isRepetitiveOfLastAssistant(String reply) {
+  bool _isRepetitiveOfLastAssistant(String reply, {int? beforeMessageIndex}) {
     String? lastAssistant;
-    for (var i = widget.messages.length - 1; i >= 0; i--) {
+    // Streaming writes the in-progress answer into a placeholder at
+    // [beforeMessageIndex]. Never compare a completed answer with that same
+    // placeholder: doing so makes every streamed answer look 100% repetitive
+    // and forces a slow, usually worse second generation.
+    for (
+      var i = (beforeMessageIndex ?? widget.messages.length) - 1;
+      i >= 0;
+      i--
+    ) {
       if (widget.messages[i].role == ChatRole.assistant) {
         lastAssistant = widget.messages[i].text;
         break;
