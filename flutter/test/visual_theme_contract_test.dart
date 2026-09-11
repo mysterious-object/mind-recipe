@@ -132,6 +132,36 @@ void main() {
       expect(source, contains('compositionChanged'));
     });
 
+    test('every theme has a distinct WebGL component and matter signature', () {
+      final source = File('assets/familiar/chimera-fx/mobile-scene.js')
+          .readAsStringSync();
+      final definitions = RegExp(
+        r"'([a-z0-9-]+)':\s*\{\s*components:\s*\[([^\]]+)\],\s*matter:\s*'([^']+)'",
+      );
+      final signatures = <String, String>{};
+
+      for (final match in definitions.allMatches(source)) {
+        final id = match.group(1)!;
+        final components =
+            RegExp(r"'([^']+)'")
+                .allMatches(match.group(2)!)
+                .map((entry) => entry.group(1)!)
+                .toList()
+              ..sort();
+        final signature = '${components.join(',')}|${match.group(3)}';
+        expect(
+          signatures[signature],
+          isNull,
+          reason:
+              '$id duplicates the WebGL scene used by '
+              '${signatures[signature]}',
+        );
+        signatures[signature] = id;
+      }
+
+      expect(signatures, hasLength(15));
+    });
+
     test(
       'background runs the source ChimeraFX stack without a parallel shader',
       () {

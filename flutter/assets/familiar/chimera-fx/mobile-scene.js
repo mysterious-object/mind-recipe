@@ -35,43 +35,43 @@ const COMPOSITIONS = {
     components: ['rivers', 'beams', 'hud', 'matter'], matter: 'electric',
   },
   'bioluminescent': {
-    components: ['nebula', 'volumetric', 'tendrils', 'matter'], matter: 'cellular',
+    components: ['nebula', 'volumetric', 'matter'], matter: 'cellular',
   },
   'quantum-void': {
     components: ['nebula', 'voronoi', 'matter'], matter: 'photonic',
   },
   'holographic-matrix': {
-    components: ['hud', 'beams', 'rivers', 'matter'], matter: 'electric',
+    components: ['hud', 'rivers', 'volumetric', 'matter'], matter: 'electric',
   },
   'midnight-signal': {
-    components: ['rivers', 'hud', 'tendrils', 'matter'], matter: 'ionstorm',
+    components: ['rivers', 'tendrils', 'matter'], matter: 'ionstorm',
   },
   'neon-ronin': {
-    components: ['tendrils', 'beams', 'voronoi', 'matter'], matter: 'plasma',
+    components: ['tendrils', 'metal', 'matter'], matter: 'plasma',
   },
   'abyssal-current': {
-    components: ['nebula', 'volumetric', 'rivers', 'matter'], matter: 'superfluid',
+    components: ['volumetric', 'rivers', 'matter'], matter: 'superfluid',
   },
   'solar-flare': {
-    components: ['volumetric', 'tendrils', 'reaction', 'matter'], matter: 'plasma',
+    components: ['volumetric', 'reaction', 'matter'], matter: 'plasma',
   },
   'void-walker': {
-    components: ['nebula', 'voronoi', 'matter'], matter: 'ionstorm',
+    components: ['metal', 'nebula', 'matter'], matter: 'ionstorm',
   },
   'crystal-matrix': {
-    components: ['voronoi', 'beams', 'hud', 'matter'], matter: 'crystalline',
+    components: ['metal', 'hud', 'matter'], matter: 'crystalline',
   },
   'aurora': {
-    components: ['nebula', 'tendrils', 'volumetric', 'matter'], matter: 'aerogel',
+    components: ['nebula', 'tendrils', 'reaction', 'matter'], matter: 'aerogel',
   },
   'obsidian-forge': {
-    components: ['metal', 'volumetric', 'beams', 'matter'], matter: 'ferrofluid',
+    components: ['metal', 'volumetric', 'matter'], matter: 'ferrofluid',
   },
   'orchid-vapor': {
-    components: ['reaction', 'tendrils', 'nebula', 'matter'], matter: 'fluid',
+    components: ['reaction', 'tendrils', 'hud', 'matter'], matter: 'fluid',
   },
   'tidal-glass': {
-    components: ['rivers', 'volumetric', 'matter'], matter: 'superfluid',
+    components: ['rivers', 'reaction', 'matter'], matter: 'superfluid',
   },
 };
 
@@ -264,12 +264,16 @@ function reportHealth() {
   const gl = engine.renderer?.getContext?.();
   const components = engine.components || [];
   const familiar = components.find(component => component instanceof EvolvingOrb);
+  const matter = components.find(
+    component => component.constructor?.name === 'ShapableMatter',
+  );
   const details = [
     `theme=${activeTheme}`,
     `composition=${sceneKind === 'background' ? activeComposition : 'pulse-familiar'}`,
     `canvas=${canvas?.width || 0}x${canvas?.height || 0}`,
     `host=${host.clientWidth}x${host.clientHeight}`,
     `components=${components.map(component => component.constructor?.name).join(',') || 'none'}`,
+    `matter=${matter?.getMatterMode?.() || 'none'}`,
     `familiar=${Boolean(familiar && familiar.core?.visible !== false && familiar.group?.visible !== false)}`,
     `running=${Boolean(engine.running)}`,
     `reducedMotion=${Boolean(engine.reducedMotion)}`,
