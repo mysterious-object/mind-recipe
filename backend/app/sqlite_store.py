@@ -161,6 +161,9 @@ class SqliteStore:
                     current_module_id TEXT NOT NULL DEFAULT 'lesson-1',
                     recommended_module_id TEXT,
                     recommendation_reason TEXT NOT NULL,
+                    recommendation_inputs TEXT NOT NULL DEFAULT '[]',
+                    alternatives TEXT NOT NULL DEFAULT '[]',
+                    last_recalculated_at TEXT,
                     updated_at TEXT NOT NULL
                 );
                 CREATE TABLE IF NOT EXISTS recipe_proposals (
@@ -313,6 +316,16 @@ class SqliteStore:
             ):
                 if column not in notification_columns:
                     conn.execute(f"ALTER TABLE notification_preferences ADD COLUMN {column} {definition}")
+            journey_columns = {
+                row["name"] for row in conn.execute("PRAGMA table_info(journey_settings)").fetchall()
+            }
+            for column, definition in (
+                ("recommendation_inputs", "TEXT NOT NULL DEFAULT '[]'"),
+                ("alternatives", "TEXT NOT NULL DEFAULT '[]'"),
+                ("last_recalculated_at", "TEXT"),
+            ):
+                if column not in journey_columns:
+                    conn.execute(f"ALTER TABLE journey_settings ADD COLUMN {column} {definition}")
             # One-time preservation migration from the retired practice table.
             legacy_table = "tool" + "box_items"
             exists = conn.execute(
@@ -330,12 +343,17 @@ class SqliteStore:
         with self._connect() as conn:
             row = conn.execute("SELECT * FROM journey_settings WHERE member_id=?", (member_id,)).fetchone()
         if row:
-            return dict(row)
+            result = dict(row)
+            for field in ("recommendation_inputs", "alternatives"):
+                result[field] = json.loads(result.get(field) or "[]")
+            return result
         return {
             "member_id": member_id, "mode": "guided_foundations", "active_goal": None,
             "preferred_duration_minutes": None, "current_module_id": "lesson-1",
             "recommended_module_id": "lesson-1",
             "recommendation_reason": "Start with the foundations at your own pace.",
+            "recommendation_inputs": [], "alternatives": ["lesson-2", "lesson-3"],
+            "last_recalculated_at": None,
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }
 
@@ -346,13 +364,17 @@ class SqliteStore:
         result.update(recommendation)
         with self._connect() as conn:
             conn.execute("""INSERT INTO journey_settings
-                (member_id,mode,active_goal,preferred_duration_minutes,current_module_id,recommended_module_id,recommendation_reason,updated_at)
-                VALUES (?,?,?,?,?,?,?,?)
+                (member_id,mode,active_goal,preferred_duration_minutes,current_module_id,recommended_module_id,recommendation_reason,recommendation_inputs,alternatives,last_recalculated_at,updated_at)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?)
                 ON CONFLICT(member_id) DO UPDATE SET mode=excluded.mode,active_goal=excluded.active_goal,
                 preferred_duration_minutes=excluded.preferred_duration_minutes,current_module_id=excluded.current_module_id,
-                recommended_module_id=excluded.recommended_module_id,recommendation_reason=excluded.recommendation_reason,updated_at=excluded.updated_at""",
+                recommended_module_id=excluded.recommended_module_id,recommendation_reason=excluded.recommendation_reason,
+                recommendation_inputs=excluded.recommendation_inputs,alternatives=excluded.alternatives,
+                last_recalculated_at=excluded.last_recalculated_at,updated_at=excluded.updated_at""",
                 (result["member_id"], result["mode"], result.get("active_goal"), result.get("preferred_duration_minutes"),
-                 result["current_module_id"], result.get("recommended_module_id"), result["recommendation_reason"], result["updated_at"]))
+                 result["current_module_id"], result.get("recommended_module_id"), result["recommendation_reason"],
+                 json.dumps(result.get("recommendation_inputs", [])), json.dumps(result.get("alternatives", [])),
+                 result.get("last_recalculated_at"), result["updated_at"]))
         return result
 
     def recompute_journey_recommendation(self, member_id: str) -> Dict[str, Any]:
@@ -361,15 +383,45 @@ class SqliteStore:
         if (
             current.get("recommended_module_id") == recommendation["recommended_module_id"]
             and current.get("recommendation_reason") == recommendation["recommendation_reason"]
+            and current.get("recommendation_inputs") == recommendation["recommendation_inputs"]
+            and current.get("alternatives") == recommendation["alternatives"]
         ):
             return current
         return self.save_journey_settings(member_id, recommendation)
 
-    def _journey_recommendation(self, member_id: str, active_goal: Optional[str]) -> Dict[str, str]:
+    def _journey_recommendation(self, member_id: str, active_goal: Optional[str]) -> Dict[str, Any]:
         completed = set((self.get_curriculum_progress(member_id) or {}).get("completed_lesson_ids", []))
         ordered = [f"lesson-{number}" for number in range(1, 16)]
         default = next((lesson for lesson in ordered if lesson not in completed), "lesson-15")
         goal = (active_goal or "").lower()
+        inputs: List[str] = []
+        if active_goal:
+            inputs.append("Your current goal")
+        with self._connect() as conn:
+            latest = conn.execute(
+                "SELECT observations FROM checkins WHERE member_id=? ORDER BY created_at DESC LIMIT 1",
+                (member_id,),
+            ).fetchone()
+        navigation: Dict[str, Any] = {}
+        if latest:
+            try:
+                navigation = {
+                    str(item.get("kind")): item.get("value")
+                    for item in json.loads(latest["observations"] or "[]")
+                    if isinstance(item, dict)
+                }
+            except (TypeError, json.JSONDecodeError):
+                navigation = {}
+        capacity = str(navigation.get("self_reported_capacity", "")).lower()
+        nav_mode = str(navigation.get("navigation_mode", "")).lower()
+        available_minutes = navigation.get("available_minutes")
+        if capacity:
+            inputs.append("Your latest self-reported capacity")
+        if nav_mode or available_minutes is not None:
+            inputs.append("How you chose to navigate most recently")
+
+        selected = default
+        reason: Optional[str] = None
         goal_matches = (
             (("sleep", "rest", "recovery"), "lesson-4", "You named rest or recovery as a goal, so a baseline-focused lesson is an optional next step."),
             (("stress", "overwhelm", "tense", "anxious"), "lesson-6", "You named feeling under pressure, so a grounding lesson is an optional next step."),
@@ -377,20 +429,41 @@ class SqliteStore:
             (("value", "direction", "confidence"), "lesson-11", "You named a direction-setting goal, so a values lesson is an optional next step."),
             (("goal", "plan", "habit"), "lesson-15", "You named a planning goal, so a practical goal-setting lesson is an optional next step."),
         )
-        for terms, lesson, reason in goal_matches:
+        for terms, lesson, match_reason in goal_matches:
             if any(term in goal for term in terms) and lesson not in completed:
-                return {"recommended_module_id": lesson, "recommendation_reason": reason}
-        if default == "lesson-1":
+                selected = lesson
+                reason = match_reason
+                break
+        if reason is None and capacity == "low" and "lesson-4" not in completed:
+            selected = "lesson-4"
+            reason = (
+                "You reported lower capacity in your latest navigation, so a short baseline-focused "
+                "lesson is an optional next step. This is based on that session, not a lasting pattern."
+            )
+        if reason is None and nav_mode == "quick_reset" and "lesson-6" not in completed:
+            selected = "lesson-6"
+            reason = (
+                "You chose a quick reset most recently, so this grounding lesson is an optional next step. "
+                "You can choose another direction instead."
+            )
+        if reason is None and default == "lesson-1":
             reason = "Start with the foundations at your own pace."
-        elif default == "lesson-6":
+        elif reason is None and default == "lesson-6":
             reason = "You have completed the foundations; a grounding lesson is an optional next step."
-        elif default == "lesson-11":
+        elif reason is None and default == "lesson-11":
             reason = "You have explored awareness and patterns; a direction-setting lesson is an optional next step."
-        elif default == "lesson-15" and len(completed) >= 15:
+        elif reason is None and default == "lesson-15" and len(completed) >= 15:
             reason = "You have completed the core journey. You can revisit any lesson or create a member-approved next step."
-        else:
+        elif reason is None:
             reason = "This is the next open lesson in your chosen journey."
-        return {"recommended_module_id": default, "recommendation_reason": reason}
+        alternatives = [lesson for lesson in ordered if lesson not in completed and lesson != selected][:3]
+        return {
+            "recommended_module_id": selected,
+            "recommendation_reason": reason,
+            "recommendation_inputs": inputs,
+            "alternatives": alternatives,
+            "last_recalculated_at": datetime.now(timezone.utc).isoformat(),
+        }
 
     def create_recipe_proposal(self, member_id: str, values: Dict[str, Any]) -> Dict[str, Any]:
         now = datetime.now(timezone.utc).isoformat()
@@ -782,6 +855,13 @@ class SqliteStore:
         return [
             {
                 **dict(row),
+                "attempts": int(row["attempts"]),
+                "average_effectiveness": float(row["average_effectiveness"]),
+                "average_activation_change": (
+                    float(row["average_activation_change"])
+                    if row["average_activation_change"] is not None
+                    else None
+                ),
                 "interpretation": "Based on your recorded experience; this is not a clinical finding.",
             }
             for row in rows
@@ -971,6 +1051,7 @@ class SqliteStore:
 
     def merge_curriculum_progress(self, member_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         existing = self.get_curriculum_progress(member_id)
+        prior_lessons = set(existing["completed_lesson_ids"]) if existing else set()
         lessons = set(payload.get("completed_lesson_ids", []))
         practices = set(payload.get("completed_practice_ids", []))
         current = payload.get("current_lesson_id")
@@ -1009,6 +1090,18 @@ class SqliteStore:
                     result["updated_at"],
                 ),
             )
+            for lesson_id in sorted(lessons - prior_lessons):
+                conn.execute(
+                    """INSERT OR IGNORE INTO member_events
+                    (id,member_id,kind,occurred_at,source,provenance,payload,consent_scope,schema_version)
+                    VALUES (?,?,?,?,?,?,?,?,?)""",
+                    (
+                        f"module-completed-{member_id}-{lesson_id}", member_id,
+                        "module_completed", updated_at, "mind_recipe",
+                        "member", json.dumps({"module_id": lesson_id}),
+                        "curriculum", "v1",
+                    ),
+                )
         self.recompute_journey_recommendation(member_id)
         return result
 
@@ -1029,7 +1122,10 @@ class SqliteStore:
                 "INSERT INTO checkins (id,member_id,client_id,emotions,activation,body_areas,journal,zone_label,observations,created_at,policy_version,safety_interrupted) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
                 (str(record.id), record.member_id, record.client_id, json.dumps(record.emotions), record.activation,
                  json.dumps(record.body_areas), record.journal, record.zone_label,
-                 json.dumps([o.model_dump() if hasattr(o, 'model_dump') else o for o in record.observations]),
+                    json.dumps([
+                        o.model_dump(mode="json") if hasattr(o, "model_dump") else o
+                        for o in record.observations
+                    ]),
                  record.created_at.isoformat(), record.policy_version, int(record.safety_interrupted)))
             conn.execute(
                 """INSERT OR IGNORE INTO member_events
@@ -1039,6 +1135,21 @@ class SqliteStore:
                     f"checkin-{record.id}", record.member_id, "checkin_recorded",
                     record.created_at.isoformat(), "daily_navigation", "member",
                     json.dumps({"checkin_id": str(record.id), "activation": record.activation}),
+                    "checkins", "v1",
+                ),
+            )
+            conn.execute(
+                """INSERT OR IGNORE INTO member_events
+                (id,member_id,kind,occurred_at,source,provenance,payload,consent_scope,schema_version)
+                VALUES (?,?,?,?,?,?,?,?,?)""",
+                (
+                    f"navigation-{record.id}", record.member_id,
+                    "daily_navigation_completed", record.created_at.isoformat(),
+                    "daily_navigation", "member",
+                    json.dumps({
+                        "checkin_id": str(record.id),
+                        "zone_label": record.zone_label,
+                    }),
                     "checkins", "v1",
                 ),
             )
@@ -1271,5 +1382,3 @@ class SqliteStore:
                         (str(uuid4()), member_id, p["type"], p["description"], p["confidence"], p["detected_at"]))
 
         return patterns
-
-store = SqliteStore()

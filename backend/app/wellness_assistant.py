@@ -15,7 +15,7 @@ from uuid import UUID
 from .config import settings
 from .models import AiRequest, AiResponse
 from .safety import evaluate
-from .sqlite_store import store
+from .repository import store
 from .navigator_agent import agent
 
 ALLOWED_CONTEXT = {
@@ -143,7 +143,7 @@ def build_personalized_prompt(member_id: str, display_name: str = "") -> str:
 
 def get_memory(member_id: str) -> list[dict]:
     """Get conversation history for a member from SQLite."""
-    from .sqlite_store import store
+    from .repository import store
     try:
         conn = store._connect()
         rows = conn.execute(
@@ -158,7 +158,7 @@ def get_memory(member_id: str) -> list[dict]:
 
 def save_to_memory(member_id: str, role: str, content: str):
     """Persist a conversation turn to SQLite."""
-    from .sqlite_store import store
+    from .repository import store
     from datetime import datetime, timezone
     try:
         conn = store._connect()

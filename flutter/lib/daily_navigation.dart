@@ -13,6 +13,7 @@ import 'design_tokens.dart';
 
 enum NavStep {
   greeting,
+  context,
   consent,
   emotion,
   body,
@@ -49,6 +50,8 @@ class DailyNavigation extends StatefulWidget {
 
 class _DailyNavigationState extends State<DailyNavigation> {
   NavStep _current = NavStep.greeting;
+  List<NavStep> _path = const [NavStep.greeting, NavStep.context];
+  int _pathIndex = 0;
   final _journalController = TextEditingController();
   final _selectedEmotions = <String>{};
   int _activationLevel = 0;
@@ -58,6 +61,9 @@ class _DailyNavigationState extends State<DailyNavigation> {
   bool _consentGiven = false;
   bool _cloudOptIn = true;
   bool _completing = false;
+  int _availableMinutes = 3;
+  String _desiredMode = 'Guidance';
+  String _capacity = 'Steady';
 
   static const _emotions = [
     'Calm',
@@ -91,10 +97,13 @@ class _DailyNavigationState extends State<DailyNavigation> {
   ];
 
   Future<void> _advance() async {
-    final order = NavStep.values;
-    final idx = order.indexOf(_current);
-    if (idx < order.length - 1) {
-      setState(() => _current = order[idx + 1]);
+    if (_current == NavStep.context) {
+      _configurePath();
+    } else if (_pathIndex < _path.length - 1) {
+      setState(() {
+        _pathIndex++;
+        _current = _path[_pathIndex];
+      });
     }
     if (_current == NavStep.complete) {
       if (_completing) return;
@@ -112,6 +121,10 @@ class _DailyNavigationState extends State<DailyNavigation> {
         'activation': _activationLevel,
         'body': _selectedBodyAreas.isEmpty ? '' : _selectedBodyAreas.join(', '),
         'journal': _journalController.text.trim(),
+        'mode': _desiredMode,
+        'available_minutes': _availableMinutes,
+        'capacity': _capacity,
+        'outcome': _chosenAction,
       });
       await widget.appState.queueCheckIn({
         'client_id': entryId,
@@ -120,6 +133,32 @@ class _DailyNavigationState extends State<DailyNavigation> {
         'body_areas': _selectedBodyAreas.toList()..sort(),
         'journal': _journalController.text.trim(),
         'zone_label': _zoneLabel,
+        'observations': [
+          {
+            'kind': 'navigation_mode',
+            'value': _desiredMode.toLowerCase().replaceAll(' ', '_'),
+            'recorded_at': recordedAt.toIso8601String(),
+            'timezone': recordedAt.timeZoneName,
+            'source': 'member_input',
+            'schema_version': 'v1',
+          },
+          {
+            'kind': 'available_minutes',
+            'value': _availableMinutes,
+            'recorded_at': recordedAt.toIso8601String(),
+            'timezone': recordedAt.timeZoneName,
+            'source': 'member_input',
+            'schema_version': 'v1',
+          },
+          {
+            'kind': 'self_reported_capacity',
+            'value': _capacity.toLowerCase(),
+            'recorded_at': recordedAt.toIso8601String(),
+            'timezone': recordedAt.timeZoneName,
+            'source': 'member_input',
+            'schema_version': 'v1',
+          },
+        ],
       });
       final queued = widget.onCheckInQueued;
       if (queued != null) unawaited(queued());
@@ -133,16 +172,72 @@ class _DailyNavigationState extends State<DailyNavigation> {
   }
 
   void _goBack() {
-    final order = NavStep.values;
-    final idx = order.indexOf(_current);
-    if (idx > 0) {
-      setState(() => _current = order[idx - 1]);
+    if (_pathIndex > 0) {
+      setState(() {
+        _pathIndex--;
+        _current = _path[_pathIndex];
+      });
     }
+  }
+
+  void _configurePath() {
+    final core = <NavStep>[NavStep.greeting, NavStep.context, NavStep.consent];
+    final mode = _desiredMode;
+    if (mode == 'Quick reset' || _availableMinutes == 1) {
+      core.addAll([
+        NavStep.emotion,
+        NavStep.activation,
+        NavStep.action,
+        NavStep.followUp,
+        NavStep.complete,
+      ]);
+    } else if (mode == 'Talk and reflect') {
+      core.addAll([
+        NavStep.journal,
+        if (_availableMinutes >= 3) NavStep.emotion,
+        NavStep.followUp,
+        NavStep.complete,
+      ]);
+    } else if (mode == 'Go deeper' || _availableMinutes >= 10) {
+      core.addAll([
+        NavStep.emotion,
+        NavStep.body,
+        NavStep.activation,
+        NavStep.journal,
+        NavStep.recommendation,
+        NavStep.action,
+        NavStep.followUp,
+        NavStep.complete,
+      ]);
+    } else {
+      core.addAll([
+        NavStep.emotion,
+        if (_capacity != 'Low') NavStep.body,
+        NavStep.activation,
+        NavStep.action,
+        NavStep.followUp,
+        NavStep.complete,
+      ]);
+    }
+    setState(() {
+      _path = core;
+      _pathIndex = 2;
+      _current = NavStep.consent;
+    });
+  }
+
+  void _changeDirection() {
+    setState(() {
+      _path = const [NavStep.greeting, NavStep.context];
+      _pathIndex = 1;
+      _current = NavStep.context;
+    });
   }
 
   String get _stepTitle {
     return switch (_current) {
       NavStep.greeting => 'Welcome',
+      NavStep.context => 'What would help today?',
       NavStep.consent => 'Privacy & Consent',
       NavStep.emotion => 'How do you feel?',
       NavStep.body => 'Body check-in',
@@ -158,6 +253,7 @@ class _DailyNavigationState extends State<DailyNavigation> {
   String get _stepSubtitle {
     return switch (_current) {
       NavStep.greeting => 'MindRecipe is here for you — no test, no performance, and you can redirect at any time.',
+      NavStep.context => 'Choose the time and style that fit this moment. You can change direction at any point.',
       NavStep.consent => 'Your data is private. Cloud AI requires your explicit consent each session.',
       NavStep.emotion => 'Select the emotions most present for you right now.',
       NavStep.body => 'Where do you notice sensations in your body?',
@@ -181,12 +277,11 @@ class _DailyNavigationState extends State<DailyNavigation> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final progress =
-        NavStep.values.indexOf(_current) / (NavStep.values.length - 1);
+    final progress = _path.length <= 1 ? 0.0 : _pathIndex / (_path.length - 1);
 
     return Semantics(
       label:
-          'Daily navigation step ${NavStep.values.indexOf(_current) + 1} of ${NavStep.values.length}: $_stepTitle',
+          'Daily navigation step ${_pathIndex + 1} of ${_path.length}: $_stepTitle',
       child: Column(
         children: [
           LinearProgressIndicator(
@@ -227,6 +322,16 @@ class _DailyNavigationState extends State<DailyNavigation> {
       NavStep.greeting => _GreetingStep(
         onContinue: _advance,
         syncSummary: widget.syncSummary,
+      ),
+      NavStep.context => _ContextStep(
+        availableMinutes: _availableMinutes,
+        desiredMode: _desiredMode,
+        capacity: _capacity,
+        onChanged: (minutes, mode, capacity) => setState(() {
+          _availableMinutes = minutes;
+          _desiredMode = mode;
+          _capacity = capacity;
+        }),
       ),
       NavStep.consent => _ConsentStep(
         consentGiven: _consentGiven,
@@ -292,6 +397,7 @@ class _DailyNavigationState extends State<DailyNavigation> {
   Widget _buildNavigationBar() {
     final canAdvance = switch (_current) {
       NavStep.greeting => true,
+      NavStep.context => true,
       NavStep.consent => _consentGiven,
       NavStep.emotion => _selectedEmotions.isNotEmpty,
       NavStep.body => true,
@@ -309,7 +415,22 @@ class _DailyNavigationState extends State<DailyNavigation> {
         children: [
           if (_current != NavStep.greeting && _current != NavStep.complete)
             OutlinedButton(onPressed: _goBack, child: const Text('Back')),
+          if (_current != NavStep.greeting &&
+              _current != NavStep.context &&
+              _current != NavStep.consent &&
+              _current != NavStep.complete) ...[
+            const SizedBox(width: 8),
+            TextButton(onPressed: _advance, child: const Text('Skip')),
+          ],
           const Spacer(),
+          if (_current != NavStep.greeting &&
+              _current != NavStep.context &&
+              _current != NavStep.complete)
+            IconButton(
+              tooltip: 'Change navigation length or direction',
+              onPressed: _changeDirection,
+              icon: const Icon(Icons.tune_rounded),
+            ),
           if (_current == NavStep.complete)
             FilledButton.icon(
               onPressed: widget.onSeePulse,
@@ -394,6 +515,85 @@ class _GreetingStep extends StatelessWidget {
         ),
       ),
     ),
+  );
+}
+
+class _ContextStep extends StatelessWidget {
+  const _ContextStep({
+    required this.availableMinutes,
+    required this.desiredMode,
+    required this.capacity,
+    required this.onChanged,
+  });
+
+  final int availableMinutes;
+  final String desiredMode;
+  final String capacity;
+  final void Function(int minutes, String mode, String capacity) onChanged;
+
+  static const _minutes = <int>[1, 3, 10, 20];
+  static const _modes = <String>[
+    'Talk and reflect',
+    'Guidance',
+    'Quick reset',
+    'Go deeper',
+  ];
+  static const _capacities = <String>['Low', 'Steady', 'Open'];
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text('Time available', style: MindRecipeTokens.title(context)),
+      const SizedBox(height: 8),
+      Wrap(
+        spacing: 8,
+        children: _minutes
+            .map(
+              (minutes) => ChoiceChip(
+                label: Text(minutes == 1 ? '60 seconds' : '$minutes minutes'),
+                selected: availableMinutes == minutes,
+                onSelected: (_) => onChanged(minutes, desiredMode, capacity),
+              ),
+            )
+            .toList(),
+      ),
+      const SizedBox(height: 20),
+      Text(
+        'How should Navigator meet you?',
+        style: MindRecipeTokens.title(context),
+      ),
+      const SizedBox(height: 8),
+      Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: _modes
+            .map(
+              (mode) => ChoiceChip(
+                label: Text(mode),
+                selected: desiredMode == mode,
+                onSelected: (_) => onChanged(availableMinutes, mode, capacity),
+              ),
+            )
+            .toList(),
+      ),
+      const SizedBox(height: 20),
+      Text('Capacity right now', style: MindRecipeTokens.title(context)),
+      const SizedBox(height: 8),
+      SegmentedButton<String>(
+        segments: _capacities
+            .map((value) => ButtonSegment(value: value, label: Text(value)))
+            .toList(),
+        selected: {capacity},
+        onSelectionChanged: (selection) =>
+            onChanged(availableMinutes, desiredMode, selection.first),
+      ),
+      const SizedBox(height: 16),
+      Text(
+        'MindRecipe uses these choices only to shape this navigation. They are saved with source and time so you can understand later recommendations.',
+        style: MindRecipeTokens.bodySmall(context),
+      ),
+    ],
   );
 }
 

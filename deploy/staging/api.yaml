@@ -59,6 +59,7 @@ spec:
             - uvicorn[standard]==0.52.4
             - httpx==0.28.1
             - psycopg[binary]==3.3.5
+            - PyJWT[crypto]==2.10.1
           env:
             - name: HOME
               value: /tmp

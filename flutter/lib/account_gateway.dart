@@ -163,6 +163,29 @@ class _AccountGatewayState extends State<AccountGateway> {
     }
   }
 
+  Future<void> submitOidc() async {
+    if (busy) return;
+    setState(() {
+      busy = true;
+      error = null;
+    });
+    try {
+      final session = await widget.api.authenticateWithOidc();
+      await widget.appState.setSession(session);
+    } on ApiException catch (exception) {
+      if (mounted) setState(() => error = exception.message);
+    } catch (_) {
+      if (mounted) {
+        setState(
+          () => error =
+              'MindRecipe could not complete secure login. Please try again.',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
     body: Stack(
@@ -233,172 +256,191 @@ class _AccountGatewayState extends State<AccountGateway> {
                               ?.copyWith(fontWeight: FontWeight.w800),
                         ),
                         const SizedBox(height: 24),
-                        if (creating && !resetting)
-                          TextField(
-                            controller: name,
-                            textInputAction: TextInputAction.next,
-                            decoration: const InputDecoration(
-                              labelText: 'Name',
-                              prefixIcon: Icon(Icons.person_outline),
-                              border: OutlineInputBorder(),
+                        if (mindRecipeOidcConfigured) ...[
+                          const Text(
+                            'Sign in or register in your system browser. MindRecipe uses Authorization Code with PKCE and never receives your password.',
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 18),
+                          FilledButton.icon(
+                            onPressed: busy ? null : submitOidc,
+                            icon: const Icon(Icons.open_in_browser_rounded),
+                            label: Text(
+                              busy
+                                  ? 'Connecting…'
+                                  : 'Sign in or create an account',
                             ),
                           ),
-                        if (creating && !resetting) const SizedBox(height: 12),
-                        TextField(
-                          controller: email,
-                          keyboardType: TextInputType.emailAddress,
-                          textInputAction: TextInputAction.next,
-                          autocorrect: false,
-                          decoration: const InputDecoration(
-                            labelText: 'Email',
-                            prefixIcon: Icon(Icons.alternate_email),
-                            border: OutlineInputBorder(),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        if (resetting && resetTokenStage)
+                        ],
+                        if (!mindRecipeOidcConfigured) ...[
+                          if (creating && !resetting)
+                            TextField(
+                              controller: name,
+                              textInputAction: TextInputAction.next,
+                              decoration: const InputDecoration(
+                                labelText: 'Name',
+                                prefixIcon: Icon(Icons.person_outline),
+                                border: OutlineInputBorder(),
+                              ),
+                            ),
+                          if (creating && !resetting)
+                            const SizedBox(height: 12),
                           TextField(
-                            controller: resetToken,
+                            controller: email,
+                            keyboardType: TextInputType.emailAddress,
                             textInputAction: TextInputAction.next,
                             autocorrect: false,
                             decoration: const InputDecoration(
-                              labelText: 'Reset code',
-                              helperText:
-                                  'From the reset link or support message',
-                              prefixIcon: Icon(Icons.vpn_key_outlined),
+                              labelText: 'Email',
+                              prefixIcon: Icon(Icons.alternate_email),
                               border: OutlineInputBorder(),
                             ),
                           ),
-                        if (resetting && resetTokenStage)
                           const SizedBox(height: 12),
-                        if (!resetting || resetTokenStage)
-                          TextField(
-                            controller: password,
-                            obscureText: obscure,
-                            onSubmitted: (_) => busy ? null : submit(),
-                            decoration: InputDecoration(
-                              labelText: resetting
-                                  ? 'New password'
-                                  : 'Password',
-                              helperText:
-                                  (!resetting && creating) ||
-                                      (resetting && resetTokenStage)
-                                  ? '10 characters minimum'
-                                  : null,
-                              prefixIcon: const Icon(Icons.lock_outline),
-                              border: const OutlineInputBorder(),
-                              suffixIcon: IconButton(
-                                onPressed: () =>
-                                    setState(() => obscure = !obscure),
-                                icon: Icon(
-                                  obscure
-                                      ? Icons.visibility_outlined
-                                      : Icons.visibility_off_outlined,
+                          if (resetting && resetTokenStage)
+                            TextField(
+                              controller: resetToken,
+                              textInputAction: TextInputAction.next,
+                              autocorrect: false,
+                              decoration: const InputDecoration(
+                                labelText: 'Reset code',
+                                helperText:
+                                    'From the reset link or support message',
+                                prefixIcon: Icon(Icons.vpn_key_outlined),
+                                border: OutlineInputBorder(),
+                              ),
+                            ),
+                          if (resetting && resetTokenStage)
+                            const SizedBox(height: 12),
+                          if (!resetting || resetTokenStage)
+                            TextField(
+                              controller: password,
+                              obscureText: obscure,
+                              onSubmitted: (_) => busy ? null : submit(),
+                              decoration: InputDecoration(
+                                labelText: resetting
+                                    ? 'New password'
+                                    : 'Password',
+                                helperText:
+                                    (!resetting && creating) ||
+                                        (resetting && resetTokenStage)
+                                    ? '10 characters minimum'
+                                    : null,
+                                prefixIcon: const Icon(Icons.lock_outline),
+                                border: const OutlineInputBorder(),
+                                suffixIcon: IconButton(
+                                  onPressed: () =>
+                                      setState(() => obscure = !obscure),
+                                  icon: Icon(
+                                    obscure
+                                        ? Icons.visibility_outlined
+                                        : Icons.visibility_off_outlined,
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                        if (creating || (resetting && resetTokenStage))
-                          const SizedBox(height: 12),
-                        if (creating || (resetting && resetTokenStage))
-                          TextField(
-                            controller: confirmPassword,
-                            obscureText: obscure,
-                            onSubmitted: (_) => busy ? null : submit(),
-                            decoration: const InputDecoration(
-                              labelText: 'Confirm password',
-                              prefixIcon: Icon(Icons.lock_reset_rounded),
-                              border: OutlineInputBorder(),
-                            ),
-                          ),
-                        if (creating && !resetting)
-                          CheckboxListTile(
-                            contentPadding: EdgeInsets.zero,
-                            value: acceptedTerms,
-                            onChanged: busy
-                                ? null
-                                : (value) => setState(
-                                    () => acceptedTerms = value ?? false,
-                                  ),
-                            title: const Text(
-                              'I understand MindRecipe is a wellness tool, not therapy or emergency care.',
-                            ),
-                            subtitle: const Text(
-                              'I agree to the Privacy Notice and Terms.',
-                            ),
-                            controlAffinity: ListTileControlAffinity.leading,
-                          ),
-                        if (info != null)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 12),
-                            child: Text(
-                              info!,
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.primary,
+                          if (creating || (resetting && resetTokenStage))
+                            const SizedBox(height: 12),
+                          if (creating || (resetting && resetTokenStage))
+                            TextField(
+                              controller: confirmPassword,
+                              obscureText: obscure,
+                              onSubmitted: (_) => busy ? null : submit(),
+                              decoration: const InputDecoration(
+                                labelText: 'Confirm password',
+                                prefixIcon: Icon(Icons.lock_reset_rounded),
+                                border: OutlineInputBorder(),
                               ),
                             ),
-                          ),
-                        if (error != null)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 12),
-                            child: Text(
-                              error!,
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.error,
+                          if (creating && !resetting)
+                            CheckboxListTile(
+                              contentPadding: EdgeInsets.zero,
+                              value: acceptedTerms,
+                              onChanged: busy
+                                  ? null
+                                  : (value) => setState(
+                                      () => acceptedTerms = value ?? false,
+                                    ),
+                              title: const Text(
+                                'I understand MindRecipe is a wellness tool, not therapy or emergency care.',
+                              ),
+                              subtitle: const Text(
+                                'I agree to the Privacy Notice and Terms.',
+                              ),
+                              controlAffinity: ListTileControlAffinity.leading,
+                            ),
+                          if (info != null)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 12),
+                              child: Text(
+                                info!,
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
                               ),
                             ),
+                          if (error != null)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 12),
+                              child: Text(
+                                error!,
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.error,
+                                ),
+                              ),
+                            ),
+                          const SizedBox(height: 18),
+                          FilledButton(
+                            onPressed: busy ? null : submit,
+                            child: Text(
+                              busy
+                                  ? 'Connecting…'
+                                  : resetting
+                                  ? (resetTokenStage
+                                        ? 'Set new password'
+                                        : 'Send reset code')
+                                  : creating
+                                  ? 'Create account'
+                                  : 'Sign in',
+                            ),
                           ),
-                        const SizedBox(height: 18),
-                        FilledButton(
-                          onPressed: busy ? null : submit,
-                          child: Text(
-                            busy
-                                ? 'Connecting…'
-                                : resetting
-                                ? (resetTokenStage
-                                      ? 'Set new password'
-                                      : 'Send reset code')
-                                : creating
-                                ? 'Create account'
-                                : 'Sign in',
-                          ),
-                        ),
-                        TextButton(
-                          onPressed: busy
-                              ? null
-                              : () => setState(() {
-                                  if (resetting) {
-                                    // Leaving reset flow back to sign in
-                                    resetting = false;
-                                    resetTokenStage = false;
-                                  } else if (creating) {
-                                    creating = false;
-                                  } else {
-                                    creating = true;
-                                  }
-                                  error = null;
-                                  info = null;
-                                }),
-                          child: Text(
-                            resetting
-                                ? 'Back to sign in'
-                                : creating
-                                ? 'I already have an account'
-                                : 'Create a new account',
-                          ),
-                        ),
-                        if (!creating && !resetting)
                           TextButton(
                             onPressed: busy
                                 ? null
                                 : () => setState(() {
-                                    resetting = true;
-                                    resetTokenStage = false;
+                                    if (resetting) {
+                                      // Leaving reset flow back to sign in
+                                      resetting = false;
+                                      resetTokenStage = false;
+                                    } else if (creating) {
+                                      creating = false;
+                                    } else {
+                                      creating = true;
+                                    }
                                     error = null;
                                     info = null;
                                   }),
-                            child: const Text('Forgot password?'),
+                            child: Text(
+                              resetting
+                                  ? 'Back to sign in'
+                                  : creating
+                                  ? 'I already have an account'
+                                  : 'Create a new account',
+                            ),
                           ),
+                          if (!creating && !resetting)
+                            TextButton(
+                              onPressed: busy
+                                  ? null
+                                  : () => setState(() {
+                                      resetting = true;
+                                      resetTokenStage = false;
+                                      error = null;
+                                      info = null;
+                                    }),
+                              child: const Text('Forgot password?'),
+                            ),
+                        ],
                         const SizedBox(height: 4),
                         const Text(
                           'Your account keeps Recipes progress available across your devices.',

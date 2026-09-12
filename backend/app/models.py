@@ -249,6 +249,9 @@ class JourneySettings(JourneySettingsInput):
     current_module_id: str = "lesson-1"
     recommended_module_id: Optional[str] = None
     recommendation_reason: str = "Start with the foundations at your own pace."
+    recommendation_inputs: List[str] = Field(default_factory=list)
+    alternatives: List[str] = Field(default_factory=list)
+    last_recalculated_at: Optional[datetime] = None
     updated_at: datetime
 
 

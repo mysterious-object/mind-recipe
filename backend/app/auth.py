@@ -9,7 +9,7 @@ import secrets
 import sqlite3
 import time
 from dataclasses import dataclass
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 from uuid import uuid4
 
 from fastapi import HTTPException, status
@@ -275,6 +275,74 @@ def verify_token_identity(token: str) -> tuple[str, str]:
         return str(body["sub"]), role
     except (ValueError, KeyError, TypeError, json.JSONDecodeError):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid or expired session")
+
+
+_oidc_clients: Dict[str, Any] = {}
+
+
+def _roles_from_oidc_claims(claims: Dict[str, Any]) -> set[str]:
+    roles: set[str] = set()
+    direct = claims.get("mindrecipe_role")
+    if isinstance(direct, str):
+        roles.add(direct)
+    realm_access = claims.get("realm_access")
+    if isinstance(realm_access, dict):
+        roles.update(str(value) for value in realm_access.get("roles", []) if value)
+    resource_access = claims.get("resource_access")
+    if isinstance(resource_access, dict):
+        audience_roles = resource_access.get(settings.oidc_audience)
+        if isinstance(audience_roles, dict):
+            roles.update(str(value) for value in audience_roles.get("roles", []) if value)
+    return roles
+
+
+def verify_oidc_identity(token: str) -> tuple[str, str, Dict[str, Any]]:
+    """Validate a production OIDC access token against issuer JWKS.
+
+    Signature, issuer, audience, expiry, issued-at time, and subject are all
+    required.  Roles come only from signed claims configured by the identity
+    provider; request headers can never elevate an OIDC identity.
+    """
+    if not settings.oidc_ready:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="production identity is not configured",
+        )
+    try:
+        import jwt
+
+        jwks_url = settings.oidc_jwks_url or (
+            f"{settings.oidc_issuer}/protocol/openid-connect/certs"
+        )
+        client = _oidc_clients.get(jwks_url)
+        if client is None:
+            client = jwt.PyJWKClient(jwks_url, cache_keys=True, lifespan=300)
+            _oidc_clients[jwks_url] = client
+        signing_key = client.get_signing_key_from_jwt(token)
+        claims = jwt.decode(
+            token,
+            signing_key.key,
+            algorithms=["RS256", "PS256", "ES256"],
+            audience=settings.oidc_audience,
+            issuer=settings.oidc_issuer,
+            options={"require": ["exp", "iat", "iss", "sub"]},
+        )
+        if claims.get("email") and claims.get("email_verified") is not True:
+            raise ValueError("unverified email")
+        roles = _roles_from_oidc_claims(claims)
+        role = (
+            "practitioner" if "practitioner" in roles
+            else "guardian" if "guardian" in roles
+            else "member"
+        )
+        return str(claims["sub"]), role, claims
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="invalid or expired session",
+        )
 
 
 auth_store = AccountStore()

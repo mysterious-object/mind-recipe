@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter_appauth/flutter_appauth.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
@@ -10,22 +11,87 @@ const mindRecipeApiBase = String.fromEnvironment(
   'MIND_RECIPE_API_BASE',
   defaultValue: 'https://staging-api.mindrecipe.142.93.201.156.sslip.io',
 );
+const mindRecipeOidcIssuer = String.fromEnvironment('MIND_RECIPE_OIDC_ISSUER');
+const mindRecipeOidcClientId = String.fromEnvironment(
+  'MIND_RECIPE_OIDC_CLIENT_ID',
+);
+const mindRecipeOidcRedirectUrl = 'com.contextfield.mindrecipe:/oauthredirect';
+const mindRecipeOidcConfigured =
+    mindRecipeOidcIssuer != '' && mindRecipeOidcClientId != '';
 
 class AccountSession {
   const AccountSession({
     required this.token,
     required this.displayName,
     required this.email,
+    this.refreshToken,
+    this.idToken,
+    this.accessTokenExpiresAt,
   });
   final String token;
   final String displayName;
   final String email;
+  final String? refreshToken;
+  final String? idToken;
+  final DateTime? accessTokenExpiresAt;
 }
 
 class MindRecipeApiClient {
   MindRecipeApiClient({http.Client? client})
     : _client = client ?? http.Client();
   final http.Client _client;
+  static const _appAuth = FlutterAppAuth();
+
+  Future<AccountSession> authenticateWithOidc() async {
+    if (!mindRecipeOidcConfigured) {
+      throw const ApiException('Official account login is not configured.');
+    }
+    final result = await _appAuth.authorizeAndExchangeCode(
+      AuthorizationTokenRequest(
+        mindRecipeOidcClientId,
+        mindRecipeOidcRedirectUrl,
+        issuer: mindRecipeOidcIssuer,
+        scopes: const ['openid', 'profile', 'email', 'offline_access'],
+        promptValues: const ['login'],
+      ),
+    );
+    final token = result.accessToken;
+    if (token == null || token.isEmpty) {
+      throw const ApiException('Account login did not return a credential.');
+    }
+    return _sessionFromBearer(
+      token,
+      refreshToken: result.refreshToken,
+      idToken: result.idToken,
+      expiresAt: result.accessTokenExpirationDateTime,
+    );
+  }
+
+  Future<AccountSession> _sessionFromBearer(
+    String token, {
+    String? refreshToken,
+    String? idToken,
+    DateTime? expiresAt,
+  }) async {
+    final response = await _client
+        .get(
+          Uri.parse('$mindRecipeApiBase/v1/auth/me'),
+          headers: {'authorization': 'Bearer $token'},
+        )
+        .timeout(const Duration(seconds: 12));
+    if (response.statusCode != 200) {
+      throw const ApiException('MindRecipe could not verify this account.');
+    }
+    final user = jsonDecode(response.body) as Map<String, dynamic>;
+    return AccountSession(
+      token: token,
+      displayName: user['display_name']?.toString() ?? 'Navigator',
+      email: user['email']?.toString() ?? '',
+      refreshToken: refreshToken,
+      idToken: idToken,
+      accessTokenExpiresAt: expiresAt,
+    );
+  }
 
   Future<AccountSession> register({
     required String name,
@@ -81,12 +147,38 @@ class MindRecipeApiClient {
             headers: {'authorization': 'Bearer ${stored.token}'},
           )
           .timeout(const Duration(seconds: 8));
-      if (response.statusCode != 200) return null;
+      if (response.statusCode != 200) {
+        if (mindRecipeOidcConfigured &&
+            (stored.refreshToken?.isNotEmpty ?? false)) {
+          final refreshed = await _appAuth.token(
+            TokenRequest(
+              mindRecipeOidcClientId,
+              mindRecipeOidcRedirectUrl,
+              issuer: mindRecipeOidcIssuer,
+              refreshToken: stored.refreshToken,
+              scopes: const ['openid', 'profile', 'email', 'offline_access'],
+            ),
+          );
+          final token = refreshed.accessToken;
+          if (token != null && token.isNotEmpty) {
+            return await _sessionFromBearer(
+              token,
+              refreshToken: refreshed.refreshToken ?? stored.refreshToken,
+              idToken: refreshed.idToken ?? stored.idToken,
+              expiresAt: refreshed.accessTokenExpirationDateTime,
+            );
+          }
+        }
+        return null;
+      }
       final user = jsonDecode(response.body) as Map<String, dynamic>;
       return AccountSession(
         token: stored.token,
         displayName: user['display_name']?.toString() ?? stored.displayName,
         email: user['email']?.toString() ?? stored.email,
+        refreshToken: stored.refreshToken,
+        idToken: stored.idToken,
+        accessTokenExpiresAt: stored.accessTokenExpiresAt,
       );
     } catch (_) {
       // Fail closed: an unverifiable saved credential must not silently open
@@ -313,6 +405,7 @@ class MindRecipeApiClient {
     required List<String> bodyAreas,
     String? journal,
     String? zoneLabel,
+    List<Map<String, dynamic>> observations = const [],
   }) async {
     final response = await _client
         .post(
@@ -327,7 +420,7 @@ class MindRecipeApiClient {
               'journal': journal,
             if (zoneLabel != null && zoneLabel.trim().isNotEmpty)
               'zone_label': zoneLabel,
-            'observations': const [],
+            'observations': observations,
           }),
         )
         .timeout(const Duration(seconds: 12));
@@ -383,10 +476,12 @@ class MindRecipeApiClient {
   Future<void> grantConsent({
     required String token,
     required String practitionerId,
+    List<String> categories = const ['checkins', 'trends'],
+    int durationDays = 30,
   }) async {
     final now = DateTime.now().toUtc().toIso8601String();
     final exp = DateTime.now()
-        .add(const Duration(days: 30))
+        .add(Duration(days: durationDays.clamp(1, 365)))
         .toUtc()
         .toIso8601String();
     await _client
@@ -395,7 +490,7 @@ class MindRecipeApiClient {
           headers: _memberHeaders(token, json: true),
           body: jsonEncode({
             'recipient_practitioner_id': practitionerId,
-            'categories': ['checkins', 'trends'],
+            'categories': categories,
             'purpose': 'Wellness coordination',
             'starts_at': now,
             'expires_at': exp,
@@ -648,6 +743,12 @@ class MindRecipeApiClient {
     Map<String, dynamic> value,
   ) => _sendMember('POST', '/v1/memory', token, value);
 
+  Future<Map<String, dynamic>> updateMemory(
+    String token,
+    String id,
+    Map<String, dynamic> value,
+  ) => _sendMember('PUT', '/v1/memory/$id', token, value);
+
   Future<void> deleteMemory(String token, String id) async {
     final response = await _client
         .delete(
@@ -884,6 +985,9 @@ class SecureAppState extends ChangeNotifier {
   static const _tokenKey = 'mind_recipe_session_token';
   static const _nameKey = 'mind_recipe_display_name';
   static const _emailKey = 'mind_recipe_email';
+  static const _refreshTokenKey = 'mind_recipe_oidc_refresh_token';
+  static const _idTokenKey = 'mind_recipe_oidc_id_token';
+  static const _tokenExpiryKey = 'mind_recipe_oidc_token_expiry';
   static const _providerKey = 'mind_recipe_openrouter_key';
   static const _assistantActivityKey = 'mind_recipe_assistant_activity';
   static const _cloudAiEnabledKey = 'mind_recipe_cloud_ai_enabled';
@@ -956,12 +1060,18 @@ class SecureAppState extends ChangeNotifier {
         _storage.read(key: _legacyChimeraThemeKey),
         _storage.read(key: _legacyChimeraVfxThemeKey),
         _storage.read(key: _cloudModelKey),
+        _storage.read(key: _refreshTokenKey),
+        _storage.read(key: _idTokenKey),
+        _storage.read(key: _tokenExpiryKey),
       ]);
       if ((values[0] ?? '').isNotEmpty) {
         session = AccountSession(
           token: values[0]!,
           displayName: values[1] ?? 'Navigator',
           email: values[2] ?? '',
+          refreshToken: values[12],
+          idToken: values[13],
+          accessTokenExpiresAt: DateTime.tryParse(values[14] ?? ''),
         );
       }
       openRouterKey = values[3] ?? '';
@@ -1192,6 +1302,10 @@ class SecureAppState extends ChangeNotifier {
                 .toList(),
             journal: item['journal']?.toString(),
             zoneLabel: item['zone_label']?.toString(),
+            observations: (item['observations'] as List? ?? const [])
+                .whereType<Map>()
+                .map((value) => value.cast<String, dynamic>())
+                .toList(),
           );
           synced++;
         } catch (_) {
@@ -1315,6 +1429,24 @@ class SecureAppState extends ChangeNotifier {
       await _storage.write(key: _tokenKey, value: value.token);
       await _storage.write(key: _nameKey, value: value.displayName);
       await _storage.write(key: _emailKey, value: value.email);
+      if (value.refreshToken == null || value.refreshToken!.isEmpty) {
+        await _storage.delete(key: _refreshTokenKey);
+      } else {
+        await _storage.write(key: _refreshTokenKey, value: value.refreshToken);
+      }
+      if (value.idToken == null || value.idToken!.isEmpty) {
+        await _storage.delete(key: _idTokenKey);
+      } else {
+        await _storage.write(key: _idTokenKey, value: value.idToken);
+      }
+      if (value.accessTokenExpiresAt == null) {
+        await _storage.delete(key: _tokenExpiryKey);
+      } else {
+        await _storage.write(
+          key: _tokenExpiryKey,
+          value: value.accessTokenExpiresAt!.toUtc().toIso8601String(),
+        );
+      }
     } catch (_) {
       // The authenticated in-memory session remains usable if platform secure
       // storage is temporarily unavailable; the user can sign in next launch.
@@ -1391,6 +1523,9 @@ class SecureAppState extends ChangeNotifier {
       _storage.delete(key: _tokenKey),
       _storage.delete(key: _nameKey),
       _storage.delete(key: _emailKey),
+      _storage.delete(key: _refreshTokenKey),
+      _storage.delete(key: _idTokenKey),
+      _storage.delete(key: _tokenExpiryKey),
       _storage.delete(key: _assistantActivityKey),
     ]);
     notifyListeners();
@@ -1402,6 +1537,9 @@ class SecureAppState extends ChangeNotifier {
       _storage.delete(key: _tokenKey),
       _storage.delete(key: _nameKey),
       _storage.delete(key: _emailKey),
+      _storage.delete(key: _refreshTokenKey),
+      _storage.delete(key: _idTokenKey),
+      _storage.delete(key: _tokenExpiryKey),
     ]);
     notifyListeners();
   }

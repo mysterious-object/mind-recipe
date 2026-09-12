@@ -43,47 +43,98 @@ class _PractitionerSharingState extends State<PractitionerSharing> {
 
   Future<void> _grantConsent() async {
     final practitionerCtl = TextEditingController();
-    final result = await showDialog<Map<String, String>>(
+    final selectedCategories = <String>{'checkins', 'trends'};
+    var durationDays = 30;
+    final result = await showDialog<Map<String, dynamic>>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Share with practitioner'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: practitionerCtl,
-              decoration: const InputDecoration(
-                labelText: 'Practitioner ID',
-                hintText: 'Enter their practitioner ID',
-                border: OutlineInputBorder(),
-              ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Text('Share with practitioner'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: practitionerCtl,
+                  onChanged: (_) => setDialogState(() {}),
+                  decoration: const InputDecoration(
+                    labelText: 'Practitioner ID',
+                    hintText: 'Enter their practitioner ID',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                const Text(
+                  'Choose exactly what to share',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+                for (final category in const {
+                  'checkins': 'Daily Navigation check-ins',
+                  'trends': 'Calculated trends',
+                  'tracker_events': 'Practice and activity events',
+                }.entries)
+                  CheckboxListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    value: selectedCategories.contains(category.key),
+                    title: Text(category.value),
+                    onChanged: (value) => setDialogState(() {
+                      if (value == true) {
+                        selectedCategories.add(category.key);
+                      } else {
+                        selectedCategories.remove(category.key);
+                      }
+                    }),
+                  ),
+                DropdownButtonFormField<int>(
+                  initialValue: durationDays,
+                  decoration: const InputDecoration(
+                    labelText: 'Access expires',
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 7, child: Text('In 7 days')),
+                    DropdownMenuItem(value: 30, child: Text('In 30 days')),
+                    DropdownMenuItem(value: 90, child: Text('In 90 days')),
+                  ],
+                  onChanged: (value) =>
+                      setDialogState(() => durationDays = value ?? 30),
+                ),
+                const SizedBox(height: 8),
+                const Text('Journal entries and AI chats remain private.'),
+              ],
             ),
-            const SizedBox(height: 12),
-            const Text('Shared categories: check-ins, trends, tracker events'),
-            const SizedBox(height: 8),
-            const Text('Journal entries and AI chats remain private.'),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed:
+                  practitionerCtl.text.trim().isEmpty ||
+                      selectedCategories.isEmpty
+                  ? null
+                  : () => Navigator.pop(ctx, {
+                      'practitioner': practitionerCtl.text.trim(),
+                      'categories': selectedCategories.toList(),
+                      'duration_days': durationDays,
+                    }),
+              child: const Text('Grant access'),
+            ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, {
-              'practitioner': practitionerCtl.text.trim(),
-            }),
-            child: const Text('Grant access'),
-          ),
-        ],
       ),
     );
+    practitionerCtl.dispose();
     if (result != null) {
       final api = MindRecipeApiClient();
       try {
         await api.grantConsent(
           token: widget.appState.session?.token ?? '',
-          practitionerId: result['practitioner']!,
+          practitionerId: result['practitioner'].toString(),
+          categories: (result['categories'] as List).cast<String>(),
+          durationDays: result['duration_days'] as int,
         );
         _load();
       } catch (_) {}

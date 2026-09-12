@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.auth import auth_store
-from app.sqlite_store import store
+from app.repository import store
 from app.voice_synthesis import VOICE_PRESETS, get_available_voices, prepare_delivery, _delivery_tone
 from app.wellness_assistant import _client_conversation
 import app.wellness_assistant as wellness_assistant
@@ -479,6 +479,13 @@ def test_memory_proposals_require_member_decision_and_preserve_provenance():
     memory = client.get("/v1/memory", headers=headers).json()[0]
     assert memory["source"] == "assistant_proposal"
     assert memory["expires_at"] is not None
+    updated = client.put(
+        f"/v1/memory/{memory['id']}", headers=headers,
+        json={"kind": memory["kind"], "content": "Prefer a two-minute practice before meetings.", "pinned": True},
+    )
+    assert updated.status_code == 200
+    assert updated.json()["pinned"] is True
+    assert "two-minute" in updated.json()["content"]
 
 
 def test_curriculum_progress_recomputes_an_explainable_next_lesson():
@@ -498,6 +505,42 @@ def test_curriculum_progress_recomputes_an_explainable_next_lesson():
     journey = client.get("/v1/journey", headers=headers)
     assert journey.json()["recommended_module_id"] == "lesson-6"
     assert "grounding" in journey.json()["recommendation_reason"].lower()
+    event_kinds = {
+        event["kind"] for event in client.get("/v1/pulse/today", headers=headers).json()["recent_events"]
+    }
+    assert "module_completed" in event_kinds
+
+
+def test_navigation_choices_adapt_journey_with_visible_provenance_and_alternatives():
+    reset_store()
+    account = client.post("/v1/auth/register", json={
+        "email": "adaptive-nav@example.com", "display_name": "Adaptive",
+        "password": "very-secure-passphrase",
+    })
+    headers = {"authorization": f"Bearer {account.json()['access_token']}"}
+    recorded_at = datetime.now(timezone.utc).isoformat()
+    checkin = client.post("/v1/checkins", headers=headers, json={
+        "client_id": "adaptive-navigation-001",
+        "emotions": ["Tired"],
+        "activation": -2,
+        "observations": [
+            {"kind": "self_reported_capacity", "value": "low", "recorded_at": recorded_at,
+             "timezone": "UTC", "source": "member_input"},
+            {"kind": "available_minutes", "value": 3, "recorded_at": recorded_at,
+             "timezone": "UTC", "source": "member_input"},
+        ],
+    })
+    assert checkin.status_code == 201
+    journey = client.get("/v1/journey", headers=headers)
+    assert journey.status_code == 200
+    assert journey.json()["recommended_module_id"] == "lesson-4"
+    assert "self-reported capacity" in " ".join(journey.json()["recommendation_inputs"])
+    assert journey.json()["alternatives"]
+    assert "not a lasting pattern" in journey.json()["recommendation_reason"]
+    event_kinds = {
+        event["kind"] for event in client.get("/v1/pulse/today", headers=headers).json()["recent_events"]
+    }
+    assert {"checkin_recorded", "daily_navigation_completed"} <= event_kinds
 
 
 def test_agent_requires_explicit_approval_for_external_research_and_skill_activation():

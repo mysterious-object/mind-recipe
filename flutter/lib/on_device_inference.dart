@@ -5,13 +5,11 @@
 library;
 
 import 'dart:async';
-import 'dart:convert';
 import 'dart:isolate';
 import 'dart:io';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
 import 'package:llama_cpp_dart/llama_cpp_dart.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -769,6 +767,13 @@ class OnDeviceInference implements LocalInference {
       return clean.isEmpty ? null : clean;
     } catch (error) {
       await _inferLog('infer ERROR: $error');
+      _disposeEngine();
+      _set(
+        const LocalInferenceSnapshot(
+          OnDeviceStatus.error,
+          detail: 'The private model stopped responding. Reopen it before using private AI again.',
+        ),
+      );
       return null;
     }
   }
@@ -1190,84 +1195,6 @@ class OnDeviceInference implements LocalInference {
         RegExp(r'\byou are not in danger\b', caseSensitive: false),
         'notice what feels steady around you',
       );
-
-  String _fallbackResponse(String raw, List<LocalConversationTurn> history) {
-    // Extract real member utterance when NavigatorAgent wraps it — otherwise the
-    // fallback echoes "Member message: ... Selected MindRecipe support: ..." which
-    // looks like broken code. The member only typed the part after "Member message:".
-    var clean = raw;
-    final memberIdx = clean.indexOf('Member message:');
-    if (memberIdx != -1) {
-      clean = clean.substring(memberIdx + 'Member message:'.length);
-      final supportIdx = clean.indexOf('Selected MindRecipe support:');
-      if (supportIdx != -1) clean = clean.substring(0, supportIdx);
-      final guidanceIdx = clean.indexOf('Tool guidance:');
-      if (guidanceIdx != -1) clean = clean.substring(0, guidanceIdx);
-      final instructionIdx = clean.indexOf('Respond to the member directly');
-      if (instructionIdx != -1) clean = clean.substring(0, instructionIdx);
-      // Navigation context suffix
-      final navIdx = clean.indexOf('(I already completed');
-      if (navIdx != -1) clean = clean.substring(0, navIdx);
-      final importantIdx = clean.indexOf('Important: your previous reply');
-      if (importantIdx != -1) clean = clean.substring(0, importantIdx);
-      clean = clean.trim();
-    } else {
-      clean = clean
-          .replaceFirst(RegExp(r'^(member|user):\s*', caseSensitive: false), '')
-          .trim();
-      // Strip bare retry instruction
-      final importantIdx = clean.indexOf('Important:');
-      if (importantIdx != -1) clean = clean.substring(0, importantIdx).trim();
-    }
-    if (clean.isEmpty) clean = raw.trim();
-    // Final safety: collapse newlines and trim
-    clean = clean.replaceAll(RegExp(r'\s+'), ' ').trim();
-    final lower = clean.toLowerCase();
-
-    // Use history to avoid repetition and move the conversation forward.
-    final lastAssistant = history.isNotEmpty
-        ? history
-              .lastWhere(
-                (t) => t.role == 'assistant',
-                orElse: () => history.last,
-              )
-              .text
-              .toLowerCase()
-        : '';
-    final hasAskedCalm =
-        lastAssistant.contains('calm rather than empty') ||
-        lastAssistant.contains('sitting with you');
-
-    // Slower illusion: the fallback is fast (native failed), but reasoning should
-    // feel thoughtful, not instant. Caller streams with 28ms delay + 800ms pause.
-    if (lower.contains('quick reset') || lower.contains('reset')) {
-      return 'Let’s make the next minute simpler. Put both feet down, loosen your jaw, and let one exhale run slightly longer than the inhale. No need to force calm—just reduce the demand on your attention for three breaths. Then choose: continue here, or handle the one thing that matters next.';
-    }
-    if (lower.length < 14 ||
-        ['yes', 'that', 'it', 'ok', 'okay', 'idk', 'alone'].contains(lower)) {
-      // Short follow-ups like "that I'm alone and it's calm" — don't repeat "member"
-      // Make it dynamic: if we already asked about calm, shift to grounding.
-      if (hasAskedCalm) {
-        return 'That calm aloneness — is it more in your chest, shoulders, or breath right now? Notice one small physical detail and tell me what you find.';
-      }
-      return hasAskedCalm
-          ? 'I’m with you. We don’t need to turn this into another exercise. Do you want me to stay with the feeling, help make sense of it, or help with something practical?'
-          : 'I’m following. Before I steer this somewhere generic: do you want presence, perspective, or practical help right now?';
-    }
-    // Reflect with specificity, no internal labels, one grounded question — vary if last turn was similar
-    if (hasAskedCalm && lower.contains('alone')) {
-      return 'That distinction matters. Being alone can be restorative when it feels chosen and spacious, and painful when it feels imposed. We can leave the calm intact instead of analyzing it—unless there is something underneath it you want help understanding.';
-    }
-    if (lower.contains('appointment') ||
-        lower.contains('remind') ||
-        lower.contains('calendar')) {
-      return 'I can help turn that into a clear action. Tell me the date, time, and title if any are missing; MindRecipe will show the complete proposal for you to review before your phone confirms it.';
-    }
-    if (lower.contains('help me decide') || lower.contains('should i')) {
-      return 'Let’s make the decision concrete. I’ll compare what each option gives you, what it costs, and which choice is easiest to reverse. What are the two options—and is your priority relief now, progress later, or protecting a relationship?';
-    }
-    return 'I’m paying attention to the situation, not just the emotion around it. I can help you understand the pattern, decide what to do next, or simply stay with it without turning it into homework. Which would actually help?';
-  }
 
   String _cleanPromptText(String value) =>
       value.replaceAll('<|', '').replaceAll('|>', '').trim();

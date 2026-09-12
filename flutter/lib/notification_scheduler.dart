@@ -1,7 +1,10 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 
 import 'app_services.dart';
 import 'design_tokens.dart';
+import 'mobile_automation.dart';
 
 /// Notification scheduler — discreet wellness reminders with quiet hours,
 /// snooze, pause controls, and user-selected times.
@@ -39,6 +42,8 @@ class _NotificationSchedulerState extends State<NotificationScheduler> {
   // Message style
   String _messageStyle = 'discreet';
   bool _loading = true;
+  bool _applyingToPhone = false;
+  String? _phoneReceipt;
 
   static const _styles = {
     'discreet': 'Just checking in 🌿',
@@ -129,6 +134,101 @@ class _NotificationSchedulerState extends State<NotificationScheduler> {
       });
     } catch (_) {
       // The next interaction retries the member-scoped save.
+    }
+  }
+
+  DateTime _nextMorningOccurrence() {
+    final now = DateTime.now();
+    final enabledDays = <int>{
+      for (var i = 0; i < _slots.length; i++)
+        if (_slots[i]) i + 1,
+    };
+    for (var offset = 0; offset < 8; offset++) {
+      final day = now.add(Duration(days: offset));
+      final candidate = DateTime(
+        day.year,
+        day.month,
+        day.day,
+        _morningTime.hour,
+        _morningTime.minute,
+      );
+      if ((enabledDays.isEmpty || enabledDays.contains(candidate.weekday)) &&
+          candidate.isAfter(now)) {
+        return candidate;
+      }
+    }
+    return now.add(const Duration(days: 1));
+  }
+
+  Future<void> _applyToPhone() async {
+    if (_applyingToPhone || !_enabled) return;
+    setState(() {
+      _applyingToPhone = true;
+      _phoneReceipt = null;
+    });
+
+    Map<String, dynamic>? commitment;
+    final scheduledFor = _nextMorningOccurrence();
+    try {
+      if (_token.isNotEmpty) {
+        commitment = await _api.createCommitment(_token, {
+          'client_id': 'reminder-${DateTime.now().microsecondsSinceEpoch}',
+          'title': 'Daily navigation reminder',
+          'action_type': 'reminder',
+          'scheduled_for': scheduledFor.toUtc().toIso8601String(),
+          'source': 'member',
+        });
+        commitment = await _api.updateCommitment(
+          _token,
+          commitment['id'].toString(),
+          'confirmed',
+        );
+      }
+
+      final activeDays = <int>{
+        for (var i = 0; i < _slots.length; i++)
+          if (_slots[i]) i + 1,
+      };
+      final result = await MindRecipeMobileAutomation()
+          .scheduleDailyNavigationReminder(
+            time: _morningTime,
+            weekdays: activeDays.isEmpty ? null : activeDays,
+          );
+      final executionStatus = result.success
+          ? 'requested'
+          : result.isUnavailable
+          ? 'unavailable'
+          : 'failed';
+      final receiptCode = result.nativeCode ?? executionStatus;
+
+      if (_token.isNotEmpty && commitment != null) {
+        await _api.recordCommitmentExecution(
+          _token,
+          commitment['id'].toString(),
+          action: 'reminder',
+          status: executionStatus,
+          receipt: receiptCode,
+          scheduledFor: scheduledFor,
+        );
+      }
+      await widget.appState.writeRaw(
+        'mindrecipe_notification_receipt_v1',
+        jsonEncode({
+          'requested_at': DateTime.now().toUtc().toIso8601String(),
+          'scheduled_for': scheduledFor.toUtc().toIso8601String(),
+          'status': executionStatus,
+          'native_code': receiptCode,
+        }),
+      );
+      if (!mounted) return;
+      setState(() => _phoneReceipt = result.message);
+    } catch (_) {
+      if (!mounted) return;
+      setState(
+        () => _phoneReceipt = 'The phone reminder could not be prepared. Your in-app schedule is still saved.',
+      );
+    } finally {
+      if (mounted) setState(() => _applyingToPhone = false);
     }
   }
 
@@ -364,6 +464,47 @@ class _NotificationSchedulerState extends State<NotificationScheduler> {
                 dense: true,
               ),
             )),
+            const SizedBox(height: 12),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'Phone reminder',
+                      style: MindRecipeTokens.title(context),
+                    ),
+                    const SizedBox(height: 6),
+                    const Text(
+                      'Open your phone’s alarm or reminder screen with this schedule. Nothing is added until you confirm there.',
+                    ),
+                    const SizedBox(height: 12),
+                    FilledButton.icon(
+                      onPressed: _applyingToPhone ? null : _applyToPhone,
+                      icon: _applyingToPhone
+                          ? const SizedBox.square(
+                              dimension: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.alarm_add),
+                      label: Text(
+                        _applyingToPhone
+                            ? 'Preparing…'
+                            : 'Apply morning reminder to phone',
+                      ),
+                    ),
+                    if (_phoneReceipt != null) ...[
+                      const SizedBox(height: 10),
+                      Text(
+                        _phoneReceipt!,
+                        semanticsLabel: 'Phone reminder result: $_phoneReceipt',
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
           ],
           const SizedBox(height: 24),
           _buildWellnessBoundary(),

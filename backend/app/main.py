@@ -9,7 +9,7 @@ from typing import List, Optional, Tuple
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Response, status
 from fastapi.responses import StreamingResponse
 
-from .auth import auth_store, issue_token, verify_token_identity
+from .auth import auth_store, issue_token, verify_oidc_identity, verify_token_identity
 from .wellness_assistant import managed_provider_available, respond, get_provider_status
 from .navigator_agent import agent
 from .config import settings
@@ -23,12 +23,14 @@ from .models import (
     JourneySettings, JourneySettingsInput, RecipeProposal, RecipeProposalInput,
     RecipeProposalDecision, MemoryCard, MemoryCardInput, MemoryProposal, MemoryProposalDecision, MemoryProposalInput, MemberEventInput,
 )
-from .sqlite_store import store
+from .repository import store
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     if not settings.development and not settings.production_ready:
-        raise RuntimeError("production requires a PostgreSQL MIND_RECIPE_DATABASE_URL")
+        raise RuntimeError(
+            "production requires PostgreSQL and a configured OIDC issuer/audience"
+        )
     yield
 
 
@@ -41,7 +43,16 @@ def actor(
     x_mind_recipe_role: Role = Header(default=Role.member),
 ) -> Tuple[str, Role]:
     if authorization and authorization.lower().startswith("bearer "):
-        actor_id, role = verify_token_identity(authorization[7:].strip())
+        token = authorization[7:].strip()
+        if settings.oidc_ready:
+            actor_id, role, _ = verify_oidc_identity(token)
+        elif settings.development:
+            actor_id, role = verify_token_identity(token)
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="validated OIDC bearer identity required",
+            )
         return actor_id, Role(role)
     if settings.development:
         return x_mind_recipe_user or "dev-member", x_mind_recipe_role
@@ -94,7 +105,12 @@ def activate_skill_proposal(proposal_id: str, payload: dict[str, object], identi
 
 @app.get("/healthz")
 def healthz() -> dict[str, str]:
-    return {"status": "ok", "environment": settings.environment}
+    return {
+        "status": "ok",
+        "environment": settings.environment,
+        "persistence": "postgresql" if settings.database_url.startswith("postgresql") else "development_sqlite",
+        "identity": "oidc" if settings.oidc_ready else "development_local",
+    }
 
 
 @app.get("/v1/assistant/status")
@@ -144,13 +160,20 @@ def auth_response(account) -> AuthToken:
         id=account.id, email=account.email, display_name=account.display_name, role=Role(account.role)))
 
 
+def require_development_identity() -> None:
+    if not settings.development:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="not found")
+
+
 @app.post("/v1/auth/register", response_model=AuthToken, status_code=status.HTTP_201_CREATED)
 def register(payload: AuthRegister) -> AuthToken:
+    require_development_identity()
     return auth_response(auth_store.register(payload.email, payload.display_name, payload.password))
 
 
 @app.post("/v1/auth/login", response_model=AuthToken)
 def login(payload: AuthLogin) -> AuthToken:
+    require_development_identity()
     return auth_response(auth_store.authenticate(payload.email, payload.password))
 
 
@@ -161,6 +184,7 @@ def request_password_reset(payload: AuthResetRequest) -> dict[str, str]:
     In development/staging the token is returned so the member can finish the
     flow without an email provider. Production wires this to the mailer.
     """
+    require_development_identity()
     token = auth_store.create_reset_token(payload.email)
     response: dict[str, str] = {
         "status": "ok",
@@ -176,6 +200,7 @@ def request_password_reset(payload: AuthResetRequest) -> dict[str, str]:
 @app.post("/v1/auth/reset/confirm", response_model=AuthToken)
 def confirm_password_reset(payload: AuthResetConfirm) -> AuthToken:
     """Complete password reset and sign the member in with the new password."""
+    require_development_identity()
     account = auth_store.reset_password(payload.email, payload.token, payload.new_password)
     auth_store.clear_reset_token(payload.email)
     audit(account.id, "password_reset_complete", "account", account.id)
@@ -183,8 +208,23 @@ def confirm_password_reset(payload: AuthResetConfirm) -> AuthToken:
 
 
 @app.get("/v1/auth/me", response_model=AuthUser)
-def me(identity: Tuple[str, Role] = Depends(actor)) -> AuthUser:
+def me(
+    identity: Tuple[str, Role] = Depends(actor),
+    authorization: Optional[str] = Header(default=None),
+) -> AuthUser:
     actor_id, role = identity
+    if settings.oidc_ready and authorization:
+        _, _, claims = verify_oidc_identity(authorization[7:].strip())
+        return AuthUser(
+            id=actor_id,
+            email=str(claims.get("email") or ""),
+            display_name=str(
+                claims.get("name")
+                or claims.get("preferred_username")
+                or "Navigator"
+            ),
+            role=role,
+        )
     account = auth_store.users_by_id.get(actor_id)
     if not account:
         raise HTTPException(status_code=404, detail="account not found")
