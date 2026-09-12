@@ -920,6 +920,7 @@ class SecureAppState extends ChangeNotifier {
   int _lifetimeNavigatorTurns = 0;
   int _lifetimeAiReflections = 0;
   DateTime? _lastAssistantActivityAt;
+  Future<void> _visualThemeWrite = Future<void>.value();
 
   bool get hasProviderKey => openRouterKey.trim().isNotEmpty;
   bool get aiAvailable => managedAiAvailable || hasProviderKey;
@@ -1370,7 +1371,13 @@ class SecureAppState extends ChangeNotifier {
     final migrated = migrateVisualTheme(value);
     visualThemeId = migrated;
     notifyListeners();
-    await _storage.write(key: _visualThemeKey, value: migrated);
+    // Theme cards update the renderer immediately. Serialize the durable
+    // writes so fast consecutive selections cannot finish out of order and
+    // restore an older theme after the next cold launch.
+    _visualThemeWrite = _visualThemeWrite.then(
+      (_) => _storage.write(key: _visualThemeKey, value: migrated),
+    );
+    await _visualThemeWrite;
   }
 
   Future<void> signOut() async {

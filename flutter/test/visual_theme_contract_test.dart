@@ -136,6 +136,12 @@ void main() {
         reason: 'Minified class names must not break live matter-mode swaps.',
       );
       expect(source, isNot(contains("constructor?.name === 'ShapableMatter'")));
+      expect(
+        source,
+        contains('rivers?.rivers?.forEach(({ points }, index)'),
+        reason: 'DataRivers exposes points, not a mesh field.',
+      );
+      expect(source, isNot(contains('rivers?.rivers?.forEach(({ mesh }')));
     });
 
     test('every theme has a distinct WebGL component and matter signature', () {

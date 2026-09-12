@@ -463,7 +463,9 @@ function apply(state = {}) {
   const rivers = components.find(
     component => component instanceof ChimeraFX.DataRivers,
   );
-  rivers?.rivers?.forEach(({ mesh }, index) => { mesh.visible = index < 1 + Math.ceil(complexity * 2); });
+  rivers?.rivers?.forEach(({ points }, index) => {
+    points.visible = index < 1 + Math.ceil(complexity * 2);
+  });
   if (growth >= .8 && lastState._lastMilestone !== growth) {
     engine.pulse('success');
     lastState._lastMilestone = growth;

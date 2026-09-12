@@ -15363,7 +15363,7 @@
     const p = u.find(
       (f) => f instanceof Je.DataRivers
     );
-    p?.rivers?.forEach(({ mesh: f }, v) => {
+    p?.rivers?.forEach(({ points: f }, v) => {
       f.visible = v < 1 + Math.ceil(l * 2);
     });
     if (o >= 0.8 && it._lastMilestone !== o) {
