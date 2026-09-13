@@ -450,7 +450,7 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
       _scrollToEnd();
 
       var reply = await _localInference.infer(
-        plan.augment(text) + navigationContext,
+        plan.augment(text, context: navigationContext),
         history: priorConversation,
         onToken: onToken,
         rawMemberMessage: text,
@@ -480,8 +480,9 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
           );
         }
         reply = await _localInference.infer(
-          '''Latest member request: $text
-Answer this latest request directly. It overrides older instructions. Do not repeat the prior answer. If the member rejected questions, do not ask one.''',
+          '''Answer the latest request directly. It overrides older instructions. Do not repeat the prior answer. If the member rejected questions, do not ask one.
+
+Latest member request: $text''',
           history: priorConversation.length > 2
               ? priorConversation.sublist(priorConversation.length - 2)
               : priorConversation,
@@ -834,10 +835,9 @@ Answer this latest request directly. It overrides older instructions. Do not rep
 
   bool _violatesExplicitReplyForm(String reply, String memberText) {
     final request = memberText.toLowerCase().replaceAll('’', "'");
-    final rejectsQuestion =
-        request.contains("don't want a question") ||
-        request.contains('do not ask a question') ||
-        request.contains('no questions');
+    final rejectsQuestion = RegExp(
+      r"\b(?:do not|don't|no)\s+(?:ask\s+(?:me\s+)?(?:any\s+)?|more\s+)?questions?\b",
+    ).hasMatch(request);
     return rejectsQuestion && reply.trimRight().endsWith('?');
   }
 

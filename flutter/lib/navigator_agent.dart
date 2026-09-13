@@ -15,13 +15,13 @@ class NavigatorAgentPlan {
   final String instruction;
   final bool requiresResearchApproval;
 
-  String augment(String memberMessage) =>
+  String augment(String memberMessage, {String context = ''}) =>
       '''
-Member message: $memberMessage
-
 Selected MindRecipe support: $tool
 Tool guidance: $instruction
-Respond to the member directly. Do not mention tool routing or internal systems.
+${context.trim().isEmpty ? '' : 'Relevant member-owned context:\n${context.trim()}\n'}Respond directly without mentioning routing or internal systems. The latest member message below has final priority:
+
+Latest member message: $memberMessage
 ''';
 }
 
