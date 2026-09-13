@@ -378,6 +378,13 @@ class _PulseScreenState extends State<PulseScreen> with WidgetsBindingObserver {
       );
     }
     if (_pulses.length > 1) parts.add('your recent Pulse trend');
+    if (parts.isEmpty && widget.appState.lifetimeNavigationSessions > 0) {
+      final sessions = widget.appState.lifetimeNavigationSessions;
+      parts.add(
+        '$sessions recorded Daily Navigation ${sessions == 1 ? 'session' : 'sessions'}',
+      );
+    }
+    if (parts.isEmpty) parts.add('your recent on-device activity');
     return 'This form reflects ${parts.join(', ')}. Mood changes its temporary energy; only sustained progress changes its lasting form.';
   }
 

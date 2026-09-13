@@ -818,18 +818,21 @@ class _ActionSelector extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Semantics(
     label: 'Choose a wellness action for today.',
-    child: Column(
-      children: [
-        ...(_actions.map(
-          (a) => RadioListTile<String>(
-            title: Text(a),
-            value: a,
-            groupValue: value,
-            onChanged: (v) => onChanged(v ?? ''),
-            activeColor: MindRecipeTokens.primary,
-          ),
-        )),
-      ],
+    explicitChildNodes: true,
+    child: Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: _actions
+          .map(
+            (action) => ChoiceChip(
+              label: Text(action),
+              selected: value == action,
+              onSelected: (_) => onChanged(action),
+              selectedColor: MindRecipeTokens.primary.withValues(alpha: 0.18),
+              checkmarkColor: MindRecipeTokens.primary,
+            ),
+          )
+          .toList(),
     ),
   );
 }
