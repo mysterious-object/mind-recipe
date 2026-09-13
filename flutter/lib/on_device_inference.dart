@@ -205,6 +205,8 @@ class OnDeviceInference implements LocalInference {
   @override
   LocalInferenceSnapshot get snapshot => _snapshot;
   OnDeviceModelManifest get activeModel => _activeManifest;
+  String get activeModelDisplayName =>
+      _activeManifest.id.contains('gemma') ? 'Gemma 2 2B' : 'Qwen3 1.7B';
 
   Future<bool> isModelDownloaded(OnDeviceModelManifest manifest) async {
     final file = await _modelFile(manifest);
@@ -315,6 +317,11 @@ class OnDeviceInference implements LocalInference {
   @override
   Future<LocalInferenceSnapshot> refreshStatus() async {
     await _restoreActiveSelection();
+    // A loaded engine is already the authoritative capability check. Re-running
+    // the file verifier for every app-wide readiness poll briefly published
+    // `verifying` and `initializing`, which made Navigator visibly oscillate
+    // between online and offline even though the native engine never stopped.
+    if (_snapshot.isReady && _engine != null) return _snapshot;
     if (_refreshing) {
       // Activation and the Settings poller can request status at the same
       // time. Returning the transient `verifying`/`initializing` snapshot made

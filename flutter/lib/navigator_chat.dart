@@ -1045,6 +1045,7 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
             _ModelRouteSelector(
               useCloud: widget.appState.cloudAiEnabled,
               localReady: _localSnapshot.isReady,
+              localModelName: OnDeviceInference().activeModelDisplayName,
               cloudReady: cloudAvailable,
               onChanged: sending
                   ? null
@@ -1307,11 +1308,13 @@ class _ModelRouteSelector extends StatelessWidget {
   const _ModelRouteSelector({
     required this.useCloud,
     required this.localReady,
+    required this.localModelName,
     required this.cloudReady,
     required this.onChanged,
   });
   final bool useCloud;
   final bool localReady;
+  final String localModelName;
   final bool cloudReady;
   final ValueChanged<bool>? onChanged;
 
@@ -1334,7 +1337,7 @@ class _ModelRouteSelector extends StatelessWidget {
               DropdownMenuItem(
                 value: false,
                 child: Text(
-                  'Private · Qwen3 1.7B${localReady ? ' · ready' : ' · unavailable'}',
+                  'Private · $localModelName${localReady ? ' · ready' : ' · unavailable'}',
                 ),
               ),
               DropdownMenuItem(

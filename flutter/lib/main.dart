@@ -276,11 +276,14 @@ class _MemberHomeState extends State<MemberHome> {
   }
 
   Future<void> _primeNavigator() async {
-    await (widget.localInference ?? OnDeviceInference()).refreshStatus();
+    final local = await (widget.localInference ?? OnDeviceInference())
+        .refreshStatus();
     if (!widget.appState.aiAvailable) {
       widget.appState.setManagedAiAvailable(await widget.api.aiAvailable());
     }
-    if (widget.appState.aiAvailable) navigatorReadinessTimer?.cancel();
+    if (local.isReady || widget.appState.aiAvailable) {
+      navigatorReadinessTimer?.cancel();
+    }
   }
 
   @override
