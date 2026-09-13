@@ -477,7 +477,7 @@ class _NotificationSchedulerState extends State<NotificationScheduler> {
                     ),
                     const SizedBox(height: 6),
                     const Text(
-                      'Open your phone’s alarm or reminder screen with this schedule. Nothing is added until you confirm there.',
+                      'Open your phone’s calendar reminder editor with this schedule. Nothing is added until you review it and tap Save there.',
                     ),
                     const SizedBox(height: 12),
                     FilledButton.icon(
@@ -487,7 +487,7 @@ class _NotificationSchedulerState extends State<NotificationScheduler> {
                               dimension: 18,
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
-                          : const Icon(Icons.alarm_add),
+                          : const Icon(Icons.edit_calendar_rounded),
                       label: Text(
                         _applyingToPhone
                             ? 'Preparing…'

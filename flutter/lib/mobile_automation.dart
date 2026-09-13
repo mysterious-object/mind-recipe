@@ -412,21 +412,56 @@ class MindRecipeMobileAutomation {
     );
   }
 
-  /// Mirror NotificationScheduler's daily navigation reminder as an OS reminder/alarm
-  /// so it fires even if the app is killed.
+  /// Open an editable OS reminder proposal for Daily Navigation.
+  ///
+  /// Calendar insertion is used instead of `ACTION_SET_ALARM`: some Android
+  /// clock apps commit that intent immediately even when `EXTRA_SKIP_UI` is
+  /// false. The calendar editor keeps the proposed time visible and requires
+  /// the member to press Save.
   /// `time` is Flutter's material TimeOfDay (hour 0-23, minute 0-59).
   Future<AutomationResult> scheduleDailyNavigationReminder({
     required TimeOfDay time,
     Set<int>? weekdays, // 1=Mon..7=Sun; null = daily
   }) {
-    // Map to alarm: daily navigation at fixed clock time
-    final days = weekdays?.toList();
-    return setAlarm(
-      hour: time.hour,
-      minute: time.minute,
-      label: 'MindRecipe — daily navigation',
-      daysOfWeek: days,
-      skipUi: false,
+    final now = DateTime.now();
+    DateTime? due;
+    for (var offset = 0; offset <= 7; offset++) {
+      final day = now.add(Duration(days: offset));
+      final candidate = DateTime(
+        day.year,
+        day.month,
+        day.day,
+        time.hour,
+        time.minute,
+      );
+      final allowedDay = weekdays == null || weekdays.isEmpty
+          ? true
+          : weekdays.contains(candidate.weekday);
+      if (allowedDay && candidate.isAfter(now)) {
+        due = candidate;
+        break;
+      }
+    }
+    due ??= now.add(const Duration(days: 1));
+    const dayNames = <int, String>{
+      1: 'Monday',
+      2: 'Tuesday',
+      3: 'Wednesday',
+      4: 'Thursday',
+      5: 'Friday',
+      6: 'Saturday',
+      7: 'Sunday',
+    };
+    final sortedDays = (weekdays ?? const <int>{}).toList()..sort();
+    final recurrenceNote = weekdays == null || weekdays.isEmpty
+        ? 'Proposed daily reminder.'
+        : 'Proposed weekly days: ${sortedDays.map((day) => dayNames[day]).whereType<String>().join(', ')}.';
+    return setReminder(
+      title: 'MindRecipe — daily navigation',
+      dueDate: due,
+      notes:
+          '$recurrenceNote Review the time and recurrence, then tap Save to confirm.',
+      alarmMinutesBefore: 0,
     );
   }
 
