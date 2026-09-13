@@ -458,12 +458,18 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
       // Anti-loop guard: if the reply mostly repeats the previous Navigator
       // turn ("consider the next step…" circles), retry ONCE with an explicit
       // variation instruction so the model moves somewhere new.
-      if (reply != null &&
+      final repetitive =
+          reply != null &&
           _isRepetitiveOfLastAssistant(
             reply,
             beforeMessageIndex: placeholderIndex,
-          )) {
-        await _log('REPETITION detected — retrying with variation nudge');
+          );
+      final violatesLatestRequest =
+          reply != null && _violatesExplicitReplyForm(reply, text);
+      if (reply != null && (repetitive || violatesLatestRequest)) {
+        await _log(
+          '${violatesLatestRequest ? 'INSTRUCTION' : 'REPETITION'} violation — retrying with direct latest request',
+        );
         if (mounted && placeholderIndex < widget.messages.length) {
           setState(
             () => widget.messages[placeholderIndex] = ChatMessage(
@@ -474,8 +480,11 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
           );
         }
         reply = await _localInference.infer(
-          '${plan.augment(text)}\n\nImportant: your previous reply repeated what you already said. Respond with ONE concrete, different suggestion or question you have not used in this conversation. Reference the member\'s latest words specifically.',
-          history: priorConversation,
+          '''Latest member request: $text
+Answer this latest request directly. It overrides older instructions. Do not repeat the prior answer. If the member rejected questions, do not ask one.''',
+          history: priorConversation.length > 2
+              ? priorConversation.sublist(priorConversation.length - 2)
+              : priorConversation,
           onToken: onToken,
           rawMemberMessage: text,
         );
@@ -801,6 +810,10 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
       unawaited(_log('FILTER: fragment "$clean"'));
       return false;
     }
+    if (_violatesExplicitReplyForm(clean, memberText)) {
+      unawaited(_log('FILTER: reply contradicts explicit response form'));
+      return false;
+    }
     final lowered = clean.toLowerCase();
     if (lowered.contains('<|im_')) {
       unawaited(_log('FILTER: im_ token'));
@@ -817,6 +830,15 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
     }
     unawaited(_log('FILTER: PASSED len=${clean.length}'));
     return true;
+  }
+
+  bool _violatesExplicitReplyForm(String reply, String memberText) {
+    final request = memberText.toLowerCase().replaceAll('’', "'");
+    final rejectsQuestion =
+        request.contains("don't want a question") ||
+        request.contains('do not ask a question') ||
+        request.contains('no questions');
+    return rejectsQuestion && reply.trimRight().endsWith('?');
   }
 
   Future<void> _toggleVoiceInput() async {
