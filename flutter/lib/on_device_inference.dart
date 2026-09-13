@@ -57,6 +57,7 @@ abstract class LocalInference {
     String userMessage, {
     List<LocalConversationTurn> history = const [],
     void Function(String token)? onToken,
+    String? rawMemberMessage,
   });
   Future<void> removeModel();
 }
@@ -176,6 +177,63 @@ Future<String> _sha256ForFile(String path) async {
   return digest.toString().toLowerCase();
 }
 
+@visibleForTesting
+bool mindRecipeShouldDeliberate(String message) {
+  final text = message.toLowerCase();
+  if (message.length > 180) return true;
+  return const [
+    'plan',
+    'compare',
+    'decide',
+    'why',
+    'reason',
+    'remember',
+    'earlier',
+    'appointment',
+    'calendar',
+    'organize',
+    'goal',
+    'pattern',
+    'what should i',
+    'help me figure out',
+    'i changed my mind',
+    'that is not what i meant',
+  ].any(text.contains);
+}
+
+/// Qwen's visible thinking tokens consume most of the small generation budget
+/// on low-memory phones. Keep deliberate generation for capable devices while
+/// preserving the answer budget on the 3–4 GB class.
+@visibleForTesting
+bool mindRecipeShouldEmitThinking({
+  required bool deliberationRequested,
+  required int totalMemoryMiB,
+}) => deliberationRequested && totalMemoryMiB >= 6144;
+
+/// Accept a complete model file even when the app was killed before it wrote
+/// its receipt. This is also what makes a locally staged live-test artifact
+/// follow the same full checksum path as a network download.
+@visibleForTesting
+Future<bool> mindRecipeVerifyExistingModelFile(
+  File file,
+  OnDeviceModelManifest manifest,
+) async {
+  if (!await file.exists() || await file.length() != manifest.sizeBytes) {
+    return false;
+  }
+  final receipt = File('${file.path}.verified');
+  final expectedReceipt =
+      '${manifest.version}:${manifest.sizeBytes}:${manifest.sha256}';
+  if (await receipt.exists() &&
+      await receipt.readAsString() == expectedReceipt) {
+    return true;
+  }
+  final digest = await Isolate.run(() => _sha256ForFile(file.path));
+  if (digest != manifest.sha256) return false;
+  await receipt.writeAsString(expectedReceipt, flush: true);
+  return true;
+}
+
 class OnDeviceInference implements LocalInference {
   static final OnDeviceInference _instance = OnDeviceInference._();
   factory OnDeviceInference() => _instance;
@@ -201,6 +259,7 @@ class OnDeviceInference implements LocalInference {
   /// installModel — that was the restart-from-zero deadlock.
   bool _downloadActive = false;
   OnDeviceModelManifest _activeManifest = mindRecipePrivateModel;
+  bool _thinkingAllowed = false;
 
   @override
   LocalInferenceSnapshot get snapshot => _snapshot;
@@ -444,10 +503,45 @@ class OnDeviceInference implements LocalInference {
       await activateModel(_activeManifest);
       return;
     }
+    final destination = await _modelFile();
+    // A complete destination without a receipt means download promotion
+    // finished but the process died before receipt persistence. Verify it in
+    // place instead of silently starting another 1–2 GB download.
+    if (await destination.exists() &&
+        await destination.length() == _activeManifest.sizeBytes) {
+      _downloadActive = true;
+      try {
+        _set(const LocalInferenceSnapshot(OnDeviceStatus.verifying));
+        await _inferLog(
+          'verifying complete existing model ${destination.path}',
+        );
+        final valid = await _matchesManifest(
+          destination,
+          _activeManifest,
+        ).timeout(const Duration(minutes: 10));
+        if (valid) {
+          await _persistActiveSelection();
+          _downloadActive = false;
+          _set(const LocalInferenceSnapshot(OnDeviceStatus.checking));
+          final ready = await refreshStatus();
+          if (!ready.isReady) {
+            throw StateError(
+              ready.detail ?? 'The private model could not be started.',
+            );
+          }
+          return;
+        }
+        await _inferLog('existing model hash mismatch – replacing download');
+        final staleReceipt = await _verificationReceipt(destination);
+        if (await staleReceipt.exists()) await staleReceipt.delete();
+        await destination.delete();
+      } finally {
+        _downloadActive = false;
+      }
+    }
     // Connectivity policy is owned by the caller; this method remains explicit
     // about the requested cellular permission for the future scheduler.
     _set(const LocalInferenceSnapshot(OnDeviceStatus.downloading));
-    final destination = await _modelFile();
     final temporary = File('${destination.path}.partial');
     // Resume support: keep .partial and use Range header so tab switches
     // or brief backgrounding don't discard 1+ GB already fetched.
@@ -720,6 +814,7 @@ class OnDeviceInference implements LocalInference {
     String userMessage, {
     List<LocalConversationTurn> history = const [],
     void Function(String token)? onToken,
+    String? rawMemberMessage,
   }) async {
     // Use the broadcast snapshot — refreshStatus() here would re-scan the
     // model files on every message and add avoidable first-token latency.
@@ -754,6 +849,7 @@ class OnDeviceInference implements LocalInference {
         userMessage,
         history: history,
         format: _activeManifest.promptFormat,
+        deliberationMessage: rawMemberMessage ?? userMessage,
       );
       await _inferLog('infer prompt length=${prompt.length}');
       final promptId = await _engine!.sendPrompt(prompt);
@@ -840,21 +936,8 @@ class OnDeviceInference implements LocalInference {
     await refreshStatus();
   }
 
-  Future<bool> _matchesManifest(
-    File file,
-    OnDeviceModelManifest manifest,
-  ) async {
-    if (await file.length() != manifest.sizeBytes) return false;
-    final receipt = await _verificationReceipt(file);
-    if (await receipt.exists() &&
-        await receipt.readAsString() == _receiptContents(manifest)) {
-      return true;
-    }
-    final digest = await Isolate.run(() => _sha256ForFile(file.path));
-    final matches = digest == manifest.sha256;
-    if (matches) await _writeVerificationReceipt(file, manifest);
-    return matches;
-  }
+  Future<bool> _matchesManifest(File file, OnDeviceModelManifest manifest) =>
+      mindRecipeVerifyExistingModelFile(file, manifest);
 
   Future<void> _writeVerificationReceipt(
     File model,
@@ -876,11 +959,12 @@ class OnDeviceInference implements LocalInference {
       final appBundle = File(Platform.resolvedExecutable).parent.path;
       Llama.libraryPath = '$appBundle/Frameworks/llama.framework/llama';
     }
-    // Determine base context size based on device memory
+    // Determine base context size and thinking budget from device memory.
     var nCtx = 4096;
+    var totalMem = 8192;
     try {
       final device = await MindRecipeDeviceHarness().capabilities();
-      final totalMem = device.totalMemoryMiB ?? 8192;
+      totalMem = device.totalMemoryMiB ?? 8192;
       if (totalMem < 4096) {
         nCtx = 1024; // Very low memory device
       } else if (totalMem < 6144) {
@@ -890,7 +974,9 @@ class OnDeviceInference implements LocalInference {
       }
     } catch (_) {
       nCtx = 2048; // Safe default
+      totalMem = 4096;
     }
+    _thinkingAllowed = totalMem >= 6144;
 
     // Adaptive attempt ladder based on device memory
     List<
@@ -934,8 +1020,6 @@ class OnDeviceInference implements LocalInference {
       ];
     } else if (Platform.isAndroid) {
       // Android: Try GPU first on most devices — 6GB+ is enough for Q4_K_M, fixes false offline error.
-      final device = await MindRecipeDeviceHarness().capabilities();
-      final totalMem = device.totalMemoryMiB ?? 8192;
       if (totalMem >= 8192) {
         // This Android package currently bundles the llama.cpp CPU backend.
         // Keep the larger context on capable phones without pretending a GPU
@@ -1206,33 +1290,11 @@ class OnDeviceInference implements LocalInference {
   String _cleanPromptText(String value) =>
       value.replaceAll('<|', '').replaceAll('|>', '').trim();
 
-  bool _shouldDeliberate(String message) {
-    final text = message.toLowerCase();
-    if (message.length > 180) return true;
-    return const [
-      'plan',
-      'compare',
-      'decide',
-      'why',
-      'reason',
-      'remember',
-      'earlier',
-      'appointment',
-      'calendar',
-      'organize',
-      'goal',
-      'pattern',
-      'what should i',
-      'help me figure out',
-      'i changed my mind',
-      'that is not what i meant',
-    ].any(text.contains);
-  }
-
   String _buildPrompt(
     String userMessage, {
     List<LocalConversationTurn> history = const [],
     required PrivatePromptFormat format,
+    required String deliberationMessage,
   }) {
     if (format == PrivatePromptFormat.gemmaTurns) {
       return _buildGemmaPrompt(userMessage, history);
@@ -1250,6 +1312,7 @@ Anti-repetition rules (highest priority):
 - Never answer with a variation of "notice what you said" or "consider the next step" if a previous turn already said something similar. Move the conversation somewhere new: a concrete memory, a specific body sensation, a decision they face, or a small action for today.
 - If the member gives a short answer like "yes", "ok", or "idk", build on their LAST concrete detail instead of asking another broad question.
 - Each reply must contain exactly one new element (observation, question, or suggestion) that was not in any earlier turn.
+- The latest member message overrides older formatting or response-length instructions when they conflict. Never carry an old "exactly N words" instruction into a new request.
 
 Example: If the member says their manager dismissed their work in front of the team and they froze, stay with the dismissal and the unfinished moment. A useful question might ask what they wish they had been able to say. Do not reduce it to a generic emotion check.<|im_end|>
 ''');
@@ -1274,7 +1337,7 @@ Example: If the member says their manager dismissed their work in front of the t
       ..writeln('<|im_start|>user')
       ..writeln(_cleanPromptText(userMessage))
       ..writeln(
-        '${_shouldDeliberate(userMessage) ? '/think' : '/no_think'}<|im_end|>',
+        '${mindRecipeShouldEmitThinking(deliberationRequested: mindRecipeShouldDeliberate(deliberationMessage), totalMemoryMiB: _thinkingAllowed ? 6144 : 4096) ? '/think' : '/no_think'}<|im_end|>',
       )
       ..writeln('<|im_start|>assistant');
     return prompt.toString();

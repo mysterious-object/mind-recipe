@@ -27,6 +27,7 @@ class FakeLocalInference implements LocalInference {
     String userMessage, {
     List<LocalConversationTurn> history = const [],
     void Function(String token)? onToken,
+    String? rawMemberMessage,
   }) async => null;
 
   @override

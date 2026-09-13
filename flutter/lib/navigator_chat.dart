@@ -453,6 +453,7 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
         plan.augment(text) + navigationContext,
         history: priorConversation,
         onToken: onToken,
+        rawMemberMessage: text,
       );
       // Anti-loop guard: if the reply mostly repeats the previous Navigator
       // turn ("consider the next step…" circles), retry ONCE with an explicit
@@ -476,6 +477,7 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
           '${plan.augment(text)}\n\nImportant: your previous reply repeated what you already said. Respond with ONE concrete, different suggestion or question you have not used in this conversation. Reference the member\'s latest words specifically.',
           history: priorConversation,
           onToken: onToken,
+          rawMemberMessage: text,
         );
       }
       // Fallback ladder: a null reply usually means the full prompt
@@ -784,6 +786,19 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
     }
     if (clean.length < 8) {
       unawaited(_log('FILTER: too short (${clean.length}) "$clean"'));
+      return false;
+    }
+    final replyWords = clean
+        .replaceAll(RegExp(r'[^A-Za-z0-9\s]'), ' ')
+        .split(RegExp(r'\s+'))
+        .where((word) => word.isNotEmpty)
+        .length;
+    final memberWords = memberText
+        .split(RegExp(r'\s+'))
+        .where((word) => word.isNotEmpty)
+        .length;
+    if (memberWords >= 6 && replyWords <= 2 && clean.length < 20) {
+      unawaited(_log('FILTER: fragment "$clean"'));
       return false;
     }
     final lowered = clean.toLowerCase();
