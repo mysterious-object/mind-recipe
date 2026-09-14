@@ -37,9 +37,12 @@ class AccountSession {
 }
 
 class MindRecipeApiClient {
-  MindRecipeApiClient({http.Client? client})
-    : _client = client ?? http.Client();
+  MindRecipeApiClient({
+    http.Client? client,
+    this.accountRetryDelay = const Duration(milliseconds: 450),
+  }) : _client = client ?? http.Client();
   final http.Client _client;
+  final Duration accountRetryDelay;
   static const _appAuth = FlutterAppAuth();
 
   Future<AccountSession> authenticateWithOidc() async {
@@ -191,18 +194,30 @@ class MindRecipeApiClient {
     String path,
     Map<String, String> body,
   ) async {
-    final response = await _client
-        .post(
-          Uri.parse('$mindRecipeApiBase$path'),
-          headers: const {'content-type': 'application/json'},
-          body: jsonEncode(body),
-        )
-        .timeout(const Duration(seconds: 12));
+    // A mobile account request can land during a short ingress rollout or pod
+    // handoff. Retry only gateway/service availability failures; validation,
+    // duplicate-account, and credential errors must reach the member exactly
+    // once and must never be disguised as a connectivity problem.
+    http.Response? response;
+    for (var attempt = 0; attempt < 3; attempt++) {
+      response = await _client
+          .post(
+            Uri.parse('$mindRecipeApiBase$path'),
+            headers: const {'content-type': 'application/json'},
+            body: jsonEncode(body),
+          )
+          .timeout(const Duration(seconds: 12));
+      if (!_isTransientAccountStatus(response.statusCode) || attempt == 2) {
+        break;
+      }
+      await Future<void>.delayed(accountRetryDelay);
+    }
+    final resolvedResponse = response!;
     Map<String, dynamic> decoded;
     try {
-      decoded = jsonDecode(response.body) as Map<String, dynamic>;
+      decoded = jsonDecode(resolvedResponse.body) as Map<String, dynamic>;
     } on Object {
-      if (response.statusCode >= 500) {
+      if (resolvedResponse.statusCode >= 500) {
         throw const ApiException(
           'The account service is temporarily unavailable. Please try again shortly.',
         );
@@ -211,11 +226,12 @@ class MindRecipeApiClient {
         'The account service returned an invalid response.',
       );
     }
-    if (response.statusCode < 200 || response.statusCode >= 300) {
+    if (resolvedResponse.statusCode < 200 ||
+        resolvedResponse.statusCode >= 300) {
       final detail = decoded['detail'];
       final message = detail is String
           ? detail
-          : response.statusCode == 422
+          : resolvedResponse.statusCode == 422
           ? 'Check the highlighted account fields and try again.'
           : 'Unable to continue.';
       throw ApiException(message);
@@ -227,6 +243,9 @@ class MindRecipeApiClient {
       email: user['email'] as String,
     );
   }
+
+  bool _isTransientAccountStatus(int statusCode) =>
+      statusCode == 502 || statusCode == 503 || statusCode == 504;
 
   Map<String, String> _memberHeaders(String token, {bool json = false}) => {
     if (json) 'content-type': 'application/json',

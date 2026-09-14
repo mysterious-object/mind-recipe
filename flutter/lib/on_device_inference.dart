@@ -210,6 +210,60 @@ bool mindRecipeShouldEmitThinking({
   required int totalMemoryMiB,
 }) => deliberationRequested && totalMemoryMiB >= 6144;
 
+/// Returns only member-visible model output while a private response is still
+/// arriving. Qwen may emit an empty or populated `<think>` block even when the
+/// prompt requests `/no_think`; forwarding raw engine tokens would briefly
+/// expose that private scratchpad in Navigator. Incomplete tag prefixes are
+/// held back so a chunk boundary such as `<thi` cannot flash in the UI.
+@visibleForTesting
+String mindRecipeVisiblePrivateStreamText(String response) {
+  var clean = response;
+  while (clean.contains('<think>') && clean.contains('</think>')) {
+    final start = clean.indexOf('<think>');
+    final end = clean.indexOf('</think>') + '</think>'.length;
+    clean = clean.substring(0, start) + clean.substring(end);
+  }
+  if (clean.contains('<think>')) {
+    clean = clean.substring(0, clean.indexOf('<think>'));
+  }
+  if (clean.contains('</think>')) {
+    clean = clean.substring(clean.lastIndexOf('</think>') + '</think>'.length);
+  }
+
+  // Do not publish a suffix that could become a control tag when the next
+  // native token arrives.
+  const markers = <String>[
+    '<think>',
+    '</think>',
+    '<|im_start|>',
+    '<|im_end|>',
+  ];
+  for (final marker in markers) {
+    for (
+      var prefixLength = marker.length - 1;
+      prefixLength > 0;
+      prefixLength--
+    ) {
+      final prefix = marker.substring(0, prefixLength);
+      if (clean.endsWith(prefix)) {
+        clean = clean.substring(0, clean.length - prefixLength);
+        break;
+      }
+    }
+  }
+
+  return clean
+      .replaceAll('<|im_start|>', '')
+      .replaceAll('<|im_end|>', '')
+      .replaceAll('/no_think', '')
+      .replaceAll('/think', '')
+      .replaceFirst(
+        RegExp(r'^(assistant|member|user)\s*:\s*', caseSensitive: false),
+        '',
+      )
+      .trim();
+}
+
 /// Accept a complete model file even when the app was killed before it wrote
 /// its receipt. This is also what makes a locally staged live-test artifact
 /// follow the same full checksum path as a network download.
@@ -839,11 +893,19 @@ class OnDeviceInference implements LocalInference {
     try {
       await _engine!.clear();
       final response = StringBuffer();
+      var emittedVisible = '';
       final subscription = _engine!.stream.listen((token) {
         response.write(token);
-        // Stream to the UI as the model speaks — perceived latency drops
-        // to the first token instead of the full completion.
-        if (onToken != null && token.isNotEmpty) onToken(token);
+        // Stream only the monotonic member-visible suffix. The native engine's
+        // Qwen scratchpad must never appear in the conversation bubble.
+        final visible = mindRecipeVisiblePrivateStreamText(
+          response.toString(),
+        );
+        if (onToken != null && visible.startsWith(emittedVisible)) {
+          final delta = visible.substring(emittedVisible.length);
+          if (delta.isNotEmpty) onToken(delta);
+        }
+        emittedVisible = visible;
       });
       final prompt = _buildPrompt(
         userMessage,
@@ -1240,35 +1302,7 @@ class OnDeviceInference implements LocalInference {
   }
 
   String _stripPrivateReasoning(String response) {
-    var clean = response;
-    // Strip Qwen3 <think> blocks fully
-    while (clean.contains('<think>') && clean.contains('</think>')) {
-      final start = clean.indexOf('<think>');
-      final end = clean.indexOf('</think>') + '</think>'.length;
-      clean = clean.substring(0, start) + clean.substring(end);
-    }
-    if (clean.contains('<think>')) {
-      final open = clean.indexOf('<think>');
-      clean = clean.substring(0, open);
-    }
-    if (clean.contains('</think>')) {
-      final close = clean.lastIndexOf('</think>');
-      clean = clean.substring(close + '</think>'.length);
-    }
-    // Strip chat markers that leak as broken code
-    clean = clean
-        .replaceAll('<|im_start|>', '')
-        .replaceAll('<|im_end|>', '')
-        .replaceAll('/no_think', '')
-        .replaceAll('/think', '')
-        .trim();
-    // Strip leaked role prefixes like "member:" or "assistant:" at start
-    clean = clean
-        .replaceFirst(
-          RegExp(r'^(assistant|member|user)\s*:\s*', caseSensitive: false),
-          '',
-        )
-        .trim();
+    var clean = mindRecipeVisiblePrivateStreamText(response);
     // Strip code fences that appear as broken code
     if (clean.startsWith('```') && clean.contains('```')) {
       final lines = clean.split('\n');
