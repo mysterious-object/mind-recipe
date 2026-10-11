@@ -10,6 +10,7 @@ import 'package:mind_recipe/daily_navigation_scan.dart';
 import 'package:mind_recipe/main.dart';
 import 'package:mind_recipe/navigator_agent.dart';
 import 'package:mind_recipe/on_device_inference.dart';
+import 'package:mind_recipe/three_intro_screen.dart';
 
 class FakeLocalInference implements LocalInference {
   @override
@@ -107,7 +108,7 @@ void main() {
     bool skipOnboarding = true,
   }) async {
     await tester.pumpWidget(testApp());
-    await tester.pump(const Duration(milliseconds: 4300));
+    await tester.pump(const Duration(milliseconds: 100));
     await tester.pump();
     await tester.ensureVisible(find.text('Create a new account'));
     await tester.tap(find.text('Create a new account'));
@@ -138,7 +139,8 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(testApp());
-    await tester.pump(const Duration(milliseconds: 4300));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.byType(ThreeIntroScreen), findsNothing);
     await tester.pump();
     expect(find.text('Welcome back, navigator'), findsOneWidget);
     expect(find.text('Sign in'), findsOneWidget);

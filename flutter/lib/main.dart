@@ -27,7 +27,6 @@ import 'live_visual_theme_picker.dart';
 import 'pulse_screen.dart';
 import 'recipes_screen.dart';
 import 'voice_interface.dart';
-import 'three_intro_screen.dart';
 import 'three_background.dart';
 
 const _themeLiveCheck = bool.fromEnvironment('MIND_RECIPE_THEME_LIVE_CHECK');
@@ -51,7 +50,6 @@ class MindRecipeApp extends StatefulWidget {
 class _MindRecipeAppState extends State<MindRecipeApp> {
   bool practitionerMode = false;
   bool _initializing = true;
-  bool _introComplete = false;
   late final MindRecipeApiClient api;
   late final SecureAppState appState;
 
@@ -142,13 +140,7 @@ class _MindRecipeAppState extends State<MindRecipeApp> {
         scaffoldBackgroundColor: Colors.transparent,
       ),
       themeMode: themeMode,
-      home: !_introComplete
-          ? ThreeIntroScreen(
-              variant:
-                  (DateTime.now().millisecondsSinceEpoch ~/ 86400000 ~/ 2) % 12,
-              onComplete: () => setState(() => _introComplete = true),
-            )
-          : !appState.loaded || _initializing
+      home: !appState.loaded || _initializing
           ? const Scaffold(body: Center(child: CircularProgressIndicator()))
           : appState.session == null
           ? AccountGateway(api: api, appState: appState)

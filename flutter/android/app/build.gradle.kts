@@ -20,6 +20,9 @@ android {
             .orNull
             .orEmpty()
         applicationId = "com.contextfield.mindrecipe$applicationIdSuffix"
+        manifestPlaceholders["mindRecipeAppLabel"] = providers
+            .gradleProperty("mindRecipeAppLabel")
+            .getOrElse("MindRecipe")
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode

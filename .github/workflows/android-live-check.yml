@@ -9,7 +9,8 @@ permissions:
 
 env:
   MIND_RECIPE_STAGING_API_URL: https://staging-api.mindrecipe.142.93.201.156.sslip.io
-  ORG_GRADLE_PROJECT_mindRecipeApplicationIdSuffix: .livecheck
+  ORG_GRADLE_PROJECT_mindRecipeApplicationIdSuffix: .validation2151
+  ORG_GRADLE_PROJECT_mindRecipeAppLabel: MindRecipe Test 2151
 
 jobs:
   apk:
@@ -26,7 +27,7 @@ jobs:
       - run: flutter pub get
         working-directory: flutter
       - name: Build ARM64 live-check APK
-        run: flutter build apk --release --target-platform android-arm64 --no-pub --dart-define=MIND_RECIPE_API_BASE=${MIND_RECIPE_STAGING_API_URL} --dart-define=MIND_RECIPE_THEME_LIVE_CHECK=true --dart-define=MIND_RECIPE_EXTERNAL_MODEL_TEST=true --dart-define=MIND_RECIPE_LOCAL_VERBOSE=true
+        run: flutter build apk --release --target-platform android-arm64 --no-pub --dart-define=MIND_RECIPE_API_BASE=${MIND_RECIPE_STAGING_API_URL}
         working-directory: flutter
       - run: test -s flutter/build/app/outputs/flutter-apk/app-release.apk
       - uses: actions/upload-artifact@v4
