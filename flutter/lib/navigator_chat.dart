@@ -8,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 
 import 'app_services.dart';
 import 'chat_actions.dart';
+import 'phone_action_review.dart';
 import 'check_in_state.dart';
 import 'mind_recipe_fx.dart';
 import 'mind_recipe_device_harness.dart';
@@ -108,21 +109,26 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
   /// Executes a consented phone action through the on-device harness
   /// (Calendar / Reminders / AlarmClock) and reports the result in chat.
   Future<void> _executePhoneAction(PhoneAction action) async {
+    if (_executingPhoneAction) return;
     setState(() => _executingPhoneAction = true);
     try {
-      final result = await executePhoneAction(action);
+      final reviewed = await reviewPhoneAction(context, action);
+      if (reviewed == null || !mounted) return;
+      final result = await executePhoneAction(reviewed);
       if (!mounted) return;
       setState(() {
         widget.messages.add(
           ChatMessage(
             role: ChatRole.status,
-            text: result.success
-                ? '${action.summaryLabel} created on this device — "${action.title}"${action.when != null ? ' for ${formatActionTime(action.when!)}' : ''}. You can change it in your Calendar or Clock app anytime.'
-                : 'I could not create that automatically (${result.message}). Nothing was changed on your device.',
+            text: result.isCompleted
+                ? '${reviewed.summaryLabel} saved on this device.'
+                : result.isHandedOff
+                ? '${result.message} MindRecipe has not verified that it was saved.'
+                : result.message,
             systemGenerated: true,
           ),
         );
-        _pendingPhoneAction = null;
+        if (result.success) _pendingPhoneAction = null;
       });
       widget.onChanged();
       _scrollToEnd();
@@ -356,8 +362,33 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
   }
 
   Future<void> send([String? suggestion]) async {
+    if (sending || _executingPhoneAction) return;
+    try {
+      await _send(suggestion);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        sending = false;
+        if (widget.messages.isNotEmpty &&
+            widget.messages.last.role == ChatRole.assistant &&
+            widget.messages.last.text.isEmpty) {
+          widget.messages.removeLast();
+        }
+        widget.messages.add(
+          const ChatMessage(
+            role: ChatRole.status,
+            text: 'The selected AI could not finish this reply. You can try again. No phone action was performed.',
+            systemGenerated: true,
+          ),
+        );
+      });
+      widget.onChanged();
+    }
+  }
+
+  Future<void> _send([String? suggestion]) async {
     final text = (suggestion ?? composer.text).trim();
-    if (text.isEmpty || sending) return;
+    if (text.isEmpty || sending || _executingPhoneAction) return;
     final startsSession = turn == 0;
     final priorConversation = widget.messages
         .where((message) => message.role != ChatRole.status)
@@ -383,6 +414,26 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
     unawaited(
       widget.appState.recordAssistantMessage(startsSession: startsSession),
     );
+    // Structured requests are independent of inference/provider availability.
+    // Never wait for a prose reply before offering the native review flow.
+    final actionDraft = _phoneActionParser.parse(text);
+    if (actionDraft != null) {
+      setState(() {
+        _pendingPhoneAction = actionDraft;
+        sending = false;
+        widget.messages.add(
+          ChatMessage(
+            role: ChatRole.status,
+            text:
+                'Review the ${actionDraft.summaryLabel.toLowerCase()} below. You can edit the details before confirming.',
+            systemGenerated: true,
+          ),
+        );
+      });
+      widget.onChanged();
+      _scrollToEnd();
+      return;
+    }
     // Ground the conversation in real navigation data when a session starts.
     String navigationContext = '';
     if (startsSession) {
@@ -404,13 +455,14 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
 
     // Private inference is the primary route. It does not require cloud
     // consent, a provider key, or sending conversation context off device.
-    final localStatus = await _localInference.refreshStatus();
+    final localStatus = widget.appState.cloudAiEnabled
+        ? _localSnapshot
+        : await _localInference.refreshStatus();
+    if (!mounted) return;
     if (mounted) setState(() => _localSnapshot = localStatus);
     final cloudCanClarify =
         widget.appState.cloudAiEnabled && widget.appState.aiAvailable;
-    final nuanceNeedsConnectedReasoning =
-        cloudCanClarify && _needsNuancedReasoning(text, priorConversation);
-    if (localStatus.isReady && !nuanceNeedsConnectedReasoning) {
+    if (localStatus.isReady && !widget.appState.cloudAiEnabled) {
       final plan = _agent.plan(
         text,
         externalResearchApproved: widget.appState.publicResearchEnabled,
@@ -422,12 +474,10 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
       // member sees words within the first second instead of after the
       // full completion.
       final placeholderIndex = widget.messages.length;
-      var lastPaint = DateTime.now();
       void onToken(String token) {
         if (!mounted || token.isEmpty) return;
-        final now = DateTime.now();
-        if (now.difference(lastPaint).inMilliseconds < 90) return;
-        lastPaint = now;
+        // setState coalesces rebuilding into frames. Never drop a delta to
+        // throttle painting: each delta is a unique part of the reply.
         setState(() {
           if (placeholderIndex < widget.messages.length &&
               widget.messages[placeholderIndex].role == ChatRole.assistant) {
@@ -527,13 +577,10 @@ Latest member request: $text''',
       }
 
       await _log(
-        'REPLY null=${replyToUse == null} len=${replyToUse?.length ?? 0} preview="${replyToUse?.substring(0, replyToUse != null && replyToUse.length > 100 ? 100 : replyToUse?.length ?? 0)}"',
+        'REPLY null=${replyToUse == null} len=${replyToUse?.length ?? 0}',
       );
       final localReplyUseful = _isUsefulLocalReply(replyToUse, text);
       await _log('USEFUL=$localReplyUseful');
-      // Phone-harness intent detection — offer a consent-gated action card
-      // whenever the member's message maps to a reminder/appointment/alarm.
-      final phoneAction = _phoneActionParser.parse(text);
       final replyFinal = replyToUse;
       if (replyFinal != null && mounted && localReplyUseful) {
         setState(() {
@@ -555,7 +602,6 @@ Latest member request: $text''',
           }
           _lastMessageSide = 1.0;
           sending = false;
-          _pendingPhoneAction = phoneAction;
         });
         unawaited(widget.appState.recordAiReflection());
         widget.onChanged();
@@ -583,16 +629,6 @@ Latest member request: $text''',
           return;
         }
       }
-    }
-    if (localStatus.isReady && nuanceNeedsConnectedReasoning && mounted) {
-      setState(
-        () => widget.messages.add(
-          const ChatMessage(
-            role: ChatRole.status,
-            text: 'Taking a closer look at what you meant…',
-          ),
-        ),
-      );
     }
 
     if (!widget.appState.aiAvailable) {
@@ -737,18 +773,6 @@ Latest member request: $text''',
         _scrollToEnd();
       }
     }
-  }
-
-  bool _needsNuancedReasoning(
-    String text,
-    List<LocalConversationTurn> history,
-  ) {
-    if (history.isEmpty) return false;
-    final words = text.toLowerCase().split(RegExp(r'\s+'));
-    if (words.length <= 5) return true;
-    return RegExp(
-      r'\b(it|that|this|they|them|he|she|what do you mean|why do i|help me understand)\b',
-    ).hasMatch(text.toLowerCase());
   }
 
   /// Word-overlap similarity between a candidate reply and the most recent
@@ -973,7 +997,8 @@ Latest member request: $text''',
   @override
   Widget build(BuildContext context) {
     final cloudAvailable = widget.appState.aiAvailable;
-    final canSend = cloudAvailable || _localSnapshot.isReady;
+    // Structured phone requests work even when inference is unavailable.
+    const canSend = true;
     final activity = _isListening ? 0.8 : (sending ? 0.6 : 0.0);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Stack(
@@ -1096,7 +1121,7 @@ Latest member request: $text''',
               focusNode: composerFocus,
               canSend: canSend,
               cloudAvailable: cloudAvailable,
-              sending: sending,
+              sending: sending || _executingPhoneAction,
               onSend: send,
               onToggleVoice: _toggleVoiceInput,
               isListening: _isListening,
@@ -1114,7 +1139,7 @@ Latest member request: $text''',
 enum ChatRole { assistant, member, status }
 
 /// Consent-gated phone action card — MindRecipe's on-device phone-harness
-/// surface inside free chat. Nothing executes until the member taps Allow.
+/// surface inside free chat. Nothing executes until review is confirmed.
 class _PhoneActionCard extends StatelessWidget {
   const _PhoneActionCard({
     required this.action,
@@ -1171,7 +1196,7 @@ class _PhoneActionCard extends StatelessWidget {
             ),
             const SizedBox(height: 2),
             Text(
-              'MindRecipe can add this on your phone — it stays in your own Calendar, Reminders, or Clock app.',
+              'Review the title, date, time, and destination before confirming. Opening another app does not verify that it saved the item.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 8),
@@ -1192,7 +1217,7 @@ class _PhoneActionCard extends StatelessWidget {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Icon(Icons.bolt_rounded, size: 16),
-                  label: Text(busy ? 'Adding…' : 'Allow'),
+                  label: Text(busy ? 'Reviewing…' : 'Review'),
                 ),
               ],
             ),

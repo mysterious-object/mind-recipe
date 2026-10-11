@@ -50,7 +50,6 @@ class MindRecipeApp extends StatefulWidget {
 
 class _MindRecipeAppState extends State<MindRecipeApp> {
   bool practitionerMode = false;
-  bool onboardingComplete = false;
   bool _initializing = true;
   bool _introComplete = false;
   late final MindRecipeApiClient api;
@@ -70,11 +69,14 @@ class _MindRecipeAppState extends State<MindRecipeApp> {
       if (!appState.loaded) await appState.load();
       final restored = appState.session;
       if (restored != null) {
-        final verified = await api.restoreSession(restored);
-        if (verified == null) {
+        final restoredAccount = await api.restoreSession(restored);
+        appState.sessionTemporarilyUnverified =
+            restoredAccount.status ==
+            AccountRestoreStatus.temporarilyUnavailable;
+        if (restoredAccount.status == AccountRestoreStatus.invalid) {
           await appState.clearSession();
-        } else {
-          await appState.setSession(verified);
+        } else if (restoredAccount.status == AccountRestoreStatus.verified) {
+          await appState.setSession(restoredAccount.session!);
         }
       }
       // The separately identified live-check package must remain testable
@@ -84,7 +86,9 @@ class _MindRecipeAppState extends State<MindRecipeApp> {
       if (_themeLiveCheck && appState.session == null) {
         appState.useLocalDemo();
       }
-      await appState.flushPendingCheckIns(api);
+      if (!appState.sessionTemporarilyUnverified) {
+        await appState.flushPendingCheckIns(api);
+      }
       appState.setManagedAiAvailable(await api.aiAvailable());
     } finally {
       if (mounted) setState(() => _initializing = false);
@@ -148,9 +152,11 @@ class _MindRecipeAppState extends State<MindRecipeApp> {
           ? const Scaffold(body: Center(child: CircularProgressIndicator()))
           : appState.session == null
           ? AccountGateway(api: api, appState: appState)
-          : !onboardingComplete
+          : !appState.onboardingComplete
           ? CinematicOnboarding(
-              onComplete: () => setState(() => onboardingComplete = true),
+              onComplete: () async {
+                await appState.completeOnboarding();
+              },
             )
           : practitionerMode
           ? PractitionerHome(
@@ -163,7 +169,7 @@ class _MindRecipeAppState extends State<MindRecipeApp> {
               localInference: widget.initialLocalInference,
               onSignOut: () async {
                 await appState.signOut();
-                if (mounted) setState(() => onboardingComplete = false);
+                if (mounted) setState(() {});
               },
             ),
     );
@@ -369,15 +375,26 @@ class _MemberHomeState extends State<MemberHome> {
             Navigator.of(context).pop();
             goToPage(2);
           },
-          onComplete: () {
-            widget.appState.recordAssistantMessage(startsSession: true);
-            widget.appState.recordAiReflection();
-            final mood = MoodState.fromCheckIn(checkIn);
-            widget.appState.recordMoodPulse(
+          onComplete: (result) async {
+            checkIn.emotions
+              ..clear()
+              ..addAll(result.emotions);
+            checkIn.bodyAreas
+              ..clear()
+              ..addAll(result.bodyAreas);
+            checkIn.activation = result.activation;
+            checkIn.greenZone = result.zoneLabel;
+            checkIn.completedAt = result.recordedAt;
+            final mood = MoodState.fromNavigation(result);
+            await widget.appState.recordMoodPulse(
               valence: mood.valence,
               activation: mood.activation,
               source: 'navigation',
+              sourceId: result.id,
+              activationReported: result.activationReported,
             );
+            await widget.appState.recordNavigationCompletion();
+            if (!mounted) return;
             chatMessages.add(
               const ChatMessage(
                 role: ChatRole.status,
@@ -1425,24 +1442,36 @@ class ActionsScreen extends StatelessWidget {
 
   Future<void> _openApp(BuildContext context, String name) async {
     final auto = MindRecipeMobileAutomation();
-    // Try the native calendar/app surface first; the plugin falls back to
-    // store links when the app is not installed.
     if (name == 'Calendar') {
-      await auto.openCalendar();
+      final result = await auto.openCalendar();
+      if (!result.success && context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(result.message)));
+      }
       return;
     }
     final match = _healthApps.firstWhere((a) => a.$1 == name);
-    final result = await auto.setReminder(
-      title: 'Opened from MindRecipe Booking',
-      notes: '$name — continue in the app if installed.',
-    );
-    if (!result.success && mounted(context)) {
+    // These are catalog links, not reminder requests. Never create an unrelated
+    // calendar draft just to probe whether a health app is installed.
+    try {
       final url = Platform.isIOS ? match.$4 : match.$5;
-      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+      final opened = await launchUrl(
+        Uri.parse(url),
+        mode: LaunchMode.externalApplication,
+      );
+      if (!opened && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open the app listing.')),
+        );
+      }
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open the app listing.')),
+        );
+      }
     }
   }
-
-  static bool mounted(BuildContext context) => context.mounted;
 
   @override
   Widget build(BuildContext context) => Padding(
@@ -1455,7 +1484,7 @@ class ActionsScreen extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         const Text(
-          'Open your device calendar, or continue in a health app you already use. This app does not decide what level of care you need.',
+          'Open your device calendar or view a health app in the store. MindRecipe does not decide what level of care you need.',
         ),
         const SizedBox(height: 20),
         Card(
@@ -1515,7 +1544,7 @@ class ActionsScreen extends StatelessWidget {
                 app.$1,
                 style: const TextStyle(fontWeight: FontWeight.w700),
               ),
-              subtitle: Text(app.$2),
+              subtitle: Text('${app.$2} · View app listing'),
               trailing: const Icon(Icons.chevron_right_rounded),
               onTap: () => _openApp(context, app.$1),
             ),

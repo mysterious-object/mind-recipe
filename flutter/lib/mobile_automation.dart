@@ -54,6 +54,14 @@ class AutomationResult {
   bool get isFallback =>
       nativeCode == 'fallback_url' || nativeCode == 'fallback_clipboard';
   bool get isUnavailable => nativeCode == 'unavailable';
+  bool get isCompleted =>
+      success &&
+      const {
+        'eventkit_inserted',
+        'eventkit_saved',
+        'completed_verified',
+      }.contains(nativeCode);
+  bool get isHandedOff => success && !isCompleted;
 
   Map<String, dynamic> toMap() => {
     'success': success,
@@ -91,18 +99,11 @@ class AutomationCapabilities {
     String platform = map['platform']?.toString() ?? _inferPlatform();
     return AutomationCapabilities(
       platform: platform,
-      canInsertCalendarEvent:
-          map['canInsertCalendarEvent'] == true ||
-          platform == 'android' ||
-          platform == 'ios',
-      canSetAlarm: map['canSetAlarm'] == true || platform == 'android',
-      canAddReminder:
-          map['canAddReminder'] == true ||
-          platform == 'ios' ||
-          platform == 'android',
-      canOpenCalendar: map['canOpenCalendar'] == true || true,
-      canInvokeShortcuts:
-          map['canInvokeShortcuts'] == true || platform == 'ios',
+      canInsertCalendarEvent: map['canInsertCalendarEvent'] == true,
+      canSetAlarm: map['canSetAlarm'] == true,
+      canAddReminder: map['canAddReminder'] == true,
+      canOpenCalendar: map['canOpenCalendar'] == true,
+      canInvokeShortcuts: map['canInvokeShortcuts'] == true,
       details: map['details'] is Map
           ? (map['details'] as Map).cast<String, dynamic>()
           : null,
@@ -126,9 +127,9 @@ class AutomationRecurrence {
 
 /// MindRecipe Mobile Automation — the Navigator-callable surface.
 ///
-/// Every `set*` method is **member-confirmed**: native side launches the
-/// system insert sheet; the member taps Save. No silent background writes
-/// unless you later add WRITE_CALENDAR / EventKit full-access behind a toggle.
+/// Callers must collect explicit approval before invoking a `set*` method.
+/// Calendar uses a system editor; authorized iOS reminders can save directly.
+/// A successful handoff alone must never be described as a verified save.
 class MindRecipeMobileAutomation {
   MindRecipeMobileAutomation({MethodChannel? channel, UrlLauncher? urlLauncher})
     : _channel = channel ?? const MethodChannel(_channelName),
@@ -146,7 +147,7 @@ class MindRecipeMobileAutomation {
   ///
   /// On Android: `Intent.ACTION_INSERT` with `CalendarContract.Events.CONTENT_URI`
   /// + `EXTRA_EVENT_BEGIN_TIME/END_TIME` (no permission, user confirms).
-  /// On iOS: `EventKit` if authorized else `calshow:` / `shortcuts://` fallback.
+  /// On iOS: the EventKit editor returns saved or cancelled explicitly.
   Future<AutomationResult> setAppointment({
     required String title,
     required DateTime start,
@@ -197,7 +198,6 @@ class MindRecipeMobileAutomation {
     } on MissingPluginException {
       // Plugin not yet wired — fall back to URL scheme so developer still sees behavior
     } on PlatformException catch (e) {
-      debugPrint('[MobileAutomation] setAppointment PlatformException: $e');
       return AutomationResult(
         success: false,
         message: 'Could not open calendar: ${e.message ?? e.code}',

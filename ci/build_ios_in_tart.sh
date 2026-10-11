@@ -61,6 +61,7 @@ done
   xcodebuild -version
   flutter --version
   flutter pub get
+  bash '../ci/test_ios_native.sh'
   flutter build ios --release --no-codesign --dart-define=MIND_RECIPE_API_BASE='$API_URL'
   chmod +x '../ci/build_llama_ios_framework.sh'
   '../ci/build_llama_ios_framework.sh' build/ios/iphoneos/Runner.app

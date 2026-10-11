@@ -32,9 +32,11 @@ pipeline {
       steps {
         deleteDir()
         checkout scm
+        sh 'bash ci/check_mobile_build_host.sh'
         dir("${FLUTTER_DIR}") {
           sh 'flutter pub get'
-          sh 'flutter analyze --no-fatal-infos --no-fatal-warnings || true'
+          sh 'flutter analyze --no-fatal-infos --no-fatal-warnings'
+          sh 'flutter test'
         }
         // The macOS node remains the current Flutter/Android reference runner.
         // IPA provisioning is isolated in Tart below and requires no Apple ID.

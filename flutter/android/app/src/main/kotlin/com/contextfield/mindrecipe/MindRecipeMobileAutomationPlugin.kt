@@ -36,7 +36,7 @@ class MindRecipeMobileAutomationPlugin : FlutterPlugin, MethodChannel.MethodCall
     }
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
-        Log.d("MindRecipeAutomation", "request: ${call.method} args=${call.arguments}")
+        Log.d("MindRecipeAutomation", "request: ${call.method}")
         val ctx = context
         if (ctx == null) {
             result.error("no_context", "Application context unavailable", null)
@@ -47,10 +47,10 @@ class MindRecipeMobileAutomationPlugin : FlutterPlugin, MethodChannel.MethodCall
                 "capabilities" -> {
                     result.success(mapOf(
                         "platform" to "android",
-                        "canInsertCalendarEvent" to true,
-                        "canSetAlarm" to true,
-                        "canAddReminder" to true,
-                        "canOpenCalendar" to true,
+                        "canInsertCalendarEvent" to (Intent(Intent.ACTION_INSERT, CalendarContract.Events.CONTENT_URI).resolveActivity(ctx.packageManager) != null),
+                        "canSetAlarm" to (Intent(AlarmClock.ACTION_SET_ALARM).resolveActivity(ctx.packageManager) != null),
+                        "canAddReminder" to false,
+                        "canOpenCalendar" to (Intent(Intent.ACTION_VIEW, CalendarContract.CONTENT_URI.buildUpon().appendPath("time").appendPath(System.currentTimeMillis().toString()).build()).resolveActivity(ctx.packageManager) != null),
                         "canInvokeShortcuts" to false,
                         "details" to mapOf("channel" to "contextfield.mindrecipe/mobile_automation")
                     ))
@@ -60,12 +60,13 @@ class MindRecipeMobileAutomationPlugin : FlutterPlugin, MethodChannel.MethodCall
                 "setReminder" -> handleSetReminder(call, result, ctx)
                 "openReminders" -> handleOpenReminders(result, ctx)
                 "setAlarm" -> handleSetAlarm(call, result, ctx)
-                "invokeShortcut" -> handleInvokeShortcut(call, result, ctx)
+                "invokeShortcut" -> result.error("unavailable", "This shortcut is not in the supported app catalog.", null)
                 else -> result.notImplemented()
             }
         } catch (e: Exception) {
-            Log.e("MindRecipeAutomation", "error in ${call.method}", e)
-            result.error("exception", e.message, null)
+            // Native exceptions may contain action content or intent URIs.
+            Log.e("MindRecipeAutomation", "native action failed")
+            result.error("native_action_failed", "Could not open the requested device action.", null)
         }
     }
 
@@ -221,30 +222,6 @@ class MindRecipeMobileAutomationPlugin : FlutterPlugin, MethodChannel.MethodCall
             "message" to "Opened Clock to set alarm ${"%02d:%02d".format(hour, minute)}${if (label != null) " — $label" else ""} — confirm in the sheet.",
             "payload" to mapOf("hour" to hour, "minute" to minute, "label" to label)
         ))
-    }
-
-    private fun handleInvokeShortcut(call: MethodCall, result: MethodChannel.Result, ctx: android.content.Context) {
-        val name = call.argument<String>("name")?.trim().orEmpty()
-        if (name.isEmpty()) { result.error("validation","name required",null); return }
-        // Generic: broadcast or implicit intent with action name
-        val intent = Intent(name).apply {
-            // Pass input map as extras if provided
-            val input = call.argument<Map<String, Any>>("input")
-            input?.forEach { (k,v) -> putExtra(k, v.toString()) }
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
-        try {
-            if (intent.resolveActivity(ctx.packageManager) != null) {
-                ctx.startActivity(intent)
-                result.success(mapOf("success" to true, "code" to "intent_launched", "message" to "Opened shortcut \"$name\"."))
-            } else {
-                // Try broadcast
-                ctx.sendBroadcast(intent)
-                result.success(mapOf("success" to true, "code" to "broadcast", "message" to "Broadcast shortcut \"$name\"."))
-            }
-        } catch (e: Exception) {
-            result.error("unavailable", "Shortcut \"$name\" not found: ${e.message}", null)
-        }
     }
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {

@@ -6,6 +6,7 @@ import 'app_services.dart';
 import 'on_device_inference.dart';
 import 'mind_recipe_fx.dart';
 import 'design_tokens.dart';
+import 'daily_navigation_result.dart';
 
 /// Structured daily navigation — replaces free-form chat with the plan's
 /// prescribed sequence: greeting → consent → emotion → body → activation →
@@ -35,7 +36,7 @@ class DailyNavigation extends StatefulWidget {
     this.syncSummary = '',
   });
   final SecureAppState appState;
-  final VoidCallback onComplete;
+  final Future<void> Function(DailyNavigationResult result) onComplete;
   final Future<void> Function()? onCheckInQueued;
 
   /// Live activity summary shown on the greeting step (chat ↔ nav sync).
@@ -53,14 +54,16 @@ class _DailyNavigationState extends State<DailyNavigation> {
   List<NavStep> _path = const [NavStep.greeting, NavStep.context];
   int _pathIndex = 0;
   final _journalController = TextEditingController();
+  final _zoneController = TextEditingController(text: 'Steady and present');
   final _selectedEmotions = <String>{};
   int _activationLevel = 0;
+  bool _activationReported = false;
   final _selectedBodyAreas = <String>{};
   String _zoneLabel = 'Steady and present';
   String _chosenAction = '';
   bool _consentGiven = false;
-  bool _cloudOptIn = true;
   bool _completing = false;
+  String? _completedEntryId;
   int _availableMinutes = 3;
   String _desiredMode = 'Guidance';
   String _capacity = 'Steady';
@@ -96,7 +99,10 @@ class _DailyNavigationState extends State<DailyNavigation> {
     'Hands',
   ];
 
-  Future<void> _advance() async {
+  Future<void> _advance({bool skipped = false}) async {
+    if (_current == NavStep.activation && !skipped) {
+      _activationReported = true;
+    }
     if (_current == NavStep.context) {
       _configurePath();
     } else if (_pathIndex < _path.length - 1) {
@@ -112,62 +118,26 @@ class _DailyNavigationState extends State<DailyNavigation> {
       // all read this history.
       final recordedAt = DateTime.now();
       final entryId = 'daily-nav-${recordedAt.microsecondsSinceEpoch}';
-      await widget.appState.saveNavigationEntry({
-        'id': entryId,
-        't': recordedAt.toIso8601String(),
-        'emotions': _selectedEmotions.isEmpty
-            ? 'Not recorded'
-            : _selectedEmotions.join(', '),
-        'activation': _activationLevel,
-        'body': _selectedBodyAreas.isEmpty ? '' : _selectedBodyAreas.join(', '),
-        'journal': _journalController.text.trim(),
-        'mode': _desiredMode,
-        'available_minutes': _availableMinutes,
-        'capacity': _capacity,
-        'outcome': _chosenAction,
-      });
-      await widget.appState.queueCheckIn({
-        'client_id': entryId,
-        'emotions': _selectedEmotions.toList()..sort(),
-        'activation': _activationLevel,
-        'body_areas': _selectedBodyAreas.toList()..sort(),
-        'journal': _journalController.text.trim(),
-        'zone_label': _zoneLabel,
-        'observations': [
-          {
-            'kind': 'navigation_mode',
-            'value': _desiredMode.toLowerCase().replaceAll(' ', '_'),
-            'recorded_at': recordedAt.toIso8601String(),
-            'timezone': recordedAt.timeZoneName,
-            'source': 'member_input',
-            'schema_version': 'v1',
-          },
-          {
-            'kind': 'available_minutes',
-            'value': _availableMinutes,
-            'recorded_at': recordedAt.toIso8601String(),
-            'timezone': recordedAt.timeZoneName,
-            'source': 'member_input',
-            'schema_version': 'v1',
-          },
-          {
-            'kind': 'self_reported_capacity',
-            'value': _capacity.toLowerCase(),
-            'recorded_at': recordedAt.toIso8601String(),
-            'timezone': recordedAt.timeZoneName,
-            'source': 'member_input',
-            'schema_version': 'v1',
-          },
-        ],
-      });
+      _completedEntryId = entryId;
+      final result = DailyNavigationResult(
+        id: entryId,
+        recordedAt: recordedAt,
+        emotions: _selectedEmotions.toList()..sort(),
+        bodyAreas: _selectedBodyAreas.toList()..sort(),
+        activation: _activationLevel,
+        activationReported: _activationReported,
+        journal: _journalController.text.trim(),
+        zoneLabel: _zoneLabel,
+        mode: _desiredMode,
+        availableMinutes: _availableMinutes,
+        capacity: _capacity,
+        outcome: _chosenAction,
+      );
+      await widget.appState.saveNavigationEntry(result.toLocalHistory());
+      await widget.appState.queueCheckIn(result.toSyncPayload());
       final queued = widget.onCheckInQueued;
       if (queued != null) unawaited(queued());
-      widget.onComplete();
-      // The modal never lingers: brief confirmation, then land on Pulse
-      // where the new pulse point is visible.
-      Timer(const Duration(milliseconds: 2600), () {
-        if (mounted) widget.onSeePulse();
-      });
+      await widget.onComplete(result);
     }
   }
 
@@ -254,7 +224,7 @@ class _DailyNavigationState extends State<DailyNavigation> {
     return switch (_current) {
       NavStep.greeting => 'MindRecipe is here for you — no test, no performance, and you can redirect at any time.',
       NavStep.context => 'Choose the time and style that fit this moment. You can change direction at any point.',
-      NavStep.consent => 'Your data is private. Cloud AI requires your explicit consent each session.',
+      NavStep.consent => 'Your journal stays on this device. Structured check-in answers sync to your account.',
       NavStep.emotion => 'Select the emotions most present for you right now.',
       NavStep.body => 'Where do you notice sensations in your body?',
       NavStep.activation => 'On a scale from -5 (very low) to +5 (very high), where is your energy?',
@@ -271,6 +241,7 @@ class _DailyNavigationState extends State<DailyNavigation> {
   @override
   void dispose() {
     _journalController.dispose();
+    _zoneController.dispose();
     super.dispose();
   }
 
@@ -335,10 +306,8 @@ class _DailyNavigationState extends State<DailyNavigation> {
       ),
       NavStep.consent => _ConsentStep(
         consentGiven: _consentGiven,
-        cloudOptIn: _cloudOptIn,
-        onChanged: (consent, cloud) => setState(() {
+        onChanged: (consent) => setState(() {
           _consentGiven = consent;
-          _cloudOptIn = cloud;
         }),
       ),
       NavStep.emotion => _ChipSelector(
@@ -364,11 +333,14 @@ class _DailyNavigationState extends State<DailyNavigation> {
       ),
       NavStep.activation => _ActivationSlider(
         value: _activationLevel,
-        onChanged: (v) => setState(() => _activationLevel = v),
+        onChanged: (v) => setState(() {
+          _activationLevel = v;
+          _activationReported = true;
+        }),
       ),
       NavStep.journal => _JournalField(controller: _journalController),
       NavStep.recommendation => _ZoneEditor(
-        value: _zoneLabel,
+        controller: _zoneController,
         onChanged: (v) => setState(() => _zoneLabel = v),
       ),
       NavStep.action => _ActionSelector(
@@ -385,11 +357,13 @@ class _DailyNavigationState extends State<DailyNavigation> {
       ),
       NavStep.complete => _CompleteStep(
         appState: widget.appState,
+        entryId: _completedEntryId,
         emotions: _selectedEmotions.isEmpty
             ? 'Not recorded'
             : _selectedEmotions.join(', '),
         activation: _activationLevel,
         journal: _journalController.text.trim(),
+        onSeePulse: widget.onSeePulse,
       ),
     };
   }
@@ -420,7 +394,10 @@ class _DailyNavigationState extends State<DailyNavigation> {
               _current != NavStep.consent &&
               _current != NavStep.complete) ...[
             const SizedBox(width: 8),
-            TextButton(onPressed: _advance, child: const Text('Skip')),
+            TextButton(
+              onPressed: () => _advance(skipped: true),
+              child: const Text('Skip'),
+            ),
           ],
           const Spacer(),
           if (_current != NavStep.greeting &&
@@ -598,14 +575,9 @@ class _ContextStep extends StatelessWidget {
 }
 
 class _ConsentStep extends StatelessWidget {
-  const _ConsentStep({
-    required this.consentGiven,
-    required this.cloudOptIn,
-    required this.onChanged,
-  });
+  const _ConsentStep({required this.consentGiven, required this.onChanged});
   final bool consentGiven;
-  final bool cloudOptIn;
-  final void Function(bool consent, bool cloud) onChanged;
+  final ValueChanged<bool> onChanged;
 
   @override
   Widget build(BuildContext context) => Column(
@@ -617,22 +589,14 @@ class _ConsentStep extends StatelessWidget {
             children: [
               SwitchListTile.adaptive(
                 value: consentGiven,
-                onChanged: (v) => onChanged(v, cloudOptIn),
+                onChanged: onChanged,
                 title: const Text('I understand this is a wellness tool'),
                 subtitle: const Text(
                   'MindRecipe does not diagnose, prescribe, or provide emergency care.',
                 ),
               ),
-              Divider(height: 1, color: Theme.of(context).dividerColor),
-              SwitchListTile.adaptive(
-                value: cloudOptIn && consentGiven,
-                onChanged: consentGiven
-                    ? (v) => onChanged(consentGiven, v)
-                    : null,
-                title: const Text('Allow cloud AI for this session'),
-                subtitle: const Text(
-                  'Your conversation is private. Cloud processing is optional.',
-                ),
+              const Text(
+                'This navigation works without AI. Optional reflections use your private model; your journal stays on this device.',
               ),
             ],
           ),
@@ -752,8 +716,8 @@ class _JournalField extends StatelessWidget {
 }
 
 class _ZoneEditor extends StatelessWidget {
-  const _ZoneEditor({required this.value, required this.onChanged});
-  final String value;
+  const _ZoneEditor({required this.controller, required this.onChanged});
+  final TextEditingController controller;
   final ValueChanged<String> onChanged;
 
   static const _suggestions = [
@@ -774,7 +738,7 @@ class _ZoneEditor extends StatelessWidget {
     child: Column(
       children: [
         TextField(
-          controller: TextEditingController(text: value),
+          controller: controller,
           onChanged: onChanged,
           decoration: const InputDecoration(
             labelText: 'Your green zone',
@@ -788,8 +752,13 @@ class _ZoneEditor extends StatelessWidget {
           runSpacing: 8,
           children: _suggestions
               .map(
-                (s) =>
-                    ActionChip(label: Text(s), onPressed: () => onChanged(s)),
+                (s) => ActionChip(
+                  label: Text(s),
+                  onPressed: () {
+                    controller.text = s;
+                    onChanged(s);
+                  },
+                ),
               )
               .toList(),
         ),
@@ -904,14 +873,18 @@ class _RowItem extends StatelessWidget {
 class _CompleteStep extends StatefulWidget {
   const _CompleteStep({
     required this.appState,
+    required this.entryId,
     required this.emotions,
     required this.activation,
     required this.journal,
+    required this.onSeePulse,
   });
   final SecureAppState appState;
+  final String? entryId;
   final String emotions;
   final int activation;
   final String journal;
+  final VoidCallback onSeePulse;
 
   @override
   State<_CompleteStep> createState() => _CompleteStepState();
@@ -939,21 +912,23 @@ class _CompleteStepState extends State<_CompleteStep> {
   void _updateOnline() {
     if (!mounted) return;
     final local = OnDeviceInference.snapshotNotifier.value.isReady;
-    final cloud = widget.appState.cloudAiEnabled && widget.appState.aiAvailable;
-    setState(() => _navigatorOnline = local || cloud);
+    setState(() => _navigatorOnline = local);
   }
 
   Future<void> _reflect() async {
     setState(() => _aiBusy = true);
     final prompt =
         'A member just completed a daily navigation. Emotions: ${widget.emotions}. '
-        'Activation: ${widget.activation}/10. '
+        'Activation: ${widget.activation} on a -5 to +5 scale. '
         '${widget.journal.isNotEmpty ? 'Their words: "${widget.journal}". ' : ''}'
         'Give one grounded observation and one small next step. 35-80 words. '
         'No diagnosis, no clinical claims.';
     String? reply;
     try {
       reply = await OnDeviceInference().infer(prompt);
+      if (reply != null && reply.trim().isNotEmpty) {
+        await widget.appState.recordAiReflection();
+      }
     } catch (_) {}
     if (mounted) {
       setState(() {
@@ -963,11 +938,16 @@ class _CompleteStepState extends State<_CompleteStep> {
         _aiBusy = false;
       });
     }
-    final all = await widget.appState.loadNavigationHistory();
-    if (all.isNotEmpty) {
-      final latest = Map<String, dynamic>.from(all.first);
-      latest['ai_reflection'] = _reflection;
-      await widget.appState.saveNavigationEntry(latest);
+    if (reply != null && reply.trim().isNotEmpty && widget.entryId != null) {
+      final all = await widget.appState.loadNavigationHistory();
+      // Inference can finish after another session. Attach only to the session
+      // that asked for this reflection, never whichever entry is newest.
+      final index = all.indexWhere((entry) => entry['id'] == widget.entryId);
+      if (index >= 0) {
+        final entry = Map<String, dynamic>.from(all[index]);
+        entry['ai_reflection'] = reply;
+        await widget.appState.saveNavigationEntry(entry);
+      }
     }
   }
 
@@ -988,15 +968,14 @@ class _CompleteStepState extends State<_CompleteStep> {
             ),
             const SizedBox(height: 12),
             Text(
-              'Your responses are saved locally. MindRecipe is a wellness tool — nothing here is a diagnosis or clinical record.',
+              'Your journal stays on this device. Structured answers sync to your account. MindRecipe is a wellness tool; these answers are not a diagnosis.',
               style: MindRecipeTokens.bodyMedium(context),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
-            Text(
-              'Your pulse was just updated — taking you there…',
-              style: MindRecipeTokens.bodySmall(context),
-              textAlign: TextAlign.center,
+            TextButton(
+              onPressed: widget.onSeePulse,
+              child: const Text('See Pulse'),
             ),
             const Divider(height: 28),
             SwitchListTile.adaptive(
@@ -1009,7 +988,7 @@ class _CompleteStepState extends State<_CompleteStep> {
               subtitle: Text(
                 _navigatorOnline
                     ? 'A brief private reflection on this navigation — saved with it.'
-                    : 'Navigator is offline — install the private model or enable cloud AI.',
+                    : 'Install or activate your private model to reflect on this navigation.',
               ),
             ),
             if (_wantAi && _navigatorOnline) ...[

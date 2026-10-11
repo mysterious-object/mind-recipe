@@ -36,6 +36,14 @@ class AccountSession {
   final DateTime? accessTokenExpiresAt;
 }
 
+enum AccountRestoreStatus { verified, invalid, temporarilyUnavailable }
+
+class AccountRestoreResult {
+  const AccountRestoreResult(this.status, this.session);
+  final AccountRestoreStatus status;
+  final AccountSession? session;
+}
+
 class MindRecipeApiClient {
   MindRecipeApiClient({
     http.Client? client,
@@ -141,8 +149,10 @@ class MindRecipeApiClient {
   /// Mobile secure storage can survive an app reinstall (iOS Keychain) or be
   /// restored from backup (Android), so merely finding a token is not enough
   /// to bypass the account gateway.
-  Future<AccountSession?> restoreSession(AccountSession stored) async {
-    if (stored.token.trim().isEmpty) return null;
+  Future<AccountRestoreResult> restoreSession(AccountSession stored) async {
+    if (stored.token.trim().isEmpty) {
+      return const AccountRestoreResult(AccountRestoreStatus.invalid, null);
+    }
     try {
       final response = await _client
           .get(
@@ -150,7 +160,7 @@ class MindRecipeApiClient {
             headers: {'authorization': 'Bearer ${stored.token}'},
           )
           .timeout(const Duration(seconds: 8));
-      if (response.statusCode != 200) {
+      if (response.statusCode == 401) {
         if (mindRecipeOidcConfigured &&
             (stored.refreshToken?.isNotEmpty ?? false)) {
           final refreshed = await _appAuth.token(
@@ -164,29 +174,42 @@ class MindRecipeApiClient {
           );
           final token = refreshed.accessToken;
           if (token != null && token.isNotEmpty) {
-            return await _sessionFromBearer(
+            final session = await _sessionFromBearer(
               token,
               refreshToken: refreshed.refreshToken ?? stored.refreshToken,
               idToken: refreshed.idToken ?? stored.idToken,
               expiresAt: refreshed.accessTokenExpirationDateTime,
             );
+            return AccountRestoreResult(AccountRestoreStatus.verified, session);
           }
         }
-        return null;
+        return const AccountRestoreResult(AccountRestoreStatus.invalid, null);
+      }
+      if (response.statusCode != 200) {
+        return AccountRestoreResult(
+          AccountRestoreStatus.temporarilyUnavailable,
+          stored,
+        );
       }
       final user = jsonDecode(response.body) as Map<String, dynamic>;
-      return AccountSession(
-        token: stored.token,
-        displayName: user['display_name']?.toString() ?? stored.displayName,
-        email: user['email']?.toString() ?? stored.email,
-        refreshToken: stored.refreshToken,
-        idToken: stored.idToken,
-        accessTokenExpiresAt: stored.accessTokenExpiresAt,
+      return AccountRestoreResult(
+        AccountRestoreStatus.verified,
+        AccountSession(
+          token: stored.token,
+          displayName: user['display_name']?.toString() ?? stored.displayName,
+          email: user['email']?.toString() ?? stored.email,
+          refreshToken: stored.refreshToken,
+          idToken: stored.idToken,
+          accessTokenExpiresAt: stored.accessTokenExpiresAt,
+        ),
       );
     } catch (_) {
-      // Fail closed: an unverifiable saved credential must not silently open
-      // the member area. The person can sign in again from the gateway.
-      return null;
+      // Retain local access during outages. This does not authorize any server
+      // operation: the API still validates the bearer for every request.
+      return AccountRestoreResult(
+        AccountRestoreStatus.temporarilyUnavailable,
+        stored,
+      );
     }
   }
 
@@ -435,8 +458,8 @@ class MindRecipeApiClient {
             'emotions': emotions,
             'activation': activation,
             'body_areas': bodyAreas,
-            if (journal != null && journal.trim().isNotEmpty)
-              'journal': journal,
+            // Raw journal text is never part of the sync contract, including
+            // entries queued by older versions of the app.
             if (zoneLabel != null && zoneLabel.trim().isNotEmpty)
               'zone_label': zoneLabel,
             'observations': observations,
@@ -1023,10 +1046,13 @@ class SecureAppState extends ChangeNotifier {
   static const _curriculumProgressKey = 'mind_recipe_curriculum_progress';
   static const _cloudModelKey = 'mind_recipe_cloud_model';
   static const _pendingCheckinsKey = 'mind_recipe_pending_checkins';
+  static const _onboardingKey = 'mind_recipe_onboarding_version';
 
   AccountSession? session;
   String openRouterKey = '';
   bool loaded = false;
+  bool onboardingComplete = false;
+  bool sessionTemporarilyUnverified = false;
   bool managedAiAvailable = false;
   bool cloudAiEnabled = true;
   bool publicResearchEnabled = false;
@@ -1082,6 +1108,7 @@ class SecureAppState extends ChangeNotifier {
         _storage.read(key: _refreshTokenKey),
         _storage.read(key: _idTokenKey),
         _storage.read(key: _tokenExpiryKey),
+        _storage.read(key: _onboardingKey),
       ]);
       if ((values[0] ?? '').isNotEmpty) {
         session = AccountSession(
@@ -1094,6 +1121,7 @@ class SecureAppState extends ChangeNotifier {
         );
       }
       openRouterKey = values[3] ?? '';
+      onboardingComplete = values[15] == '1';
       if ((values[4] ?? '').isNotEmpty) {
         final activity = jsonDecode(values[4]!) as Map<String, dynamic>;
         _activityDate = activity['date']?.toString() ?? '';
@@ -1139,13 +1167,26 @@ class SecureAppState extends ChangeNotifier {
 
   Future<void> recordAssistantMessage({required bool startsSession}) async {
     _rollActivityDayIfNeeded();
-    if (startsSession) _navigationSessions++;
-    if (startsSession) _lifetimeNavigationSessions++;
     _messagesSent++;
     _lifetimeNavigatorTurns++;
     _lastAssistantActivityAt = DateTime.now();
     notifyListeners();
     await _persistAssistantActivity();
+  }
+
+  Future<void> completeOnboarding() async {
+    await _storage.write(key: _onboardingKey, value: '1');
+    onboardingComplete = true;
+    notifyListeners();
+  }
+
+  Future<void> recordNavigationCompletion() async {
+    _rollActivityDayIfNeeded();
+    _navigationSessions++;
+    _lifetimeNavigationSessions++;
+    _lastAssistantActivityAt = DateTime.now();
+    await _persistAssistantActivity();
+    notifyListeners();
   }
 
   Future<void> recordAiReflection() async {
@@ -1164,9 +1205,6 @@ class SecureAppState extends ChangeNotifier {
     _navigationSessions = 0;
     _messagesSent = 0;
     _aiReflections = 0;
-    _lifetimeNavigationSessions = 0;
-    _lifetimeNavigatorTurns = 0;
-    _lifetimeAiReflections = 0;
     _lastAssistantActivityAt = null;
   }
 
@@ -1289,7 +1327,7 @@ class SecureAppState extends ChangeNotifier {
       queued.removeWhere(
         (value) => clientId != null && value['client_id'] == clientId,
       );
-      queued.add(Map<String, dynamic>.from(checkIn));
+      queued.add(Map<String, dynamic>.from(checkIn)..remove('journal'));
       await _storage.write(key: _pendingCheckinsKey, value: jsonEncode(queued));
     } catch (_) {
       // The local navigation remains available even if secure storage is
@@ -1319,7 +1357,6 @@ class SecureAppState extends ChangeNotifier {
             bodyAreas: (item['body_areas'] as List? ?? const [])
                 .map((value) => value.toString())
                 .toList(),
-            journal: item['journal']?.toString(),
             zoneLabel: item['zone_label']?.toString(),
             observations: (item['observations'] as List? ?? const [])
                 .whereType<Map>()
@@ -1351,8 +1388,7 @@ class SecureAppState extends ChangeNotifier {
     final ago = t == null
         ? ''
         : ' · ${DateTime.now().difference(t).inHours}h ago';
-    return 'Emotions: ${e['emotions']}; activation ${e['activation']}/10'
-        '${(e['journal']?.toString().isNotEmpty ?? false) ? '; noted: ${e['journal']}' : ''}'
+    return 'Emotions: ${e['emotions']}; activation ${e['activation']} on a -5 to +5 scale'
         '$ago';
   }
 
@@ -1373,14 +1409,23 @@ class SecureAppState extends ChangeNotifier {
     required double valence,
     required double activation,
     String? source,
+    String? sourceId,
+    bool activationReported = true,
   }) async {
     try {
       final all = await loadMoodPulses();
+      if (sourceId != null &&
+          all.any((pulse) => pulse['source_id'] == sourceId)) {
+        return;
+      }
       all.add({
         'v': valence.clamp(-1.0, 1.0),
         'a': activation.clamp(0.0, 1.0),
         't': DateTime.now().toIso8601String(),
         if (source != null) 'src': source,
+        if (sourceId != null) 'source_id': sourceId,
+        'activation_scale': 'normalized_signed_five',
+        'activation_reported': activationReported,
       });
       while (all.length > 300) {
         all.removeAt(0);

@@ -1,24 +1,20 @@
-import 'package:flutter/material.dart';
-
 import 'mobile_automation.dart';
 
-/// MindRecipe's on-device version of phone-harness: free chat detects
-/// phone-action intents ("remind me to…", "appointment with…", "wake me at…")
-/// and offers a consent-gated action card. Nothing runs until the member
-/// taps Allow, and everything executes locally through the
-/// MindRecipeMobileAutomation MethodChannel (Calendar/Reminders/AlarmClock —
-/// no accessibility scraping, no screen capture).
+enum PhoneActionType { reminder, appointment, alarm }
+
+/// A draft, never an instruction to execute. Missing fields need review.
 class PhoneAction {
   const PhoneAction({
     required this.type,
     required this.title,
     this.when,
+    this.end,
     this.notes,
   });
-
   final PhoneActionType type;
   final String title;
   final DateTime? when;
+  final DateTime? end;
   final String? notes;
 
   String get summaryLabel => switch (type) {
@@ -26,245 +22,217 @@ class PhoneAction {
     PhoneActionType.appointment => 'Calendar event',
     PhoneActionType.alarm => 'Alarm',
   };
+  String get summary =>
+      '$summaryLabel: $title'
+      '${when == null ? ' · choose a date and time' : ' · ${formatActionTime(when!)}'}';
 
-  String get summary {
-    final whenText = when == null
-        ? ''
-        : ' · ${formatActionTime(when!)}${_daySuffix(when!)}';
-    return '$summaryLabel: $title$whenText';
-  }
-
-  String _daySuffix(DateTime dt) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final day = DateTime(dt.year, dt.month, dt.day);
-    final diff = day.difference(today).inDays;
-    if (diff == 0) return ' today';
-    if (diff == 1) return ' tomorrow';
-    return ' ${dt.month}/${dt.day}';
+  String? validationError(DateTime now) {
+    if (title.trim().isEmpty) return 'Add a title.';
+    if (when == null) return 'Choose a date and time.';
+    if (!when!.isAfter(now)) return 'Choose a future date and time.';
+    if (type == PhoneActionType.appointment) {
+      if (end == null) return 'Choose when the event ends.';
+      if (!end!.isAfter(when!)) return 'The end must be after the start.';
+    }
+    // Clock intents do not carry an arbitrary future date. Never silently
+    // turn next week's alarm into tomorrow morning's alarm.
+    if (type == PhoneActionType.alarm) {
+      var next = DateTime(
+        now.year,
+        now.month,
+        now.day,
+        when!.hour,
+        when!.minute,
+      );
+      if (!next.isAfter(now))
+        next = DateTime(
+          now.year,
+          now.month,
+          now.day + 1,
+          when!.hour,
+          when!.minute,
+        );
+      if (!when!.isAtSameMomentAs(next))
+        return 'Clock supports the next occurrence of this time. Choose today or tomorrow.';
+    }
+    return null;
   }
 }
 
-enum PhoneActionType { reminder, appointment, alarm }
-
-/// Compact clock format for action summaries ("3:05 PM").
 String formatActionTime(DateTime dt) {
-  final hour12 = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
-  final ampm = dt.hour < 12 ? 'AM' : 'PM';
-  final minute = dt.minute.toString().padLeft(2, '0');
-  return '$hour12:$minute $ampm';
+  final hour = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+  return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-'
+      '${dt.day.toString().padLeft(2, '0')} '
+      '$hour:${dt.minute.toString().padLeft(2, '0')} '
+      '${dt.hour < 12 ? 'AM' : 'PM'} ${dt.timeZoneName}';
 }
 
 class PhoneActionParser {
-  const PhoneActionParser();
+  const PhoneActionParser({this.now});
+  final DateTime Function()? now;
 
-  static final _reminder = RegExp(
-    r'remind (?:me )?(?:to )?(?<body>[^\.!?]+)',
-    caseSensitive: false,
-  );
-  static final _appointment = RegExp(
-    r'(?:(?:schedule|set up?|add|create|book)(?: an?)? |)(?:appointment|meeting|event|calendar event)(?: (?:with|for) )?(?<body>[^\.!?]+)',
-    caseSensitive: false,
-  );
-  static final _alarm = RegExp(
-    r'(?:(?:set )?an? )?(?:alarm|wake me(?: up)?)\s*(?:for|at)?\s*(?<body>[^\.!?]*)',
-    caseSensitive: false,
-  );
-
-  /// Cuts time context ("at 5pm", "tomorrow at 2", "in 20 minutes") out of a
-  /// title. If the time phrase starts the body, the words after it become the
-  /// title ("in 20 minutes to stretch" → "Stretch").
-  static final _whenCut = RegExp(
-    r'(?:^|\s)(?:in\s+\d+\s+(?:minutes?|mins?|hours?|hrs?)|at\s+\d|by\s+\d|at\s+(?:noon|midnight)|on\s+(?:mon|tues|weds|thurs|fri|sat|sun)|tomorrow|tonight|today|monday|tuesday|wednesday|thursday|friday|saturday|sunday)',
-    caseSensitive: false,
-  );
-
-  String _titleFrom(String body) {
-    final m = _whenCut.firstMatch(body);
-    if (m == null) return _tidy(body);
-    final before = body.substring(0, m.start).trim();
-    if (before.isNotEmpty) return _tidy(before);
-    final after = body
-        .substring(m.end)
-        .trim()
-        .replaceFirst(
-          RegExp(r'^(?:to|that|about)\s+', caseSensitive: false),
-          '',
-        );
-    return _tidy(after);
-  }
-
-  String _tidy(String value) {
-    final t = value
-        .replaceAll(RegExp(r'\s+'), ' ')
-        .trim()
-        .replaceAll(RegExp(r'\s+$'), '');
-    if (t.isEmpty) return t;
-    return t[0].toUpperCase() + t.substring(1);
-  }
-
-  /// Returns the first actionable phone intent in [message], or null.
   PhoneAction? parse(String message) {
-    // Keep honorifics from terminating title capture ("Dr. Lee" → "Dr Lee").
-    final text = message.replaceAllMapped(
-      RegExp(r'\b(Dr|Mr|Mrs|Ms|St)\.', caseSensitive: false),
-      (m) => m.group(1)!,
-    );
-    final preferMorning = RegExp(
-      r'wake|get up',
+    var text = message.trim();
+    if (RegExp(
+      r'''["“”]|\b(don['’]t|do not|never|if|pretend|example)\b''',
       caseSensitive: false,
-    ).hasMatch(text);
-    final alarm = _alarm.firstMatch(text);
-    if (alarm != null) {
-      final body = (alarm.namedGroup('body') ?? '').trim();
-      final when =
-          parseWhen(body, preferMorning: preferMorning) ??
-          parseWhen(text, preferMorning: preferMorning);
-      if (when != null) {
-        var label = body
-            .replaceFirst(
-              RegExp(
-                r'\b(at|for|tomorrow|tonight|today)\b',
-                caseSensitive: false,
-              ),
-              '',
-            )
-            .trim();
-        final timeMatch = RegExp(
-          r'\d{1,2}(:\d{2})?\s*(am|pm)?|\bin\s+\d+\s+(minutes?|mins?|hours?|hrs?)\b',
-          caseSensitive: false,
-        ).firstMatch(label);
-        if (timeMatch != null)
-          label = label.replaceRange(timeMatch.start, timeMatch.end, '');
-        label = label.replaceAll(RegExp(r'\s+'), ' ').trim();
-        return PhoneAction(
-          type: PhoneActionType.alarm,
-          title: label.isEmpty ? 'MindRecipe alarm' : label,
-          when: when,
-        );
-      }
-    }
-
-    final reminder = _reminder.firstMatch(text);
-    if (reminder != null) {
-      final body = (reminder.namedGroup('body') ?? '').trim();
-      if (body.isNotEmpty) {
-        final when =
-            parseWhen(body, preferMorning: preferMorning) ??
-            parseWhen(message, preferMorning: preferMorning);
-        final title = _titleFrom(body);
-        if (title.isNotEmpty) {
-          return PhoneAction(
-            type: PhoneActionType.reminder,
-            title: title,
-            when: when,
-          );
-        }
-      }
-    }
-
-    final appointment = _appointment.firstMatch(text);
-    if (appointment != null) {
-      final body = (appointment.namedGroup('body') ?? '').trim();
-      if (body.isNotEmpty) {
-        final when =
-            parseWhen(body, preferMorning: preferMorning) ??
-            parseWhen(message, preferMorning: preferMorning);
-        var title = _titleFrom(
-          body.replaceFirst(
-            RegExp(r'^(?:with|for)\s+', caseSensitive: false),
-            '',
+    ).hasMatch(text))
+      return null;
+    text = text.replaceFirst(
+      RegExp(
+        r'^(?:(?:can|could|would) you\s+)?(?:please\s+)?',
+        caseSensitive: false,
+      ),
+      '',
+    );
+    final reminder = RegExp(
+      r'^remind me (?:to\s+)?(.+)$',
+      caseSensitive: false,
+    ).firstMatch(text);
+    final appointment = RegExp(
+      r'^(?:schedule|set up|add|create) (?:an? |the )?(?:appointment|meeting|event|calendar event)\b\s*(.*)$',
+      caseSensitive: false,
+    ).firstMatch(text);
+    final alarm = RegExp(
+      r'^(?:set (?:an? )?alarm|wake me(?: up)?)\b\s*(.*)$',
+      caseSensitive: false,
+    ).firstMatch(text);
+    final match = reminder ?? appointment ?? alarm;
+    if (match == null) return null;
+    final type = reminder != null
+        ? PhoneActionType.reminder
+        : appointment != null
+        ? PhoneActionType.appointment
+        : PhoneActionType.alarm;
+    final body = match.group(1)!.trim();
+    final when = parseWhen(body);
+    var title = body.replaceFirst(
+      RegExp(r'^(?:with|for)\s+', caseSensitive: false),
+      '',
+    );
+    title = title
+        .replaceAll(
+          RegExp(
+            r'\b(?:in \d+ (?:minutes?|mins?|hours?|hrs?)|at \d{1,2}(?::\d{2})?\s*(?:am|pm)?|tomorrow|today|on (?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)|for \d+ (?:minutes?|hours?))\b',
+            caseSensitive: false,
           ),
-        );
-        title = title.replaceFirst(RegExp(r'^\d+\s*'), '');
-        if (title.isEmpty) title = 'Appointment';
-        return PhoneAction(
-          type: PhoneActionType.appointment,
-          title: title,
-          when: when ?? DateTime.now().add(const Duration(hours: 1)),
-          notes: 'Created from a MindRecipe conversation.',
-        );
-      }
+          '',
+        )
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+    if (type == PhoneActionType.alarm &&
+        (title.isEmpty || RegExp(r'^\d').hasMatch(title)))
+      title = 'MindRecipe alarm';
+    DateTime? end;
+    final duration = RegExp(
+      r'\bfor (\d+) (minutes?|hours?)\b',
+      caseSensitive: false,
+    ).firstMatch(body);
+    if (duration != null && when != null) {
+      final minutes =
+          int.parse(duration.group(1)!) *
+          (duration.group(2)!.toLowerCase().startsWith('hour') ? 60 : 1);
+      if (minutes > 0 && minutes <= 1440)
+        end = when.add(Duration(minutes: minutes));
     }
-    return null;
+    return PhoneAction(type: type, title: title, when: when, end: end);
   }
 
-  /// Parses common relative and clock times: "in 20 minutes", "at 3pm",
-  /// "at 15:30", "tomorrow at 9", "tonight". [preferMorning] resolves bare
-  /// hours 1–7 to AM (wake-me alarms) instead of the default PM.
   DateTime? parseWhen(String input, {bool preferMorning = false}) {
     final text = input.toLowerCase();
-    final now = DateTime.now();
-
-    final relative = RegExp(r'in\s+(\d+)\s+(minutes?|mins?|hours?|hrs?)')
+    final instant = now?.call() ?? DateTime.now();
+    // Unsupported/recurring dates need explicit review; never guess a day.
+    if (RegExp(
+      r'\b(every|weekly|monthly|next|tonight|january|february|march|april|may|june|july|august|september|october|november|december)\b|\d+[/-]\d+|\b\d+(?:st|nd|rd|th)\b',
+    ).hasMatch(text))
+      return null;
+    final relative = RegExp(r'\bin (\d+) (minutes?|mins?|hours?|hrs?)\b')
         .firstMatch(text);
     if (relative != null) {
-      final n = int.parse(relative.group(1)!);
-      final unit = relative.group(2)!;
-      return now.add(Duration(minutes: unit.startsWith('m') ? n : n * 60));
+      final value = int.parse(relative.group(1)!);
+      if (value <= 0 || value > 10080) return null;
+      final target = instant.add(
+        Duration(
+          minutes: value * (relative.group(2)!.startsWith('h') ? 60 : 1),
+        ),
+      );
+      return DateTime(
+        target.year,
+        target.month,
+        target.day,
+        target.hour,
+        target.minute,
+      );
     }
-
-    var day = DateTime(now.year, now.month, now.day);
-    if (text.contains('tomorrow')) {
-      day = day.add(const Duration(days: 1));
+    var day = DateTime(instant.year, instant.month, instant.day);
+    if (text.contains('tomorrow'))
+      day = DateTime(day.year, day.month, day.day + 1);
+    const weekdays = [
+      'monday',
+      'tuesday',
+      'wednesday',
+      'thursday',
+      'friday',
+      'saturday',
+      'sunday',
+    ];
+    for (var i = 0; i < weekdays.length; i++) {
+      if (RegExp('\\b${weekdays[i]}\\b').hasMatch(text)) {
+        final distance = (i + 1 - day.weekday + 7) % 7;
+        if (distance == 0) return null;
+        day = DateTime(day.year, day.month, day.day + distance);
+        break;
+      }
     }
-
-    final clock = RegExp(r'(?:at\s+)?\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b')
+    final clock = RegExp(r'\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b')
         .firstMatch(text);
+    int hour;
+    int minute;
     if (clock != null) {
-      var hour = int.parse(clock.group(1)!);
-      final minute = clock.group(2) != null ? int.parse(clock.group(2)!) : 0;
-      final meridiem = clock.group(3)!;
-      if (meridiem == 'pm' && hour < 12) hour += 12;
-      if (meridiem == 'am' && hour == 12) hour = 0;
-      return DateTime(day.year, day.month, day.day, hour, minute);
+      hour = int.parse(clock.group(1)!);
+      minute = int.parse(clock.group(2) ?? '0');
+      if (hour < 1 || hour > 12 || minute > 59) return null;
+      hour = hour % 12 + (clock.group(3) == 'pm' ? 12 : 0);
+    } else {
+      final military = RegExp(r'\bat (\d{1,2}):(\d{2})\b').firstMatch(text);
+      if (military == null) return null;
+      hour = int.parse(military.group(1)!);
+      minute = int.parse(military.group(2)!);
+      if (hour > 23 || minute > 59) return null;
     }
-
-    final military = RegExp(r'\bat\s+(\d{1,2}):(\d{2})\b').firstMatch(text);
-    if (military != null) {
-      final hour = int.parse(military.group(1)!);
-      final minute = int.parse(military.group(2)!);
-      if (hour <= 23 && minute <= 59) {
-        return DateTime(day.year, day.month, day.day, hour, minute);
-      }
-    }
-
-    final bareHour = RegExp(r'\bat\s+(\d{1,2})\b(?!:\d)').firstMatch(text);
-    if (bareHour != null) {
-      var hour = int.parse(bareHour.group(1)!);
-      if (hour >= 0 && hour <= 23) {
-        if (!preferMorning && hour >= 1 && hour <= 7) {
-          hour += 12; // "at 6" in the evening
-        }
-        return DateTime(day.year, day.month, day.day, hour, 0);
-      }
-    }
-
-    if (text.contains('tonight')) {
-      return DateTime(day.year, day.month, day.day, 20, 0);
-    }
-    return null;
+    final result = DateTime(day.year, day.month, day.day, hour, minute);
+    return result.isAfter(instant) ? result : null;
   }
 }
 
-/// Executes a consented [PhoneAction] on device.
-Future<AutomationResult> executePhoneAction(PhoneAction action) async {
-  final auto = MindRecipeMobileAutomation();
+Future<AutomationResult> executePhoneAction(
+  PhoneAction action, {
+  MindRecipeMobileAutomation? automation,
+  DateTime? now,
+}) async {
+  final invalid = action.validationError(now ?? DateTime.now());
+  if (invalid != null)
+    return AutomationResult(
+      success: false,
+      message: invalid,
+      nativeCode: 'validation',
+    );
+  final auto = automation ?? MindRecipeMobileAutomation();
   return switch (action.type) {
     PhoneActionType.reminder => auto.setReminder(
       title: action.title,
       dueDate: action.when,
-      notes: action.notes ?? 'Added from MindRecipe Navigator.',
+      notes: action.notes,
     ),
     PhoneActionType.appointment => auto.setAppointment(
       title: action.title,
-      start: action.when ?? DateTime.now().add(const Duration(hours: 1)),
-      description: action.notes ?? 'Added from MindRecipe Navigator.',
+      start: action.when!,
+      end: action.end!,
+      description: action.notes,
     ),
     PhoneActionType.alarm => auto.setAlarm(
-      hour: (action.when ?? DateTime.now().add(const Duration(hours: 8))).hour,
-      minute:
-          (action.when ?? DateTime.now().add(const Duration(hours: 8))).minute,
+      hour: action.when!.hour,
+      minute: action.when!.minute,
       label: action.title,
     ),
   };

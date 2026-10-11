@@ -32,8 +32,15 @@ jobs:
           cache: true
       - run: flutter pub get
         working-directory: flutter
+      - name: Check build host
+        run: bash ci/check_mobile_build_host.sh
+      - name: Analyze and test shared mobile code
+        run: |
+          flutter analyze --no-fatal-infos --no-fatal-warnings
+          flutter test --no-pub
+        working-directory: flutter
       - name: Build ARM64 staging APK
-        run: flutter build apk --release --target-platform android-arm64 --no-pub --verbose --dart-define=MIND_RECIPE_API_BASE=${MIND_RECIPE_STAGING_API_URL}
+        run: flutter build apk --release --target-platform android-arm64 --no-pub --dart-define=MIND_RECIPE_API_BASE=${MIND_RECIPE_STAGING_API_URL}
         working-directory: flutter
       - name: Verify APK exists
         run: test -s flutter/build/app/outputs/flutter-apk/app-release.apk

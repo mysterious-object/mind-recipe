@@ -2,6 +2,16 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>NSCalendarsUsageDescription</key>
+	<string>MindRecipe can add calendar events you review and approve.</string>
+	<key>NSRemindersUsageDescription</key>
+	<string>MindRecipe can add reminders you review and approve.</string>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>shortcuts</string>
+		<string>calshow</string>
+		<string>x-apple-reminderkit</string>
+	</array>
 	<key>NSCalendarsFullAccessUsageDescription</key>
 	<string>MindRecipe can add events you approve to your calendar.</string>
 	<key>NSCalendarsWriteOnlyAccessUsageDescription</key>

@@ -1,28 +1,15 @@
 import Flutter
 import UIKit
 import EventKit
+import EventKitUI
 
-/// Mind Recipe Mobile Automation — iOS side of
-/// `contextfield.mindrecipe/mobile_automation`
-///
-/// Two paths:
-///  A) EventKit (when authorized) — direct EKEvent/EKReminder creation with reminder alert.
-///  B) URL scheme fallback — no permission needed, opens Calendar/Shortcuts app for member to confirm.
-///
-/// Branded from mobilerun's portal patterns but adapted for iOS sandbox:
-/// iOS has no public alarm API; alarm requests route to Shortcuts `Create Alarm` or Clock.
-///
-/// Wiring:
-///   1. Copy this file to ios/Runner/MindRecipeMobileAutomationPlugin.swift
-///   2. Register in AppDelegate.swift:
-///        GeneratedPluginRegistrant.register(with: self)
-///        MindRecipeMobileAutomationPlugin.register(with: registrar(forPlugin: "mind_recipe_mobile_automation"))
-///      Or add via FlutterPluginRegistrant if using Swift AppDelegate.
-///   3. Add Info.plist keys from Info.plist.additions.xml
-///   4. `LSApplicationQueriesSchemes` for shortcuts:// etc.
+/// MindRecipe native actions. Calendar uses the OS editor; Reminders saves
+/// only after the in-app review and permission grant. Unsupported adapters
+/// fail explicitly, without running guessed user shortcuts.
 
-public class MindRecipeMobileAutomationPlugin: NSObject, FlutterPlugin {
+public class MindRecipeMobileAutomationPlugin: NSObject, FlutterPlugin, EKEventEditViewDelegate {
     private let eventStore = EKEventStore()
+    private var pendingCalendarResult: FlutterResult?
     private static func isFullAccess(_ status: EKAuthorizationStatus) -> Bool {
         if #available(iOS 17.0, *) {
             return status == .fullAccess
@@ -44,10 +31,10 @@ public class MindRecipeMobileAutomationPlugin: NSObject, FlutterPlugin {
             result([
                 "platform": "ios",
                 "canInsertCalendarEvent": true,
-                "canSetAlarm": false, // no public API; via Shortcuts only
+                "canSetAlarm": false, // No supported alarm adapter in this build.
                 "canAddReminder": true,
-                "canOpenCalendar": true,
-                "canInvokeShortcuts": true,
+                "canOpenCalendar": UIApplication.shared.canOpenURL(URL(string: "calshow:")!),
+                "canInvokeShortcuts": false,
                 "details": ["channel": Self.channelName]
             ])
         case "setAppointment", "createCalendarEvent":
@@ -59,9 +46,9 @@ public class MindRecipeMobileAutomationPlugin: NSObject, FlutterPlugin {
         case "openReminders":
             handleOpenReminders(result: result)
         case "setAlarm":
-            handleSetAlarm(call: call, result: result)
+            result(["success": false, "code": "unsupported", "message": "This build cannot set an iPhone alarm. Set it in Clock; no alarm was created."])
         case "invokeShortcut":
-            handleInvokeShortcut(call: call, result: result)
+            result(["success": false, "code": "unsupported", "message": "This shortcut is not in the supported app catalog."])
         default:
             result(FlutterMethodNotImplemented)
         }
@@ -79,40 +66,50 @@ public class MindRecipeMobileAutomationPlugin: NSObject, FlutterPlugin {
         }
         let start = Date(timeIntervalSince1970: beginMillis.doubleValue / 1000.0)
         let end = Date(timeIntervalSince1970: endMillis.doubleValue / 1000.0)
+        guard end > start else {
+            result(FlutterError(code: "validation", message: "The end must be after the start.", details: nil))
+            return
+        }
         let description = args["description"] as? String
         let location = args["location"] as? String
         let allDay = args["allDay"] as? Bool ?? false
         let alarmMinutes = args["alarmMinutesBefore"] as? NSNumber
 
-        // Try EventKit if we can get access; else fall back to URL
+        // iOS 17+ allows the native editor without broad calendar access.
+        if #available(iOS 17.0, *) {
+            presentEventEditor(title: title, start: start, end: end, description: description, location: location, allDay: allDay, alarmMinutes: alarmMinutes?.intValue, result: result)
+            return
+        }
         let status = EKEventStore.authorizationStatus(for: .event)
         if status == .notDetermined {
-            if #available(iOS 17.0, *) {
-                eventStore.requestFullAccessToEvents { granted, error in
-                    DispatchQueue.main.async {
-                        if granted { self.insertEvent(title: title, start: start, end: end, description: description, location: location, allDay: allDay, alarmMinutes: alarmMinutes?.intValue, result: result) }
-                        else { self.fallbackOpenCalendar(date: start, payload: args, result: result) }
-                    }
-                }
-            } else {
-                eventStore.requestAccess(to: .event) { granted, error in
-                    DispatchQueue.main.async {
-                        if granted { self.insertEvent(title: title, start: start, end: end, description: description, location: location, allDay: allDay, alarmMinutes: alarmMinutes?.intValue, result: result) }
-                        else { self.fallbackOpenCalendar(date: start, payload: args, result: result) }
-                    }
+            eventStore.requestAccess(to: .event) { granted, _ in
+                DispatchQueue.main.async {
+                    if granted { self.presentEventEditor(title: title, start: start, end: end, description: description, location: location, allDay: allDay, alarmMinutes: alarmMinutes?.intValue, result: result) }
+                    else { result(["success": false, "code": "permission_denied", "message": "Calendar access was not granted. No event was created."]) }
                 }
             }
             return
         } else if status == .authorized || Self.isFullAccess(status) {
-            insertEvent(title: title, start: start, end: end, description: description, location: location, allDay: allDay, alarmMinutes: alarmMinutes?.intValue, result: result)
+            presentEventEditor(title: title, start: start, end: end, description: description, location: location, allDay: allDay, alarmMinutes: alarmMinutes?.intValue, result: result)
             return
         } else {
-            // denied / restricted → URL fallback, no permission prompt
-            fallbackOpenCalendar(date: start, payload: args, result: result)
+            result(["success": false, "code": "permission_denied", "message": "Calendar access was not granted. No event was created."])
         }
     }
 
-    private func insertEvent(title: String, start: Date, end: Date, description: String?, location: String?, allDay: Bool, alarmMinutes: Int?, result: @escaping FlutterResult) {
+    private func presentEventEditor(title: String, start: Date, end: Date, description: String?, location: String?, allDay: Bool, alarmMinutes: Int?, result: @escaping FlutterResult) {
+        guard pendingCalendarResult == nil else {
+            result(["success": false, "code": "busy", "message": "Finish the open calendar review first."])
+            return
+        }
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        guard let root = scenes.filter({ $0.activationState == .foregroundActive })
+            .flatMap({ $0.windows }).first(where: { $0.isKeyWindow })?.rootViewController else {
+            result(["success": false, "code": "unavailable", "message": "Open MindRecipe before reviewing the event."])
+            return
+        }
+        var presenter = root
+        while let presented = presenter.presentedViewController { presenter = presented }
         let event = EKEvent(eventStore: eventStore)
         event.title = title
         event.startDate = start
@@ -120,27 +117,32 @@ public class MindRecipeMobileAutomationPlugin: NSObject, FlutterPlugin {
         event.notes = description
         event.location = location
         event.isAllDay = allDay
-        event.calendar = eventStore.defaultCalendarForNewEvents
         if let mins = alarmMinutes {
             // EKAlarm relativeOffset is negative seconds before start
             event.addAlarm(EKAlarm(relativeOffset: TimeInterval(-mins * 60)))
         }
-        do {
-            try eventStore.save(event, span: .thisEvent, commit: true)
-            result(["success": true, "code": "eventkit_inserted", "message": "Added \"\(title)\" to Calendar.", "payload": ["title": title]])
-        } catch {
-            // On failure, fall back to opening Calendar so member can add manually
-            fallbackOpenCalendar(date: start, payload: ["title": title], result: result)
+        let editor = EKEventEditViewController()
+        editor.eventStore = eventStore
+        editor.event = event
+        editor.editViewDelegate = self
+        editor.isModalInPresentation = true
+        pendingCalendarResult = result
+        presenter.present(editor, animated: true)
+    }
+
+    public func eventEditViewController(_ controller: EKEventEditViewController, didCompleteWith action: EKEventEditViewAction) {
+        let callback = pendingCalendarResult
+        pendingCalendarResult = nil
+        controller.dismiss(animated: true) {
+            let saved = action == .saved
+            callback?(["success": saved, "code": saved ? "eventkit_saved" : "cancelled", "message": saved ? "Calendar confirmed the event was saved." : "Calendar review cancelled. No new event was saved."])
         }
     }
 
     private func fallbackOpenCalendar(date: Date, payload: [String: Any], result: @escaping FlutterResult) {
-        // Try calshow: (seconds since reference? Apple uses unix time for calshow:)
-        let epochSec = Int(date.timeIntervalSince1970)
+        let epochSec = Int(date.timeIntervalSinceReferenceDate)
         let urls = [
             URL(string: "calshow:\(epochSec)"),
-            URL(string: "x-apple-calevent://"),
-            URL(string: "shortcuts://run-shortcut?name=AddCalendarEvent&input=\(titleEncoded(payload))"),
         ].compactMap { $0 }
 
         for url in urls {
@@ -152,11 +154,6 @@ public class MindRecipeMobileAutomationPlugin: NSObject, FlutterPlugin {
             }
         }
         result(["success": false, "code": "unavailable", "message": "Calendar permission denied. Open Calendar manually to add \"\(payload["title"] ?? "event")\".", "payload": payload])
-    }
-
-    private func titleEncoded(_ payload: [String: Any]) -> String {
-        let t = (payload["title"] as? String) ?? "MindRecipe"
-        return t.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "Mind%20Recipe"
     }
 
     private func handleOpenCalendar(call: FlutterMethodCall, result: @escaping FlutterResult) {
@@ -184,14 +181,14 @@ public class MindRecipeMobileAutomationPlugin: NSObject, FlutterPlugin {
                 eventStore.requestFullAccessToReminders { granted, _ in
                     DispatchQueue.main.async {
                         if granted { self.insertReminder(title: title, dueDate: dueDate, notes: notes, alarmMinutes: alarmMinutes?.intValue, result: result) }
-                        else { self.fallbackOpenReminders(payload: args, result: result) }
+                        else { result(["success": false, "code": "permission_denied", "message": "Reminders access was not granted. No reminder was created."]) }
                     }
                 }
             } else {
                 eventStore.requestAccess(to: .reminder) { granted, _ in
                     DispatchQueue.main.async {
                         if granted { self.insertReminder(title: title, dueDate: dueDate, notes: notes, alarmMinutes: alarmMinutes?.intValue, result: result) }
-                        else { self.fallbackOpenReminders(payload: args, result: result) }
+                        else { result(["success": false, "code": "permission_denied", "message": "Reminders access was not granted. No reminder was created."]) }
                     }
                 }
             }
@@ -199,7 +196,7 @@ public class MindRecipeMobileAutomationPlugin: NSObject, FlutterPlugin {
         } else if status == .authorized || Self.isFullAccess(status) {
             insertReminder(title: title, dueDate: dueDate, notes: notes, alarmMinutes: alarmMinutes?.intValue, result: result)
         } else {
-            fallbackOpenReminders(payload: args, result: result)
+            result(["success": false, "code": "permission_denied", "message": "Reminders access was not granted. No reminder was created."])
         }
     }
 
@@ -207,9 +204,14 @@ public class MindRecipeMobileAutomationPlugin: NSObject, FlutterPlugin {
         let reminder = EKReminder(eventStore: eventStore)
         reminder.title = title
         reminder.notes = notes
-        reminder.calendar = eventStore.defaultCalendarForNewReminders()
+        guard let calendar = eventStore.defaultCalendarForNewReminders() else {
+            result(["success": false, "code": "unavailable", "message": "No writable Reminders list is available. No reminder was created."])
+            return
+        }
+        reminder.calendar = calendar
         if let d = dueDate {
             reminder.dueDateComponents = Calendar.current.dateComponents([.year,.month,.day,.hour,.minute], from: d)
+            reminder.dueDateComponents?.timeZone = TimeZone.current
             if let mins = alarmMinutes {
                 reminder.addAlarm(EKAlarm(absoluteDate: d.addingTimeInterval(TimeInterval(-mins*60))))
             } else {
@@ -220,7 +222,7 @@ public class MindRecipeMobileAutomationPlugin: NSObject, FlutterPlugin {
             try eventStore.save(reminder, commit: true)
             result(["success": true, "code": "eventkit_inserted", "message": "Added reminder \"\(title)\".", "payload": ["title": title]])
         } catch {
-            fallbackOpenReminders(payload: ["title": title], result: result)
+            result(["success": false, "code": "save_failed", "message": "Reminders could not save this item. Please retry."])
         }
     }
 
@@ -231,7 +233,6 @@ public class MindRecipeMobileAutomationPlugin: NSObject, FlutterPlugin {
     private func fallbackOpenReminders(payload: [String: Any], result: @escaping FlutterResult) {
         let urls = [
             URL(string: "x-apple-reminderkit://"),
-            URL(string: "shortcuts://run-shortcut?name=AddReminder"),
         ].compactMap { $0 }
         for url in urls {
             if UIApplication.shared.canOpenURL(url) {
@@ -244,44 +245,4 @@ public class MindRecipeMobileAutomationPlugin: NSObject, FlutterPlugin {
         result(["success": false, "code": "unavailable", "message": "Reminders permission denied. Open Reminders manually.", "payload": payload])
     }
 
-    // MARK: - Alarm (no public API)
-
-    private func handleSetAlarm(call: FlutterMethodCall, result: @escaping FlutterResult) {
-        let args = call.arguments as? [String: Any] ?? [:]
-        let label = args["label"] as? String ?? "MindRecipe"
-        // Best effort: Shortcuts "Create Alarm" — user must have that shortcut installed.
-        let encoded = label.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "Mind%20Recipe"
-        let candidates = [
-            URL(string: "shortcuts://run-shortcut?name=Create%20Alarm&input=\(encoded)"),
-            URL(string: "shortcuts://run-shortcut?name=CreateAlarm&input=\(encoded)"),
-            URL(string: "clock-alarm://"),
-        ].compactMap { $0 }
-
-        for url in candidates {
-            if UIApplication.shared.canOpenURL(url) {
-                UIApplication.shared.open(url, options: [:]) { ok in
-                    result(["success": ok, "code": ok ? "fallback_url" : "unavailable", "message": ok ? "Opened Shortcuts to create an alarm for \"\(label)\" — confirm there." : "Could not open Shortcuts.", "payload": args])
-                }
-                return
-            }
-        }
-        result(["success": false, "code": "unavailable", "message": "iOS cannot set alarms silently. Create a Shortcuts automation named \"Create Alarm\" or set it in Clock.", "payload": args])
-    }
-
-    // MARK: - Shortcuts escape hatch
-
-    private func handleInvokeShortcut(call: FlutterMethodCall, result: @escaping FlutterResult) {
-        guard let args = call.arguments as? [String: Any], let name = args["name"] as? String, !name.isEmpty else {
-            result(FlutterError(code: "validation", message: "name required", details: nil)); return
-        }
-        let encoded = name.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? name
-        let url = URL(string: "shortcuts://run-shortcut?name=\(encoded)")!
-        if UIApplication.shared.canOpenURL(url) {
-            UIApplication.shared.open(url, options: [:]) { ok in
-                result(["success": ok, "code": ok ? "fallback_url" : "unavailable", "message": ok ? "Opened Shortcut \"\(name)\"." : "Could not open Shortcuts.", "payload": args])
-            }
-        } else {
-            result(["success": false, "code": "unavailable", "message": "Shortcuts app not available.", "payload": args])
-        }
-    }
 }

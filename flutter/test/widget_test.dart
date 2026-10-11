@@ -86,7 +86,7 @@ class FakeMindRecipeApi extends MindRecipeApiClient {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  FlutterSecureStorage.setMockInitialValues(const {});
+  setUp(() => FlutterSecureStorage.setMockInitialValues({}));
   Future<void> pumpFrames(WidgetTester tester, [int count = 9]) async {
     for (var frame = 0; frame < count; frame++) {
       await tester.pump(const Duration(milliseconds: 100));

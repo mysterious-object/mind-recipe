@@ -7,6 +7,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 
 import 'app_services.dart';
 import 'check_in_state.dart';
+import 'daily_navigation_result.dart';
 import 'visual_theme.dart';
 
 /// Converts the explicit Daily Nav check-in into the compact Pulse values
@@ -18,11 +19,15 @@ class MoodState {
   final double activation;
 
   static MoodState fromCheckIn(CheckInState checkIn) {
-    final text = <String>[
-      ...checkIn.emotions,
-      ...checkIn.contextTags,
-      checkIn.journal,
-    ].join(' ').toLowerCase();
+    return _fromAnswers(checkIn.emotions, (checkIn.activation + 5) / 10);
+  }
+
+  static MoodState fromNavigation(DailyNavigationResult result) =>
+      _fromAnswers(result.emotions, result.normalizedActivation ?? 0.5);
+
+  static MoodState _fromAnswers(Iterable<String> emotions, double activation) {
+    // Only explicit labels affect the illustration; journals are not analyzed.
+    final selected = emotions.map((value) => value.toLowerCase()).toSet();
     const activatedNegative = <String>[
       'anxious',
       'angry',
@@ -54,32 +59,14 @@ class MoodState {
       'connected',
       'relaxed',
     ];
-    final hasActivatedNegative = activatedNegative.any(text.contains);
-    final hasDepletedNegative = depletedNegative.any(text.contains);
-    final hasPositive = positive.any(text.contains);
-    final reportedActivation = (checkIn.activation / 10).clamp(0.0, 1.0);
-    if (hasActivatedNegative && !hasPositive) {
-      return MoodState(
-        valence: -0.6,
-        activation: math.max(0.75, reportedActivation),
-      );
-    }
-    if (hasDepletedNegative && !hasPositive) {
-      return MoodState(
-        valence: -0.6,
-        activation: math.min(
-          0.3,
-          reportedActivation == 0 ? 0.25 : reportedActivation,
-        ),
-      );
-    }
-    if (hasPositive) {
-      return MoodState(
-        valence: 0.6,
-        activation: reportedActivation == 0 ? 0.35 : reportedActivation,
-      );
-    }
-    return MoodState(valence: 0, activation: reportedActivation);
+    final negative =
+        activatedNegative.any(selected.contains) ||
+        depletedNegative.any(selected.contains);
+    final hasPositive = positive.any(selected.contains);
+    return MoodState(
+      valence: negative == hasPositive ? 0 : (negative ? -0.6 : 0.6),
+      activation: activation.clamp(0.0, 1.0),
+    );
   }
 }
 
