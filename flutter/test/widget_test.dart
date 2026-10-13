@@ -132,7 +132,7 @@ void main() {
 
   Future<void> enterCheckIn(WidgetTester tester) async {
     await enterMemberApp(tester);
-    expect(find.bySemanticsLabel('Navigator, tab 1 of 5'), findsOneWidget);
+    expect(find.bySemanticsLabel('Navigator, tab 1 of 4'), findsOneWidget);
   }
 
   testWidgets('login and registration gateway is the first app surface', (
@@ -268,7 +268,10 @@ void main() {
   testWidgets('Navigator is the first and default tab', (tester) async {
     await enterMemberApp(tester);
     expect(find.text('Begin daily navigation'), findsOneWidget);
-    expect(find.bySemanticsLabel('Navigator, tab 1 of 5'), findsOneWidget);
+    expect(find.bySemanticsLabel('Navigator, tab 1 of 4'), findsOneWidget);
+    expect(find.text('Pulse'), findsNothing);
+    expect(find.bySemanticsLabel('Actions, tab 3 of 4'), findsOneWidget);
+    expect(find.bySemanticsLabel('Settings, tab 4 of 4'), findsOneWidget);
   });
 
   test('motion summary describes only device movement', () {

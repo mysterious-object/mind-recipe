@@ -178,7 +178,7 @@ class _MemoryScreenState extends State<MemoryScreen> {
             padding: const EdgeInsets.all(16),
             children: [
               const Text(
-                'Only the items shown here are saved as durable memory. You can remove any item at any time.',
+                'These are your saved memory cards. You can edit or remove them at any time. Mind Nav can also use your dated daily check-ins as context; an older report is not assumed to be your current state. Raw journals stay on this device.',
               ),
               const SizedBox(height: 12),
               if (_proposals.isNotEmpty) ...[

@@ -33,7 +33,7 @@ class NavigatorChatExperience extends StatefulWidget {
   });
 
   /// Opens the manual daily-navigation flow; completion syncs back into
-  /// this thread and the Pulse tab.
+  /// this thread and the member's saved check-in history.
   final VoidCallback? onStartDailyNav;
 
   final CheckInState state;
@@ -436,20 +436,9 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
       return;
     }
     // Ground the conversation in real navigation data when a session starts.
-    String navigationContext = '';
-    if (startsSession) {
-      try {
-        final lastNav = await widget.appState.lastNavigationSummary();
-        if (lastNav.isNotEmpty) {
-          navigationContext =
-              '\n\n(For context — my latest daily navigation: $lastNav)';
-          if (lastNav.contains('0h ago') || lastNav.contains('1h ago')) {
-            navigationContext +=
-                "\n(I already completed today's daily navigation.)";
-          }
-        }
-      } catch (_) {}
-    }
+    // Load on every turn, including resumed threads and the app-wide sheet.
+    // The source/time and explicit-report flags survive process restarts.
+    final navigationContext = await widget.appState.navigatorStateContext();
     widget.onChanged();
     _scrollToEnd();
     unawaited(MindRecipeDeviceHarness().acknowledgeTurn());
@@ -673,11 +662,10 @@ Latest member request: $text''',
         'member_id': widget.appState.session?.email ?? '',
         'display_name': widget.appState.session?.displayName ?? '',
         'conversation': recent,
-        'emotions': widget.state.emotions.toList(),
-        'activation': widget.state.activation,
-        'body_areas': widget.state.bodyAreas.toList(),
-        'context_tags': widget.state.contextTags.toList(),
-        'zone_label': widget.state.greenZone,
+        'context_tags': [
+          ...widget.state.contextTags,
+          if (navigationContext.isNotEmpty) navigationContext,
+        ],
         if (curriculum != null) 'curriculum_progress': curriculum,
         'screen_context': {'destination': 'Navigator', 'mode': 'conversation'},
         'device_capabilities': {

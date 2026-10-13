@@ -4,10 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test('mobile WebGL surfaces use opaque Android-safe backing colors', () {
-    for (final path in const [
-      'lib/three_background.dart',
-      'lib/pulse_screen.dart',
-    ]) {
+    for (final path in const ['lib/three_background.dart']) {
       final source = File(path).readAsStringSync();
       expect(
         source,
@@ -63,15 +60,20 @@ void main() {
     }
   });
 
-  test('background uses the offline classic bundle on file-scheme WebViews', () {
-    final page = File('assets/familiar/background.html').readAsStringSync();
-    final scene = File(
-      'assets/familiar/chimera-fx/mobile-scene.js',
-    ).readAsStringSync();
-    expect(page, contains('data-scene-mode="background"'));
-    expect(page, contains('chimera-fx/mobile-scene.bundle.js'));
-    expect(page, isNot(contains('type="module"')));
-    expect(scene, contains("let activeTheme = 'chimera-native'"));
-    expect(scene, contains("components: ['nebula', 'tendrils', 'hud', 'matter']"));
-  });
+  test(
+    'background uses the offline classic bundle on file-scheme WebViews',
+    () {
+      final page = File('assets/familiar/background.html').readAsStringSync();
+      final scene = File('assets/familiar/chimera-fx/mobile-scene.js')
+          .readAsStringSync();
+      expect(page, contains('data-scene-mode="background"'));
+      expect(page, contains('chimera-fx/mobile-scene.bundle.js'));
+      expect(page, isNot(contains('type="module"')));
+      expect(scene, contains("let activeTheme = 'chimera-native'"));
+      expect(
+        scene,
+        contains("components: ['nebula', 'tendrils', 'hud', 'matter']"),
+      );
+    },
+  );
 }

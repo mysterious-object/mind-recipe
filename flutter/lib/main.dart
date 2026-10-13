@@ -24,7 +24,6 @@ import 'notification_scheduler.dart';
 import 'practitioner_sharing.dart';
 import 'visual_theme.dart';
 import 'live_visual_theme_picker.dart';
-import 'pulse_screen.dart';
 import 'recipes_screen.dart';
 import 'voice_interface.dart';
 import 'three_background.dart';
@@ -192,24 +191,16 @@ class _MemberHomeState extends State<MemberHome> {
   final checkIn = CheckInState();
   final tools = <String>{};
   final chatMessages = <ChatMessage>[];
-  final labels = const [
-    'Navigator',
-    'MindRecipe',
-    'Pulse',
-    'Actions',
-    'Settings',
-  ];
+  final labels = const ['Navigator', 'MindRecipe', 'Actions', 'Settings'];
   final icons = const [
     Icons.explore_rounded,
     Icons.auto_stories_rounded,
-    Icons.motion_photos_on_rounded,
     Icons.task_alt_rounded,
     Icons.settings,
   ];
   final iconAssets = const <String?>[
     'assets/branding/navigator-compass.png',
     'assets/branding/mind-recipe-mark.png',
-    null,
     null,
     null,
   ];
@@ -332,17 +323,9 @@ class _MemberHomeState extends State<MemberHome> {
   }
 
   /// Daily navigation stays manual — launched from the chat header — and
-  /// stays in sync: completion records the pulse, posts a status message
-  /// into this thread, and lands on the Pulse tab.
+  /// saves the member's check-in and returns to the assistant conversation.
   Future<void> _showDailyNav() async {
-    final pulses = await widget.appState.loadMoodPulses();
-    final lastPulse = pulses.isEmpty
-        ? null
-        : DateTime.tryParse(pulses.last['t']?.toString() ?? '');
-    final lastPulseText = lastPulse == null
-        ? 'no pulse yet'
-        : 'last pulse ${DateTime.now().difference(lastPulse).inHours}h ago';
-    final history = await widget.appState.loadNavigationHistory();
+    final history = await widget.appState.loadMemberNavigationHistory();
     var lastNavText = '';
     if (history.isNotEmpty) {
       final t = DateTime.tryParse(history.first['t']?.toString() ?? '');
@@ -354,7 +337,7 @@ class _MemberHomeState extends State<MemberHome> {
     }
     final summary =
         'Today: ${widget.appState.navigationSessions} navigation(s) · '
-        '${widget.appState.messagesSent} chat messages · $lastPulseText'
+        '${widget.appState.messagesSent} chat messages'
         '$lastNavText';
     if (!mounted) return;
     await Navigator.of(context).push(
@@ -363,9 +346,9 @@ class _MemberHomeState extends State<MemberHome> {
           appState: widget.appState,
           onCheckInQueued: _flushPendingCheckIns,
           syncSummary: summary,
-          onSeePulse: () {
+          onReturnToNavigator: () {
             Navigator.of(context).pop();
-            goToPage(2);
+            goToPage(0);
           },
           onComplete: (result) async {
             checkIn.emotions
@@ -377,20 +360,12 @@ class _MemberHomeState extends State<MemberHome> {
             checkIn.activation = result.activation;
             checkIn.greenZone = result.zoneLabel;
             checkIn.completedAt = result.recordedAt;
-            final mood = MoodState.fromNavigation(result);
-            await widget.appState.recordMoodPulse(
-              valence: mood.valence,
-              activation: mood.activation,
-              source: 'navigation',
-              sourceId: result.id,
-              activationReported: result.activationReported,
-            );
             await widget.appState.recordNavigationCompletion();
             if (!mounted) return;
             chatMessages.add(
               const ChatMessage(
                 role: ChatRole.status,
-                text: 'Daily navigation complete — your pulse was updated.',
+                text: 'Daily navigation saved. Mind Nav can use your reported state when it helps.',
               ),
             );
             setState(() {});
@@ -494,13 +469,6 @@ class _MemberHomeState extends State<MemberHome> {
           api: widget.api,
           appState: widget.appState,
           onAskNavigator: _onRecipeAskNavigator,
-        ),
-      ),
-      _KeepAlivePage(
-        child: PulseScreen(
-          checkIn: checkIn,
-          appState: widget.appState,
-          active: index == 2,
         ),
       ),
       _KeepAlivePage(child: ActionsScreen(appState: widget.appState)),

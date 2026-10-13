@@ -6,7 +6,6 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:mind_recipe/app_services.dart';
 import 'package:mind_recipe/daily_navigation_result.dart';
-import 'package:mind_recipe/pulse_screen.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -128,7 +127,7 @@ void main() {
   });
   for (final level in [-5, 0, 5]) {
     test(
-      'Pulse uses actual self-report $level without mood overriding energy',
+      'Check-in preserves self-report $level without mood overriding energy',
       () {
         final result = DailyNavigationResult(
           id: 'nav-test',
@@ -144,9 +143,7 @@ void main() {
           capacity: 'Steady',
           outcome: '',
         );
-        final mood = MoodState.fromNavigation(result);
-        expect(mood.valence, -0.6);
-        expect(mood.activation, (level + 5) / 10);
+        expect(result.normalizedActivation, (level + 5) / 10);
         expect(result.toSyncPayload().containsKey('journal'), isFalse);
         expect(result.toLocalHistory()['journal'], 'calm connected happy');
       },

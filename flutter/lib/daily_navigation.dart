@@ -31,7 +31,7 @@ class DailyNavigation extends StatefulWidget {
     super.key,
     required this.appState,
     required this.onComplete,
-    required this.onSeePulse,
+    required this.onReturnToNavigator,
     this.onCheckInQueued,
     this.syncSummary = '',
   });
@@ -42,8 +42,8 @@ class DailyNavigation extends StatefulWidget {
   /// Live activity summary shown on the greeting step (chat ↔ nav sync).
   final String syncSummary;
 
-  /// Fires after the completion confirmation — lands the member on Pulse.
-  final VoidCallback onSeePulse;
+  /// Returns to the assistant without losing the completed check-in.
+  final VoidCallback onReturnToNavigator;
 
   @override
   State<DailyNavigation> createState() => _DailyNavigationState();
@@ -114,7 +114,7 @@ class _DailyNavigationState extends State<DailyNavigation> {
     if (_current == NavStep.complete) {
       if (_completing) return;
       _completing = true;
-      // Persist the navigation — Pulse, greeting summaries, and AI grounding
+      // Persist the navigation — greeting summaries and AI grounding
       // all read this history.
       final recordedAt = DateTime.now();
       final entryId = 'daily-nav-${recordedAt.microsecondsSinceEpoch}';
@@ -363,7 +363,7 @@ class _DailyNavigationState extends State<DailyNavigation> {
             : _selectedEmotions.join(', '),
         activation: _activationLevel,
         journal: _journalController.text.trim(),
-        onSeePulse: widget.onSeePulse,
+        onReturnToNavigator: widget.onReturnToNavigator,
       ),
     };
   }
@@ -410,9 +410,9 @@ class _DailyNavigationState extends State<DailyNavigation> {
             ),
           if (_current == NavStep.complete)
             FilledButton.icon(
-              onPressed: widget.onSeePulse,
-              icon: const Icon(Icons.monitor_heart_rounded),
-              label: const Text('View pulse'),
+              onPressed: widget.onReturnToNavigator,
+              icon: const Icon(Icons.chat_bubble_outline_rounded),
+              label: const Text('Return to Mind Nav'),
             )
           else
             Semantics(
@@ -877,14 +877,14 @@ class _CompleteStep extends StatefulWidget {
     required this.emotions,
     required this.activation,
     required this.journal,
-    required this.onSeePulse,
+    required this.onReturnToNavigator,
   });
   final SecureAppState appState;
   final String? entryId;
   final String emotions;
   final int activation;
   final String journal;
-  final VoidCallback onSeePulse;
+  final VoidCallback onReturnToNavigator;
 
   @override
   State<_CompleteStep> createState() => _CompleteStepState();
@@ -974,8 +974,8 @@ class _CompleteStepState extends State<_CompleteStep> {
             ),
             const SizedBox(height: 8),
             TextButton(
-              onPressed: widget.onSeePulse,
-              child: const Text('See Pulse'),
+              onPressed: widget.onReturnToNavigator,
+              child: const Text('Continue with Mind Nav'),
             ),
             const Divider(height: 28),
             SwitchListTile.adaptive(

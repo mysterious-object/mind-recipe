@@ -48,7 +48,7 @@ class OrbitNewsService {
         timeAgo: '5h ago',
       ),
       OrbitNewsItem(
-        title: 'Community Pulse: Evening wind-down practices',
+        title: 'Community: Evening wind-down practices',
         summary: 'Members found a short breathing reset before sleep most helpful this week.',
         timeAgo: '1d ago',
       ),

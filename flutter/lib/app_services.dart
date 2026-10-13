@@ -6,6 +6,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
 import 'visual_theme.dart';
+import 'navigator_member_state.dart';
 
 const mindRecipeApiBase = String.fromEnvironment(
   'MIND_RECIPE_API_BASE',
@@ -1314,7 +1315,11 @@ class SecureAppState extends ChangeNotifier {
       final all = await loadNavigationHistory();
       final id = entry['id']?.toString();
       all.removeWhere((e) => id != null && e['id'] == id);
-      all.insert(0, entry);
+      all.insert(0, {
+        ...entry,
+        if (!entry.containsKey('member_owner') && session != null)
+          'member_owner': session!.email.trim().toLowerCase(),
+      });
       while (all.length > 100) {
         all.removeLast();
       }
@@ -1390,17 +1395,25 @@ class SecureAppState extends ChangeNotifier {
     }
   }
 
-  /// One-line summary of the most recent navigation, for AI grounding.
+  /// Older unowned records remain stored, but cannot safely be attributed to
+  /// the currently signed-in member. Never send another account's history.
+  Future<List<Map<String, dynamic>>> loadMemberNavigationHistory() async {
+    final owner = session?.email.trim().toLowerCase();
+    if (owner == null || owner.isEmpty) return [];
+    return (await loadNavigationHistory())
+        .where((entry) => entry['member_owner'] == owner)
+        .toList();
+  }
+
+  Future<String> navigatorStateContext({DateTime? now}) async =>
+      navigatorMemberStateContext(
+        await loadMemberNavigationHistory(),
+        now: now ?? DateTime.now(),
+      );
+
+  /// Retained API for callers that need a sourced navigation summary.
   Future<String> lastNavigationSummary() async {
-    final all = await loadNavigationHistory();
-    if (all.isEmpty) return '';
-    final e = all.first;
-    final t = DateTime.tryParse(e['t']?.toString() ?? '');
-    final ago = t == null
-        ? ''
-        : ' · ${DateTime.now().difference(t).inHours}h ago';
-    return 'Emotions: ${e['emotions']}; activation ${e['activation']} on a -5 to +5 scale'
-        '$ago';
+    return navigatorStateContext();
   }
 
   /// Real-time mood ring history: [{v: -1..1 valence, a: 0..1 activation,
