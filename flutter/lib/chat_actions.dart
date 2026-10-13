@@ -73,6 +73,52 @@ class PhoneActionParser {
   const PhoneActionParser({this.now});
   final DateTime Function()? now;
 
+  /// Update a draft only for an explicit, narrow correction. This never
+  /// confirms or executes it, and unrelated conversation remains conversation.
+  PhoneAction? revise(PhoneAction draft, String message) {
+    final text = message.trim();
+    final title = RegExp(
+      r'^(?:call it|title it|rename it to)\s+(.+)$',
+      caseSensitive: false,
+    ).firstMatch(text);
+    final timeOnly = RegExp(
+      r'^(?:(?:make (?:it|that)|change (?:it|that) to)\s+)?(?:(?:today|tomorrow|on (?:monday|tuesday|wednesday|thursday|friday|saturday|sunday))\s+)?(?:at \d{1,2}(?::\d{2})?\s*(?:am|pm)?|in \d+ (?:minutes?|mins?|hours?|hrs?))(?:\s+for \d+ (?:minutes?|hours?))?[.!]?$|^for \d+ (?:minutes?|hours?)[.!]?$',
+      caseSensitive: false,
+    ).hasMatch(text);
+    if (title == null && !timeOnly) return null;
+    final nextTime = title == null ? parseWhen(text) : null;
+    final duration = RegExp(
+      r'\bfor (\d+) (minutes?|hours?)\b',
+      caseSensitive: false,
+    ).firstMatch(text);
+    final start = nextTime ?? draft.when;
+    final oldDuration = draft.end != null && draft.when != null
+        ? draft.end!.difference(draft.when!)
+        : null;
+    final minutes = duration == null
+        ? null
+        : int.parse(duration.group(1)!) *
+              (duration.group(2)!.toLowerCase().startsWith('hour') ? 60 : 1);
+    final length = minutes == null
+        ? oldDuration
+        : minutes > 0 && minutes <= 1440
+        ? Duration(minutes: minutes)
+        : null;
+    // Invalid time corrections must not silently keep the previously valid
+    // time. The review will require a new selection.
+    final invalidTime =
+        timeOnly && nextTime == null && !text.toLowerCase().startsWith('for ');
+    return PhoneAction(
+      type: draft.type,
+      title: title?.group(1)?.trim() ?? draft.title,
+      when: invalidTime ? null : start,
+      end: invalidTime || start == null || length == null
+          ? null
+          : start.add(length),
+      notes: draft.notes,
+    );
+  }
+
   PhoneAction? parse(String message) {
     var text = message.trim();
     if (RegExp(
@@ -88,7 +134,7 @@ class PhoneActionParser {
       '',
     );
     final reminder = RegExp(
-      r'^remind me (?:to\s+)?(.+)$',
+      r'^(?:remind me (?:to\s+)?|(?:create|add|set) (?:an? )?(?:task|reminder)(?: to)?\s+)(.+)$',
       caseSensitive: false,
     ).firstMatch(text);
     final appointment = RegExp(

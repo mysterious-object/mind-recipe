@@ -207,6 +207,26 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
       expect(find.text('Review'), findsOneWidget);
       expect(dispatches, 0);
+      await tester.enterText(
+        find.byType(TextField).first,
+        'Tomorrow at 3pm for 30 minutes',
+      );
+      await tester.tap(find.byTooltip('Send to Navigator'));
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(messages.where((m) => m.role == ChatRole.assistant), isEmpty);
+      expect(dispatches, 0);
+      await tester.tap(find.text('Review'));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.text('Choose date and time'), findsNothing);
+      expect(find.text('Choose end date and time'), findsNothing);
+      expect(find.widgetWithText(TextField, 'Sarah'), findsOneWidget);
+      await tester.tap(find.text('Cancel'));
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.enterText(find.byType(TextField).first, 'Cancel that');
+      await tester.tap(find.byTooltip('Send to Navigator'));
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.text('Review'), findsNothing);
+      expect(dispatches, 0);
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pump(const Duration(seconds: 1));
     });

@@ -15,13 +15,16 @@ class NavigatorAgentPlan {
   final String instruction;
   final bool requiresResearchApproval;
 
-  String augment(String memberMessage, {String context = ''}) =>
-      '''
-$instruction
-${context.trim().isEmpty ? '' : 'Member context:\n${context.trim()}\n'}
-
-Latest member message: $memberMessage
-''';
+  String augment(String memberMessage, {String context = ''}) {
+    // Avoid spending the mobile prompt budget on generic routing prose.
+    // Preserve the actual latest request as the final part of the user turn.
+    final guidance = tool == 'open conversation' ? '' : instruction;
+    return [
+      if (guidance.isNotEmpty) guidance,
+      if (context.trim().isNotEmpty) 'Member context: ${context.trim()}',
+      memberMessage,
+    ].join('\n\n');
+  }
 }
 
 class NavigatorAgent {

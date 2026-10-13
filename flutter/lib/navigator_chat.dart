@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 import 'app_services.dart';
 import 'chat_actions.dart';
 import 'phone_action_review.dart';
+import 'phone_action_draft_store.dart';
 import 'check_in_state.dart';
 import 'mind_recipe_fx.dart';
 import 'mind_recipe_device_harness.dart';
@@ -71,6 +72,38 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
   PhoneAction? _pendingPhoneAction;
   bool _executingPhoneAction = false;
   final PhoneActionParser _phoneActionParser = const PhoneActionParser();
+  final _draftStore = PhoneActionDraftStore();
+  int _draftRevision = 0;
+
+  Future<void> _restorePhoneDraft() async {
+    final revision = _draftRevision;
+    final owner = widget.appState.session?.email;
+    final draft = await _draftStore.load(owner);
+    if (!mounted ||
+        revision != _draftRevision ||
+        owner != widget.appState.session?.email)
+      return;
+    setState(() => _pendingPhoneAction = draft);
+  }
+
+  void _setPhoneDraft(PhoneAction? draft) {
+    _draftRevision++;
+    setState(() => _pendingPhoneAction = draft);
+    unawaited(
+      _draftStore.save(widget.appState.session?.email, draft).catchError((
+        Object _,
+      ) {
+        if (mounted)
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'This action draft could not be saved on this device.',
+              ),
+            ),
+          );
+      }),
+    );
+  }
 
   Future<void> _log(String msg) async {
     try {
@@ -100,6 +133,7 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
     }
     unawaited(_refreshLocalStatus());
     unawaited(_loadVoiceConversationPreference());
+    unawaited(_restorePhoneDraft());
   }
 
   void _onSnapshotChanged() {
@@ -115,6 +149,7 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
     try {
       final reviewed = await reviewPhoneAction(context, action);
       if (reviewed == null || !mounted) return;
+      _setPhoneDraft(reviewed);
       final result = await executePhoneAction(reviewed);
       if (!mounted) return;
       setState(() {
@@ -129,8 +164,8 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
             systemGenerated: true,
           ),
         );
-        if (result.success) _pendingPhoneAction = null;
       });
+      if (result.success) _setPhoneDraft(null);
       widget.onChanged();
       _scrollToEnd();
     } finally {
@@ -417,10 +452,33 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
     );
     // Structured requests are independent of inference/provider availability.
     // Never wait for a prose reply before offering the native review flow.
-    final actionDraft = _phoneActionParser.parse(text);
-    if (actionDraft != null) {
+    if (_pendingPhoneAction != null &&
+        RegExp(
+          r'^(cancel|cancel (it|that|the (?:action|reminder|event|alarm)))[.!]?$',
+          caseSensitive: false,
+        ).hasMatch(text)) {
+      _setPhoneDraft(null);
       setState(() {
-        _pendingPhoneAction = actionDraft;
+        sending = false;
+        widget.messages.add(
+          ChatMessage(
+            role: ChatRole.status,
+            text: 'Draft cancelled. No phone action was executed.',
+            systemGenerated: true,
+          ),
+        );
+      });
+      widget.onChanged();
+      return;
+    }
+    final actionDraft =
+        _phoneActionParser.parse(text) ??
+        (_pendingPhoneAction == null
+            ? null
+            : _phoneActionParser.revise(_pendingPhoneAction!, text));
+    if (actionDraft != null) {
+      _setPhoneDraft(actionDraft);
+      setState(() {
         sending = false;
         widget.messages.add(
           ChatMessage(
@@ -541,12 +599,11 @@ Latest member request: $text''',
               ? priorConversation.sublist(priorConversation.length - 2)
               : priorConversation,
           onToken: onToken,
+          rawMemberMessage: text,
         );
       }
-      if (reply == null || reply.trim().isEmpty) {
-        await _log('FALLBACK: retrying with bare prompt');
-        reply = await _localInference.infer(text, onToken: onToken);
-      }
+      // Never retry without history: that changes what follow-ups such as
+      // "subtract from that" mean and can produce a confident wrong answer.
       // If the model streamed words but the final clean text came back
       // empty, the streamed text itself is the reply.
       var replyToUse = reply;
@@ -1025,7 +1082,10 @@ Latest member request: $text''',
                     IconButton(
                       icon: const Icon(Icons.delete_sweep_outlined, size: 18),
                       tooltip: 'Clear chat',
-                      onPressed: () => setState(() => widget.messages.clear()),
+                      onPressed: () {
+                        _setPhoneDraft(null);
+                        setState(() => widget.messages.clear());
+                      },
                     ),
                 ],
               ),
@@ -1059,7 +1119,7 @@ Latest member request: $text''',
                 action: _pendingPhoneAction!,
                 busy: _executingPhoneAction,
                 onAllow: () => _executePhoneAction(_pendingPhoneAction!),
-                onDismiss: () => setState(() => _pendingPhoneAction = null),
+                onDismiss: () => _setPhoneDraft(null),
               ),
             _ModelRouteSelector(
               useCloud: widget.appState.cloudAiEnabled,
