@@ -6,6 +6,9 @@ KUBE_CONTEXT="${KUBE_CONTEXT:-do-k3s}"
 
 kubectl --context "$KUBE_CONTEXT" create namespace mind-recipe-staging --dry-run=client -o yaml \
   | kubectl --context "$KUBE_CONTEXT" apply -f -
+kubectl --context "$KUBE_CONTEXT" apply -f "$ROOT_DIR/deploy/staging/auth-secret.yaml"
+kubectl --context "$KUBE_CONTEXT" -n mind-recipe-staging wait \
+  --for=condition=Ready externalsecret/mind-recipe-runtime --timeout=120s
 kubectl --context "$KUBE_CONTEXT" -n mind-recipe-staging create configmap mind-recipe-api-source \
   --from-file="$ROOT_DIR/backend/app" \
   --dry-run=client -o yaml \

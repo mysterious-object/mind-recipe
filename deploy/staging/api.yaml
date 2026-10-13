@@ -86,6 +86,13 @@ spec:
               value: development
             - name: MIND_RECIPE_DB_PATH
               value: /data/mind-recipe-staging.sqlite3
+            # Fail closed if the durable credential is unavailable. Never
+            # silently revert to a process-local signing key after a restart.
+            - name: MIND_RECIPE_AUTH_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: mind-recipe-runtime
+                  key: MIND_RECIPE_AUTH_SECRET
             - name: PYTHONPATH
               value: /opt/python-site:/app
           envFrom:
