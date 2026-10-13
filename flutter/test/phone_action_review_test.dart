@@ -92,6 +92,14 @@ void main() {
         ),
       );
       await tester.pump(const Duration(milliseconds: 100));
+      expect(
+        find.text(scenario.startsWith('cloud') ? 'CLOUD' : 'PRIVATE'),
+        findsOneWidget,
+      );
+      expect(
+        find.text(scenario.startsWith('cloud') ? 'PRIVATE' : 'CLOUD'),
+        findsNothing,
+      );
       await tester.enterText(
         find.byType(TextField).first,
         'Help me think about my week',

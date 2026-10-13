@@ -17,9 +17,8 @@ class NavigatorAgentPlan {
 
   String augment(String memberMessage, {String context = ''}) =>
       '''
-Selected MindRecipe support: $tool
-Tool guidance: $instruction
-${context.trim().isEmpty ? '' : 'Relevant member-owned context:\n${context.trim()}\n'}Respond directly without mentioning routing or internal systems. The latest member message below has final priority:
+$instruction
+${context.trim().isEmpty ? '' : 'Member context:\n${context.trim()}\n'}
 
 Latest member message: $memberMessage
 ''';

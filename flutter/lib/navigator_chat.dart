@@ -984,8 +984,9 @@ Latest member request: $text''',
           children: [
             _PresenceHeader(
               animation: fxController,
-              cloudAvailable: cloudAvailable,
-              localReady: _localSnapshot.isReady,
+              cloudAvailable: widget.appState.cloudAiEnabled && cloudAvailable,
+              localReady:
+                  !widget.appState.cloudAiEnabled && _localSnapshot.isReady,
               thinking: sending,
               turn: turn,
             ),

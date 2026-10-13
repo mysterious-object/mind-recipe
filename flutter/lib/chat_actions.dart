@@ -27,7 +27,9 @@ class PhoneAction {
       '${when == null ? ' · choose a date and time' : ' · ${formatActionTime(when!)}'}';
 
   String? validationError(DateTime now) {
-    if (title.trim().isEmpty) return 'Add a title.';
+    if (!RegExp(r'[\p{L}\p{N}\p{S}]', unicode: true).hasMatch(title)) {
+      return 'Add a title.';
+    }
     if (when == null) return 'Choose a date and time.';
     if (!when!.isAfter(now)) return 'Choose a future date and time.';
     if (type == PhoneActionType.appointment) {
@@ -90,7 +92,7 @@ class PhoneActionParser {
       caseSensitive: false,
     ).firstMatch(text);
     final appointment = RegExp(
-      r'^(?:schedule|set up|add|create) (?:an? |the )?(?:appointment|meeting|event|calendar event)\b\s*(.*)$',
+      r'^(?:schedule|set up|add|create) (?:an? |the )?(?:calendar (?:appointment|event)|appointment|meeting|event)\b\s*(.*)$',
       caseSensitive: false,
     ).firstMatch(text);
     final alarm = RegExp(
@@ -107,7 +109,7 @@ class PhoneActionParser {
     final body = match.group(1)!.trim();
     final when = parseWhen(body);
     var title = body.replaceFirst(
-      RegExp(r'^(?:with|for)\s+', caseSensitive: false),
+      RegExp(r'^(?:with|for|titled|called|named)\s+', caseSensitive: false),
       '',
     );
     title = title
@@ -120,6 +122,8 @@ class PhoneActionParser {
         )
         .replaceAll(RegExp(r'\s+'), ' ')
         .trim();
+    // Time-only requests must not leave sentence punctuation as the title.
+    title = title.replaceAll(RegExp(r'^[\s.,;:!?]+|[\s.,;:!?]+$'), '');
     if (type == PhoneActionType.alarm &&
         (title.isEmpty || RegExp(r'^\d').hasMatch(title)))
       title = 'MindRecipe alarm';

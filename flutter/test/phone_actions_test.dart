@@ -45,6 +45,38 @@ void main() {
     expect(action.title, 'stretch');
     expect(action.when, now.add(const Duration(minutes: 20)));
   });
+  test('calendar appointment wording preserves named title and duration', () {
+    final action = parser.parse(
+      'Schedule a calendar appointment titled MindRecipe test tomorrow at 3pm for 30 minutes.',
+    )!;
+    expect(action.type, PhoneActionType.appointment);
+    expect(action.title, 'MindRecipe test');
+    expect(action.when, DateTime(2026, 10, 13, 15));
+    expect(action.end, DateTime(2026, 10, 13, 15, 30));
+  });
+  test('time-only event asks for a title instead of accepting punctuation', () {
+    final action = parser.parse(
+      'Schedule a meeting tomorrow at 3pm for 30 minutes.',
+    )!;
+    expect(action.title, isEmpty);
+    expect(action.validationError(now), 'Add a title.');
+    for (final title in ['.', '...', '!?', '   ']) {
+      expect(
+        PhoneAction(
+          type: PhoneActionType.reminder,
+          title: title,
+        ).validationError(now),
+        'Add a title.',
+      );
+    }
+    expect(
+      PhoneAction(
+        type: PhoneActionType.reminder,
+        title: '散歩',
+      ).validationError(now),
+      'Choose a date and time.',
+    );
+  });
   test('past times and impossible alarm dates require correction', () {
     expect(parser.parseWhen('at 9am'), isNull);
     final futureAlarm = PhoneAction(

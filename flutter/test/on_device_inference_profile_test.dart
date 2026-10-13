@@ -6,6 +6,16 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mind_recipe/on_device_inference.dart';
 
 void main() {
+  test('Qwen non-thinking uses the official empty thinking prefix', () {
+    expect(
+      mindRecipeQwenAssistantPrefix(thinking: false),
+      '<|im_start|>assistant\n<think>\n\n</think>\n\n',
+    );
+    expect(
+      mindRecipeQwenAssistantPrefix(thinking: true),
+      '<|im_start|>assistant\n',
+    );
+  });
   test('CPU model profiles explicitly disable the GPU index', () {
     expect(mindRecipeMainGpuForLayers(0), -1);
   });

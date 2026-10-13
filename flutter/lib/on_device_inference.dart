@@ -210,6 +210,12 @@ bool mindRecipeShouldEmitThinking({
   required int totalMemoryMiB,
 }) => deliberationRequested && totalMemoryMiB >= 6144;
 
+/// Match Qwen's official enable_thinking=false generation prefix. The empty
+/// block is prompt text, not generated content to show to the member.
+@visibleForTesting
+String mindRecipeQwenAssistantPrefix({required bool thinking}) =>
+    '<|im_start|>assistant\n${thinking ? '' : '<think>\n\n</think>\n\n'}';
+
 /// Returns only member-visible model output while a private response is still
 /// arriving. Qwen may emit an empty or populated `<think>` block even when the
 /// prompt requests `/no_think`; forwarding raw engine tokens would briefly
@@ -922,6 +928,8 @@ class OnDeviceInference implements LocalInference {
       return null;
     }
     StreamSubscription<String>? subscription;
+    final timer = Stopwatch()..start();
+    var firstVisibleLogged = false;
     try {
       await _engine!.clear();
       final response = StringBuffer();
@@ -933,7 +941,17 @@ class OnDeviceInference implements LocalInference {
         final visible = mindRecipeVisiblePrivateStreamText(response.toString());
         if (onToken != null && visible.startsWith(emittedVisible)) {
           final delta = visible.substring(emittedVisible.length);
-          if (delta.isNotEmpty) onToken(delta);
+          if (delta.isNotEmpty) {
+            if (!firstVisibleLogged) {
+              firstVisibleLogged = true;
+              unawaited(
+                _inferLog(
+                  'first visible token ms=${timer.elapsedMilliseconds}',
+                ),
+              );
+            }
+            onToken(delta);
+          }
         }
         emittedVisible = visible;
       });
@@ -949,6 +967,7 @@ class OnDeviceInference implements LocalInference {
           .waitForCompletion(promptId)
           .timeout(const Duration(seconds: 150));
       final raw = response.toString();
+      await _inferLog('completion ms=${timer.elapsedMilliseconds}');
       await _inferLog('infer raw length=${raw.length}');
       final stripped = _stripPrivateReasoning(raw);
       await _inferLog('infer stripped length=${stripped.length}');
@@ -1250,12 +1269,14 @@ class OnDeviceInference implements LocalInference {
           ..typeK = kvType
           ..typeV = kvType;
         final sampler = SamplerParams()
-          ..temp = 0.75
-          ..topK = 30
-          ..topP = 0.95
+          ..temp = 0.7
+          ..topK = 20
+          ..topP = 0.8
           ..minP = 0.0
-          ..penaltyPresent = 1.7
-          ..penaltyRepeat = 1.18;
+          // Neutral penalties do not suppress numbers/names that need to be
+          // reused from context. Conversation-loop checks remain in the UI.
+          ..penaltyPresent = 0.0
+          ..penaltyRepeat = 1.0;
         final parent = LlamaParent(
           LlamaLoad(
             path: file.path,
@@ -1365,11 +1386,7 @@ class OnDeviceInference implements LocalInference {
       return _buildGemmaPrompt(userMessage, history);
     }
     final prompt = StringBuffer('''<|im_start|>system
-You are MindRecipe, a private personal assistant and wellness companion.
-
-Follow the member's latest request exactly; it overrides conflicting older instructions. Answer directly and move the conversation forward. If they reject a question, do not ask one. If they request wording, provide the wording. Correct yourself immediately after a correction. Use recent facts and unfinished commitments without inventing memory. Do not restate the request, repeat an earlier reply, or default to a generic exercise.
-
-Be warm, natural, specific, and concise (usually 25–90 words). Ask at most one question, only when the request cannot be answered without missing information. For phone tasks, briefly state what can be proposed for native approval; never claim an action already happened. Separate observed facts from uncertain interpretation. Never diagnose, prescribe, claim clinical certainty, or mention internal tools. For urgent danger, encourage local emergency help or 988 in the United States.<|im_end|>
+You are MindRecipe, a private personal assistant. Follow the latest request and corrections; use relevant history without inventing memory. Answer directly, warmly and briefly. Respect requested formats. Ask only for essential missing information. Do not echo the request, repeat prior replies, or impose wellness exercises. Phone actions require user approval; never claim unverified execution. Distinguish facts from uncertainty. Never diagnose, prescribe, or claim clinical certainty. For immediate danger, encourage local emergency help.<|im_end|>
 ''');
     // Keep context well under the 1K low-memory route while retaining enough
     // continuity for corrections and unresolved commitments.
@@ -1388,13 +1405,15 @@ Be warm, natural, specific, and concise (usually 25–90 words). Ask at most one
         ..writeln(clean)
         ..writeln('<|im_end|>');
     }
+    final thinking = mindRecipeShouldEmitThinking(
+      deliberationRequested: mindRecipeShouldDeliberate(deliberationMessage),
+      totalMemoryMiB: _thinkingAllowed ? 6144 : 4096,
+    );
     prompt
       ..writeln('<|im_start|>user')
       ..writeln(_cleanPromptText(userMessage))
-      ..writeln(
-        '${mindRecipeShouldEmitThinking(deliberationRequested: mindRecipeShouldDeliberate(deliberationMessage), totalMemoryMiB: _thinkingAllowed ? 6144 : 4096) ? '/think' : '/no_think'}<|im_end|>',
-      )
-      ..writeln('<|im_start|>assistant');
+      ..writeln('${thinking ? '/think' : '/no_think'}<|im_end|>')
+      ..write(mindRecipeQwenAssistantPrefix(thinking: thinking));
     return prompt.toString();
   }
 
