@@ -232,12 +232,7 @@ String mindRecipeVisiblePrivateStreamText(String response) {
 
   // Do not publish a suffix that could become a control tag when the next
   // native token arrives.
-  const markers = <String>[
-    '<think>',
-    '</think>',
-    '<|im_start|>',
-    '<|im_end|>',
-  ];
+  const markers = <String>['<think>', '</think>', '<|im_start|>', '<|im_end|>'];
   for (final marker in markers) {
     for (
       var prefixLength = marker.length - 1;
@@ -291,7 +286,33 @@ Future<bool> mindRecipeVerifyExistingModelFile(
 class OnDeviceInference implements LocalInference {
   static final OnDeviceInference _instance = OnDeviceInference._();
   factory OnDeviceInference() => _instance;
-  OnDeviceInference._();
+  OnDeviceInference._() : _supportDirectoryOverride = null;
+
+  @visibleForTesting
+  OnDeviceInference.forTesting({
+    required Future<Directory> Function() supportDirectory,
+  }) : _supportDirectoryOverride = supportDirectory;
+
+  final Future<Directory> Function()? _supportDirectoryOverride;
+  Future<Directory> _supportDirectory() =>
+      _supportDirectoryOverride?.call() ?? getApplicationSupportDirectory();
+  bool _modelMutationActive = false;
+
+  // A model's file, manifest and engine must move together. Pollers may read
+  // the current snapshot during installation, but may not select another file.
+  Future<T> _withModelMutation<T>(Future<T> Function() operation) async {
+    if (_modelMutationActive) {
+      throw StateError('Wait for the current private model setup to finish.');
+    }
+    _modelMutationActive = true;
+    try {
+      await _restoreActiveSelection();
+      if (_refreshing) await _refreshCompleter?.future;
+      return await operation();
+    } finally {
+      _modelMutationActive = false;
+    }
+  }
 
   /// Broadcast every snapshot change (checking → verifying → ready …) so any
   /// screen — e.g. the Navigator header — flips to online the moment the
@@ -343,6 +364,10 @@ class OnDeviceInference implements LocalInference {
 
   Future<LocalInferenceSnapshot> activateModel(
     OnDeviceModelManifest manifest,
+  ) => _withModelMutation(() => _activateModel(manifest));
+
+  Future<LocalInferenceSnapshot> _activateModel(
+    OnDeviceModelManifest manifest,
   ) async {
     if (!await isModelDownloaded(manifest)) {
       throw StateError('Download this model before selecting it.');
@@ -353,7 +378,7 @@ class OnDeviceInference implements LocalInference {
       await _persistActiveSelection();
     }
     _set(const LocalInferenceSnapshot(OnDeviceStatus.checking));
-    final result = await refreshStatus();
+    final result = await _refreshStatus(fromMutation: true);
     if (!result.isReady) {
       throw StateError(result.detail ?? 'The private model could not start.');
     }
@@ -387,22 +412,26 @@ class OnDeviceInference implements LocalInference {
         if (await staged.exists()) return staged;
       }
     }
-    final base = await getApplicationSupportDirectory();
+    final base = await _supportDirectory();
     final directory = Directory('${base.path}/private-models');
     if (!await directory.exists()) await directory.create(recursive: true);
     return File('${directory.path}/${target.id}.gguf');
   }
 
-  bool _activeSelectionLoaded = false;
+  Future<void>? _activeSelectionLoad;
 
   Future<File> _activeModelMarker() async {
-    final base = await getApplicationSupportDirectory();
+    final base = await _supportDirectory();
     return File('${base.path}/private-models/active-model.txt');
   }
 
-  Future<void> _restoreActiveSelection() async {
-    if (_activeSelectionLoaded) return;
-    _activeSelectionLoaded = true;
+  Future<void> _restoreActiveSelection() => _activeSelectionLoad ??=
+      _readActiveSelection().catchError((Object error, StackTrace stack) {
+        _activeSelectionLoad = null;
+        Error.throwWithStackTrace(error, stack);
+      });
+
+  Future<void> _readActiveSelection() async {
     final marker = await _activeModelMarker();
     if (!await marker.exists()) return;
     final id = (await marker.readAsString()).trim();
@@ -428,8 +457,13 @@ class OnDeviceInference implements LocalInference {
       '${manifest.version}:${manifest.sizeBytes}:${manifest.sha256}';
 
   @override
-  Future<LocalInferenceSnapshot> refreshStatus() async {
+  Future<LocalInferenceSnapshot> refreshStatus() => _refreshStatus();
+
+  Future<LocalInferenceSnapshot> _refreshStatus({
+    bool fromMutation = false,
+  }) async {
     await _restoreActiveSelection();
+    if (_modelMutationActive && !fromMutation) return _snapshot;
     // A loaded engine is already the authoritative capability check. Re-running
     // the file verifier for every app-wide readiness poll briefly published
     // `verifying` and `initializing`, which made Navigator visibly oscillate
@@ -459,18 +493,8 @@ class OnDeviceInference implements LocalInference {
     final completer = Completer<LocalInferenceSnapshot>();
     _refreshCompleter = completer;
     try {
-      var file = await _modelFile();
-      if (!await file.exists()) {
-        for (final choice in mindRecipePrivateModelChoices) {
-          final candidate = await _modelFile(choice.manifest);
-          if (await candidate.exists() &&
-              await candidate.length() == choice.manifest.sizeBytes) {
-            _activeManifest = choice.manifest;
-            file = candidate;
-            break;
-          }
-        }
-      }
+      final manifest = _activeManifest;
+      final file = await _modelFile(manifest);
       final partial = File('${file.path}.partial');
       final stalePartialReceipt = await _verificationReceipt(partial);
       if (!await partial.exists() && await stalePartialReceipt.exists()) {
@@ -502,7 +526,7 @@ class OnDeviceInference implements LocalInference {
       // crypto — 4 min is too tight and flakes as "never passes verification".
       if (!await _matchesManifest(
         file,
-        _activeManifest,
+        manifest,
       ).timeout(const Duration(minutes: 10))) {
         await _inferLog('verify failed: hash mismatch');
         _disposeEngine();
@@ -544,6 +568,13 @@ class OnDeviceInference implements LocalInference {
   Future<void> installModel({
     bool allowCellular = false,
     OnDeviceModelManifest? model,
+  }) => _withModelMutation(
+    () => _installModel(allowCellular: allowCellular, model: model),
+  );
+
+  Future<void> _installModel({
+    bool allowCellular = false,
+    OnDeviceModelManifest? model,
   }) async {
     if (_downloadActive) {
       throw StateError('Wait for the current private model setup to finish.');
@@ -554,7 +585,7 @@ class OnDeviceInference implements LocalInference {
       await _persistActiveSelection();
     }
     if (await isModelDownloaded(_activeManifest)) {
-      await activateModel(_activeManifest);
+      await _activateModel(_activeManifest);
       return;
     }
     final destination = await _modelFile();
@@ -577,7 +608,7 @@ class OnDeviceInference implements LocalInference {
           await _persistActiveSelection();
           _downloadActive = false;
           _set(const LocalInferenceSnapshot(OnDeviceStatus.checking));
-          final ready = await refreshStatus();
+          final ready = await _refreshStatus(fromMutation: true);
           if (!ready.isReady) {
             throw StateError(
               ready.detail ?? 'The private model could not be started.',
@@ -828,7 +859,7 @@ class OnDeviceInference implements LocalInference {
       // failed even though the model on disk is valid.
       _downloadActive = false;
       _set(const LocalInferenceSnapshot(OnDeviceStatus.checking));
-      final ready = await refreshStatus();
+      final ready = await _refreshStatus(fromMutation: true);
       if (!ready.isReady) {
         throw StateError(
           ready.detail ?? 'The private model could not be started.',
@@ -890,17 +921,16 @@ class OnDeviceInference implements LocalInference {
       );
       return null;
     }
+    StreamSubscription<String>? subscription;
     try {
       await _engine!.clear();
       final response = StringBuffer();
       var emittedVisible = '';
-      final subscription = _engine!.stream.listen((token) {
+      subscription = _engine!.stream.listen((token) {
         response.write(token);
         // Stream only the monotonic member-visible suffix. The native engine's
         // Qwen scratchpad must never appear in the conversation bubble.
-        final visible = mindRecipeVisiblePrivateStreamText(
-          response.toString(),
-        );
+        final visible = mindRecipeVisiblePrivateStreamText(response.toString());
         if (onToken != null && visible.startsWith(emittedVisible)) {
           final delta = visible.substring(emittedVisible.length);
           if (delta.isNotEmpty) onToken(delta);
@@ -918,17 +948,12 @@ class OnDeviceInference implements LocalInference {
       await _engine!
           .waitForCompletion(promptId)
           .timeout(const Duration(seconds: 150));
-      await subscription.cancel();
       final raw = response.toString();
-      await _inferLog(
-        'infer raw length=${raw.length} preview="${raw.substring(0, raw.length > 150 ? 150 : raw.length)}"',
-      );
+      await _inferLog('infer raw length=${raw.length}');
       final stripped = _stripPrivateReasoning(raw);
       await _inferLog('infer stripped length=${stripped.length}');
       final clean = _enforceWellnessBoundaries(stripped).trim();
-      await _inferLog(
-        'infer clean length=${clean.length} preview="${clean.substring(0, clean.length > 150 ? 150 : clean.length)}"',
-      );
+      await _inferLog('infer clean length=${clean.length}');
       return clean.isEmpty ? null : clean;
     } catch (error) {
       await _inferLog('infer ERROR: $error');
@@ -940,18 +965,21 @@ class OnDeviceInference implements LocalInference {
         ),
       );
       return null;
+    } finally {
+      await subscription?.cancel();
     }
   }
 
   @override
-  Future<void> removeModel() async {
-    await removeDownloadedModel(_activeManifest);
-  }
+  Future<void> removeModel() =>
+      _withModelMutation(() => _removeDownloadedModel(_activeManifest));
 
   /// Auto-resumes a download interrupted by an app kill: if a `.partial`
   /// with bytes exists and nothing is active in this process, restart the
   /// install — it continues from the on-disk bytes via a Range request.
   Future<void> resumeIfInterrupted() async {
+    await _restoreActiveSelection();
+    if (_modelMutationActive) return;
     if (_downloadActive) return;
     if (_snapshot.status == OnDeviceStatus.downloading ||
         _snapshot.status == OnDeviceStatus.verifying) {
@@ -971,7 +999,10 @@ class OnDeviceInference implements LocalInference {
     }
   }
 
-  Future<void> removeDownloadedModel(OnDeviceModelManifest manifest) async {
+  Future<void> removeDownloadedModel(OnDeviceModelManifest manifest) =>
+      _withModelMutation(() => _removeDownloadedModel(manifest));
+
+  Future<void> _removeDownloadedModel(OnDeviceModelManifest manifest) async {
     final removingActive = manifest.id == _activeManifest.id;
     if (removingActive) _disposeEngine();
     final file = await _modelFile(manifest);
@@ -995,7 +1026,7 @@ class OnDeviceInference implements LocalInference {
     _activeManifest = fallback;
     await _persistActiveSelection();
     _set(const LocalInferenceSnapshot(OnDeviceStatus.checking));
-    await refreshStatus();
+    await _refreshStatus(fromMutation: true);
   }
 
   Future<bool> _matchesManifest(File file, OnDeviceModelManifest manifest) =>

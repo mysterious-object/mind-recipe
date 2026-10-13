@@ -38,13 +38,31 @@ class ControlledInference extends FakeLocalInference {
   }
 }
 
+class InterruptedCloudApi extends FakeMindRecipeApi {
+  @override
+  Stream<NavigatorStreamEvent> navigatorTurn({
+    required String token,
+    required String providerKey,
+    required String text,
+    required Map<String, dynamic> context,
+    required String model,
+    bool externalResearchOptIn = false,
+  }) async* {
+    yield const NavigatorStreamEvent('accepted', {});
+    yield const NavigatorStreamEvent('delta', {'text': 'Partial answer'});
+    yield const NavigatorStreamEvent('error', {'code': 'rate_limited'});
+  }
+}
+
 void main() {
   setUp(() => FlutterSecureStorage.setMockInitialValues({}));
 
   for (final scenario in [
     'private stream',
+    'private short answer',
     'private failure',
     'cloud selected',
+    'cloud interrupted',
   ]) {
     testWidgets(scenario, (tester) async {
       tester.view.physicalSize = const Size(1000, 1600);
@@ -54,7 +72,7 @@ void main() {
       final local = ControlledInference()..fail = scenario == 'private failure';
       final state = SecureAppState()
         ..loaded = true
-        ..cloudAiEnabled = scenario == 'cloud selected'
+        ..cloudAiEnabled = scenario.startsWith('cloud')
         ..managedAiAvailable = true;
       final messages = <ChatMessage>[];
       await tester.pumpWidget(
@@ -63,7 +81,9 @@ void main() {
             body: NavigatorChatExperience(
               state: CheckInState(),
               onChanged: () {},
-              api: FakeMindRecipeApi(),
+              api: scenario == 'cloud interrupted'
+                  ? InterruptedCloudApi()
+                  : FakeMindRecipeApi(),
               appState: state,
               messages: messages,
               localInference: local,
@@ -85,9 +105,21 @@ void main() {
         expect(messages.last.text, 'First second third.');
         local.reply.complete('First second third.');
         await tester.pump(const Duration(milliseconds: 200));
+      } else if (scenario == 'private short answer') {
+        local.reply.complete('43');
+        await tester.pump(const Duration(milliseconds: 200));
+        expect(messages.last.text, '43');
+        expect(messages.last.localGenerated, isTrue);
+        expect(messages.last.role, ChatRole.assistant);
+        expect(local.calls, 1);
       } else if (scenario == 'private failure') {
         expect(local.calls, 1);
         expect(messages.last.text, contains('could not finish'));
+      } else if (scenario == 'cloud interrupted') {
+        expect(local.calls, 0);
+        expect(messages.last.text, contains('rate-limiting'));
+        expect(messages.last.role, ChatRole.status);
+        expect(messages.last.cloudGenerated, isFalse);
       } else {
         expect(local.calls, 0);
         expect(messages.any((m) => m.cloudGenerated), isTrue);

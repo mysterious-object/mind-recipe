@@ -342,7 +342,12 @@ class MindRecipeApiClient {
         )
         .timeout(const Duration(seconds: 30));
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw const ApiException('Navigator is temporarily unavailable.');
+      throw ApiException(switch (response.statusCode) {
+        401 => 'Your session needs to be renewed. Please sign in again.',
+        403 => 'Your account is not permitted to use this AI route.',
+        429 => 'AI requests are temporarily rate-limited. Try again shortly.',
+        _ => 'The AI service is temporarily unavailable. Try again shortly.',
+      });
     }
     final decoded = jsonDecode(response.body) as Map<String, dynamic>;
     return AiReply(
@@ -406,12 +411,18 @@ class MindRecipeApiClient {
       return;
     }
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw const ApiException('Navigator is temporarily unavailable.');
+      throw ApiException(switch (response.statusCode) {
+        401 => 'Your session needs to be renewed. Please sign in again.',
+        403 => 'Your account is not permitted to use this AI route.',
+        429 => 'AI requests are temporarily rate-limited. Try again shortly.',
+        _ => 'The AI service is temporarily unavailable. Try again shortly.',
+      });
     }
     var event = '';
     var data = '';
     await for (final line
         in response.stream
+            .timeout(const Duration(seconds: 45))
             .transform(utf8.decoder)
             .transform(const LineSplitter())) {
       if (line.startsWith('event:')) {

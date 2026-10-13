@@ -14,6 +14,7 @@ import 'mind_recipe_fx.dart';
 import 'mind_recipe_device_harness.dart';
 import 'navigator_agent.dart';
 import 'on_device_inference.dart';
+import 'private_reply_policy.dart';
 import 'voice_interface.dart';
 import 'conversation_viz.dart';
 
@@ -470,9 +471,8 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
         messagesSent: widget.appState.messagesSent,
         aiReflections: widget.appState.aiReflections,
       );
-      // Live streaming: the reply renders as the model generates, so the
-      // member sees words within the first second instead of after the
-      // full completion.
+      // Render tokens as they arrive. First-token latency depends on the
+      // device and prompt; it is measured in live validation, not assumed.
       final placeholderIndex = widget.messages.length;
       void onToken(String token) {
         if (!mounted || token.isEmpty) return;
@@ -718,6 +718,19 @@ Latest member request: $text''',
             });
             _scrollToEnd();
           }
+        } else if (event.type == 'error') {
+          reply = AiReply(
+            mode: 'provider_error',
+            message: switch (event.payload['code']) {
+              'invalid_key' => 'Check your OpenRouter key in Settings.',
+              'model_unavailable' => 'The selected model is unavailable. Choose a model in Settings.',
+              'rate_limited' => 'The selected provider is rate-limiting requests. Try again shortly.',
+              'timeout' =>
+                'The selected provider took too long to respond. Try again.',
+              _ => 'The selected AI provider could not finish this reply. Try again.',
+            },
+          );
+          break;
         } else if (event.type == 'done') {
           reply = AiReply(
             mode: event.payload['mode']?.toString() ?? 'provider_error',
@@ -736,12 +749,14 @@ Latest member request: $text''',
       setState(() {
         if (placeholderIndex < widget.messages.length) {
           final streamed = widget.messages[placeholderIndex].text;
-          completedMessage = streamed.isNotEmpty ? streamed : reply!.message;
+          completedMessage = reply!.isCloudAi && streamed.isNotEmpty
+              ? streamed
+              : reply.message;
           widget.messages[placeholderIndex] = ChatMessage(
-            role: reply!.isCloudAi ? ChatRole.assistant : ChatRole.status,
+            role: reply.isCloudAi ? ChatRole.assistant : ChatRole.status,
             text: completedMessage,
-            model: reply!.isCloudAi ? reply!.model : null,
-            cloudGenerated: reply!.isCloudAi,
+            model: reply.isCloudAi ? reply.model : null,
+            cloudGenerated: reply.isCloudAi,
           );
         }
       });
@@ -757,13 +772,13 @@ Latest member request: $text''',
           return;
         }
       }
-    } catch (_) {
+    } catch (error) {
       if (!mounted) return;
       setState(
         () => widget.messages.add(
-          const ChatMessage(
+          ChatMessage(
             role: ChatRole.status,
-            text: 'The AI connection was interrupted. Nothing was inferred or saved—try again when you’re ready.',
+            text: error is ApiException ? error.message : 'The AI connection was interrupted before completion. Any partial reply may be incomplete. Try again when you’re ready.',
           ),
         ),
       );
@@ -809,60 +824,13 @@ Latest member request: $text''',
   }
 
   bool _isUsefulLocalReply(String? reply, String memberText) {
-    if (reply == null) {
-      unawaited(_log('FILTER: reply is null'));
-      return false;
-    }
-    final clean = reply.trim();
-    if (clean.isEmpty) {
-      unawaited(_log('FILTER: empty after trim'));
-      return false;
-    }
-    if (clean.length < 8) {
-      unawaited(_log('FILTER: too short (${clean.length}) "$clean"'));
-      return false;
-    }
-    final replyWords = clean
-        .replaceAll(RegExp(r'[^A-Za-z0-9\s]'), ' ')
-        .split(RegExp(r'\s+'))
-        .where((word) => word.isNotEmpty)
-        .length;
-    final memberWords = memberText
-        .split(RegExp(r'\s+'))
-        .where((word) => word.isNotEmpty)
-        .length;
-    if (memberWords >= 6 && replyWords <= 2 && clean.length < 20) {
-      unawaited(_log('FILTER: fragment "$clean"'));
-      return false;
-    }
-    if (_violatesExplicitReplyForm(clean, memberText)) {
-      unawaited(_log('FILTER: reply contradicts explicit response form'));
-      return false;
-    }
-    final lowered = clean.toLowerCase();
-    if (lowered.contains('<|im_')) {
-      unawaited(_log('FILTER: im_ token'));
-      return false;
-    }
-    final normalizedReply = lowered.replaceAll(RegExp(r'[^a-z0-9]+'), '');
-    final normalizedMember = memberText.toLowerCase().replaceAll(
-      RegExp(r'[^a-z0-9]+'),
-      '',
-    );
-    if (normalizedReply == normalizedMember) {
-      unawaited(_log('FILTER: echo'));
-      return false;
-    }
-    unawaited(_log('FILTER: PASSED len=${clean.length}'));
-    return true;
+    final accepted = mindRecipeAcceptsPrivateReply(reply, memberText);
+    unawaited(_log('FILTER: accepted=$accepted len=${reply?.length ?? 0}'));
+    return accepted;
   }
 
   bool _violatesExplicitReplyForm(String reply, String memberText) {
-    final request = memberText.toLowerCase().replaceAll('’', "'");
-    final rejectsQuestion = RegExp(
-      r"\b(?:do not|don't|no)\s+(?:ask\s+(?:me\s+)?(?:any\s+)?|more\s+)?questions?\b",
-    ).hasMatch(request);
-    return rejectsQuestion && reply.trimRight().endsWith('?');
+    return mindRecipeViolatesReplyForm(reply, memberText);
   }
 
   Future<void> _toggleVoiceInput() async {
