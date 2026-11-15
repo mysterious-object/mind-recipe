@@ -7,10 +7,12 @@ import 'package:mind_recipe/app_services.dart';
 class ControlledStorage extends FlutterSecureStorage {
   Completer<void>? gate;
   bool fail = false;
+  bool failTheme = false;
   @override
   Future<void> write({required String key, required String? value,
     Object? iOptions, Object? aOptions, Object? lOptions, Object? webOptions,
     Object? mOptions, Object? wOptions}) async {
+    if (key == 'mind_recipe_visual_theme' && failTheme) throw StateError('theme write failed');
     if (key.startsWith('mind_recipe_onboarding_version_')) {
       if (fail) throw StateError('secure storage unavailable');
       await gate?.future;
@@ -70,5 +72,14 @@ void main() {
     });
     await state.setSession(b);
     expect(notifications, greaterThan(0));
+  });
+
+  test('visual preference write queue recovers after a storage failure', () async {
+    final storage = ControlledStorage()..failTheme = true;
+    final state = SecureAppState(storage: storage);
+    await expectLater(state.setVisualTheme('mindrecipe-core'), throwsStateError);
+    storage.failTheme = false;
+    await state.setVisualTheme('tidal-glass');
+    expect(await storage.read(key: 'mind_recipe_visual_theme'), 'tidal-glass');
   });
 }

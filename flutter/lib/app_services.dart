@@ -1671,7 +1671,7 @@ class SecureAppState extends ChangeNotifier {
     // Theme cards update the renderer immediately. Serialize the durable
     // writes so fast consecutive selections cannot finish out of order and
     // restore an older theme after the next cold launch.
-    _visualThemeWrite = _visualThemeWrite.then(
+    _visualThemeWrite = _visualThemeWrite.catchError((Object _) {}).then(
       (_) => _storage.write(key: _visualThemeKey, value: migrated),
     );
     await _visualThemeWrite;

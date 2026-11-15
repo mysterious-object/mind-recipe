@@ -28,6 +28,8 @@ class ControlledInference extends FakeLocalInference {
     List<LocalConversationTurn> history = const [],
     void Function(String token)? onToken,
     String? rawMemberMessage,
+    String memberContext = '',
+    String routingGuidance = '',
   }) {
     calls++;
     if (fail) throw StateError('native test failure');

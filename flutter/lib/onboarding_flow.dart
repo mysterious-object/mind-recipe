@@ -19,6 +19,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   late String _appearance;
   late String _visual;
   late final String? _owner;
+  late final AccountSession? _session;
   bool _busy = false;
   String? _error;
 
@@ -27,6 +28,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     super.initState();
     final draft = widget.appState.onboardingDraft;
     _owner = widget.appState.session?.email.trim().toLowerCase();
+    _session = widget.appState.session;
     _step = (draft['step'] as int? ?? 0).clamp(0, 2);
     _name = TextEditingController(text: widget.appState.memberDisplayName);
     _appearance = draft['appearance'] as String? ?? widget.appState.appearanceMode;
@@ -40,7 +42,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   }
 
   Future<void> _save({int? step, bool finish = false, bool skip = false}) async {
-    if (_busy) return;
+    if (_busy || !_activeAccount) return;
     if ((_step == 1 && step == 2 || finish) && _name.text.trim().isEmpty) {
       setState(() => _error = 'Please enter a name or nickname.');
       return;
@@ -74,6 +76,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   }
 
   bool get _activeAccount => mounted &&
+      identical(widget.appState.session, _session) &&
       widget.appState.session?.email.trim().toLowerCase() == _owner;
 
   @override
@@ -87,6 +90,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
         if (!didPop && !_busy) _save(step: _step - 1);
       },
       child: Scaffold(
+        backgroundColor: Theme.of(context).colorScheme.surface,
         appBar: AppBar(
           title: const Text('MindRecipe'),
           leading: IconButton(

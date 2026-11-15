@@ -164,7 +164,7 @@ class _MindRecipeAppState extends State<MindRecipeApp> {
           ? AccountGateway(api: api, appState: appState)
           : !appState.onboardingComplete
           ? OnboardingFlow(
-              key: ValueKey(appState.session!.email.trim().toLowerCase()),
+              key: ObjectKey(appState.session),
               appState: appState,
             )
           : practitionerMode

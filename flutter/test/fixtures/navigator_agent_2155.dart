@@ -1,0 +1,133 @@
+// Frozen router from 3990f706; synthetic evaluation only.
+/// Bounded, private tool routing for the on-device MindRecipe assistant.
+///
+/// The router is deterministic so tool selection remains available without a
+/// network connection or provider key. It supplies context to the local model;
+/// it never controls the phone, opens another app, or performs an external
+/// action without the member choosing that action.
+class NavigatorAgentPlan {
+  const NavigatorAgentPlan({
+    required this.tool,
+    required this.instruction,
+    this.requiresResearchApproval = false,
+  });
+
+  final String tool;
+  final String instruction;
+  final bool requiresResearchApproval;
+
+  String augment(String memberMessage, {String context = ''}) {
+    // Avoid spending the mobile prompt budget on generic routing prose.
+    // Preserve the actual latest request as the final part of the user turn.
+    final guidance = tool == 'open conversation' ? '' : instruction;
+    return [
+      if (guidance.isNotEmpty) guidance,
+      if (context.trim().isNotEmpty) 'Member context: ${context.trim()}',
+      memberMessage,
+    ].join('\n\n');
+  }
+}
+
+class NavigatorAgent {
+  const NavigatorAgent();
+
+  NavigatorAgentPlan plan(
+    String message, {
+    required bool externalResearchApproved,
+    required int navigationSessions,
+    required int messagesSent,
+    required int aiReflections,
+  }) {
+    final text = message.toLowerCase();
+    // General AGI assistance (phone features, tasks) is distinct from
+    // therapeutic support — route it practically, not clinically.
+    if (_contains(text, const [
+          'remind',
+          'reminder',
+          'appointment',
+          'alarm',
+          'wake me',
+          'calendar',
+          'my calendar',
+          'set a timer',
+          'add to my calendar',
+          'book',
+          'schedule an appointment',
+        ]) &&
+        !_contains(text, const [
+          'anxious',
+          'sad',
+          'depressed',
+          'overwhelmed',
+          'panic',
+          'grief',
+          'therapy',
+          'therapist',
+          'crisis',
+          'hopeless',
+        ])) {
+      return const NavigatorAgentPlan(
+        tool: 'phone assistance',
+        instruction: 'This is a practical phone task, not a therapy moment. Reply in one short sentence confirming what you can do; the app shows an on-device action card for the member to approve. No emotional framing, no questions about feelings.',
+      );
+    }
+    if (_contains(text, const [
+      'research',
+      'evidence',
+      'study',
+      'paper',
+      'source',
+    ])) {
+      if (!externalResearchApproved) {
+        return const NavigatorAgentPlan(
+          tool: 'evidence research',
+          instruction: 'No external research was performed. Briefly explain that public-source research needs the member to enable it for that request, then continue with clearly labeled general guidance.',
+          requiresResearchApproval: true,
+        );
+      }
+      return const NavigatorAgentPlan(
+        tool: 'evidence research',
+        instruction: 'External research was approved but is unavailable in private offline mode. State that no sources were retrieved; never invent a citation.',
+      );
+    }
+    if (_contains(text, const ['progress', 'trend', 'pattern', 'history'])) {
+      return NavigatorAgentPlan(
+        tool: 'progress reflection',
+        instruction:
+            'Use only these device-owned activity facts: $navigationSessions navigation sessions, $messagesSent member messages, and $aiReflections AI reflections today. Do not infer a clinical trend from them.',
+      );
+    }
+    if (_contains(text, const ['lesson', 'orientation', 'course'])) {
+      return const NavigatorAgentPlan(
+        tool: 'MindRecipe lesson',
+        instruction: 'Help the member choose a relevant lesson and direct them to the MindRecipe tab. Do not claim unimported lesson content exists.',
+      );
+    }
+    if (_contains(text, const ['book', 'booking', 'appointment', 'schedule'])) {
+      return const NavigatorAgentPlan(
+        tool: 'booking',
+        instruction: 'Explain that the member can open the clearly labeled Booking tab. Do not choose a level of care or claim an appointment was made.',
+      );
+    }
+    if (_contains(text, const [
+      'exercise',
+      'practice',
+      'ground',
+      'breathe',
+      'tool',
+      'calm',
+    ])) {
+      return const NavigatorAgentPlan(
+        tool: 'wellness recipe',
+        instruction: 'Offer one short, voluntary MindRecipe-style practice and ask whether it feels useful. Avoid diagnosis or treatment claims.',
+      );
+    }
+    return const NavigatorAgentPlan(
+      tool: 'open conversation',
+      instruction: 'Listen for what the member wants before choosing a mode. Answer, plan, reflect, or help practically based on their request. Never start Daily Nav or a wellness exercise unless they explicitly choose it.',
+    );
+  }
+
+  bool _contains(String text, List<String> terms) =>
+      terms.any((term) => text.contains(term));
+}

@@ -15,6 +15,19 @@ class NavigatorAgentPlan {
   final String instruction;
   final bool requiresResearchApproval;
 
+  /// Saved check-ins are optional evidence, not the conversation's speaker.
+  /// Include them when explicitly requested. Personal planning can use the
+  /// member's current message/history without attaching an old mood report.
+  String relevantMemberContext(String message, String context) {
+    final requestsBackground = RegExp(
+      r'\b(?:my (?:energy|check.in|mood|progress|history)|based on what i (?:said|told|reported)|how (?:have|was|am) i)\b',
+      caseSensitive: false,
+    ).hasMatch(message);
+    return tool == 'progress reflection' || requestsBackground
+        ? context
+        : '';
+  }
+
   String augment(String memberMessage, {String context = ''}) {
     // Avoid spending the mobile prompt budget on generic routing prose.
     // Preserve the actual latest request as the final part of the user turn.
@@ -37,46 +50,16 @@ class NavigatorAgent {
     required int messagesSent,
     required int aiReflections,
   }) {
-    final text = message.toLowerCase();
+    bool intent(String pattern) => RegExp(pattern, caseSensitive: false).hasMatch(message);
     // General AGI assistance (phone features, tasks) is distinct from
     // therapeutic support — route it practically, not clinically.
-    if (_contains(text, const [
-          'remind',
-          'reminder',
-          'appointment',
-          'alarm',
-          'wake me',
-          'calendar',
-          'my calendar',
-          'set a timer',
-          'add to my calendar',
-          'book',
-          'schedule an appointment',
-        ]) &&
-        !_contains(text, const [
-          'anxious',
-          'sad',
-          'depressed',
-          'overwhelmed',
-          'panic',
-          'grief',
-          'therapy',
-          'therapist',
-          'crisis',
-          'hopeless',
-        ])) {
+    if (intent(r'\b(?:remind me|wake me|set (?:an? |the )?(?:alarm|reminder|timer)|(?:add|put|save|move|reschedule|cancel).{0,35}(?:calendar|appointment)|book (?:me |an? |the )?(?:appointment|meeting)|schedule (?:an? |the )?appointment)\b')) {
       return const NavigatorAgentPlan(
         tool: 'phone assistance',
-        instruction: 'This is a practical phone task, not a therapy moment. Reply in one short sentence confirming what you can do; the app shows an on-device action card for the member to approve. No emotional framing, no questions about feelings.',
+        instruction: 'Help with the requested phone task. Missing details are unknown. No calendar/record access or completed action is available without a confirmed tool result.',
       );
     }
-    if (_contains(text, const [
-      'research',
-      'evidence',
-      'study',
-      'paper',
-      'source',
-    ])) {
+    if (intent(r'\b(?:research|find (?:a |some )?(?:studies|papers|sources)|(?:show|give|cite|share).{0,20}(?:evidence|sources|references)|evidence (?:for|that|about)|studies (?:on|about))\b')) {
       if (!externalResearchApproved) {
         return const NavigatorAgentPlan(
           tool: 'evidence research',
@@ -89,36 +72,32 @@ class NavigatorAgent {
         instruction: 'External research was approved but is unavailable in private offline mode. State that no sources were retrieved; never invent a citation.',
       );
     }
-    if (_contains(text, const ['progress', 'trend', 'pattern', 'history'])) {
+    if (intent(r'\bmy (?:progress|trends?|patterns?|history|activity|check.ins?)\b')) {
       return NavigatorAgentPlan(
         tool: 'progress reflection',
         instruction:
             'Use only these device-owned activity facts: $navigationSessions navigation sessions, $messagesSent member messages, and $aiReflections AI reflections today. Do not infer a clinical trend from them.',
       );
     }
-    if (_contains(text, const ['lesson', 'orientation', 'course'])) {
+    if (intent(r'\b(?:show|find|open|start|choose|recommend|take|learn).{0,30}\b(?:lesson|course|orientation)\b')) {
       return const NavigatorAgentPlan(
         tool: 'MindRecipe lesson',
         instruction: 'Help the member choose a relevant lesson and direct them to the MindRecipe tab. Do not claim unimported lesson content exists.',
       );
     }
-    if (_contains(text, const ['book', 'booking', 'appointment', 'schedule'])) {
-      return const NavigatorAgentPlan(
-        tool: 'booking',
-        instruction: 'Explain that the member can open the clearly labeled Booking tab. Do not choose a level of care or claim an appointment was made.',
-      );
-    }
-    if (_contains(text, const [
-      'exercise',
-      'practice',
-      'ground',
-      'breathe',
-      'tool',
-      'calm',
-    ])) {
+    // Choose a practice only when requested. Mentioning a past/negated
+    // feeling ("anxious yesterday, calm now") is not a practice request.
+    final rejectsPractice = intent(r"\b(?:do not|don't|no|without|not asking for)\b.{0,50}\b(?:breathing|grounding|calming|practice|exercise)\b");
+    if (!rejectsPractice && intent(r'\b(?:(?:give|show|suggest|offer|teach|try|start|guide|lead|want|need).{0,40}(?:breathing (?:practice|exercise)|grounding (?:practice|exercise)|wellness practice|calming exercise)|(?:help me|i need to|i want to) (?:calm down|ground myself|breathe))\b')) {
       return const NavigatorAgentPlan(
         tool: 'wellness recipe',
-        instruction: 'Offer one short, voluntary MindRecipe-style practice and ask whether it feels useful. Avoid diagnosis or treatment claims.',
+        instruction: 'Offer one short voluntary practice matching the request. Respect requested format and any no-question instruction. Do not diagnose, prescribe or assume current feelings.',
+      );
+    }
+    if (intent(r"\b(?:(?:help me|let's|please) (?:plan|prepare|organize|prioriti[sz]e|schedule)|(?:make|give|create|draft|suggest|build|write).{0,35}(?:plan|schedule|agenda|priorities)|(?:plan|organize|prioriti[sz]e|schedule) my|prepare (?:me|for)|manage my time|(?:i need|i want|i'd like).{0,20}(?:plan|schedule))\b")) {
+      return const NavigatorAgentPlan(
+        tool: 'practical planning',
+        instruction: 'Use only stated task, steps and time budget. Past feelings are not current. Do not replace preparation with a wellness practice. No calendar access/saved action claims.',
       );
     }
     return const NavigatorAgentPlan(
@@ -127,6 +106,4 @@ class NavigatorAgent {
     );
   }
 
-  bool _contains(String text, List<String> terms) =>
-      terms.any((term) => text.contains(term));
 }
