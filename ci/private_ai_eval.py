@@ -1,5 +1,6 @@
 """Synthetic GGUF outputs and latency, with explicit non-clinical heuristics."""
 import json
+import hashlib
 import os
 import platform
 import re
@@ -26,6 +27,8 @@ else:
 def visible(raw):
     # Match the app's hidden-reasoning boundary for measurement only. Keep
     # unmodified raw output in results; no substitutions or canned replies.
+    if any(tag.startswith(raw.strip()) for tag in ('<think>', '</think>')):
+        return ''
     value = re.sub(r'<think>.*?</think>', '', raw, flags=re.S)
     if '<think>' in value:
         value = value.split('<think>')[0]
@@ -60,20 +63,33 @@ def infer(prompt, limit=384):
 
 infer('Hello. Reply briefly.', limit=8)  # Exclude one warmup; no prompt caching.
 rows = []
+metadata = {'source_commit': os.environ.get('GITHUB_SHA'),
+            'baseline_commit': '3990f706ed5195fabd94034ccc3fc219ccbc3390',
+            'model_sha256': 'd2387ca2dbfee2ffabce7120d3770dadca0b293052bc2f0e138fdc940d9bc7b5',
+            'llama_commit': '4ffc47cb2001e7d523f9ff525335bbe34b1a2858',
+            'seed': 42, 'temperature': 0.7, 'top_p': 0.8, 'top_k': 20,
+            'max_output_tokens': 384,
+            'prompts_sha256': hashlib.sha256((root / 'prompts.json').read_bytes()).hexdigest()}
 for index, case in enumerate(json.loads((root / 'prompts.json').read_text())):
     # Alternate order to reduce systematic warm/cache/thermal ordering bias.
     order = ('baseline', 'candidate') if index % 2 == 0 else ('candidate', 'baseline')
+    if 'candidate_thinking' in case:
+        order += ('baseline_thinking', 'candidate_thinking')
     for version in order:
-        row = {'id': case['id'], 'version': version, 'message': case['message'],
+        row = {'source_commit': metadata['source_commit'],
+               'id': case['id'], 'version': version, 'message': case['message'],
                **infer(case[version])}
         row['heuristic_flags'] = flags(case['id'], row['visible_output'])
         rows.append(row)
-        (root / 'results.json').write_text(json.dumps({'results': rows}, indent=2))
+        (root / 'results.json').write_text(json.dumps({'metadata': metadata, 'results': rows}, indent=2))
         print(json.dumps(row), flush=True)
 
 report = ['# Synthetic private-model comparison', '',
           'Pinned Qwen3 1.7B Q4_K_M; llama.cpp 4ffc47cb; seed 42; T0.7/P0.8/K20; '
           '384 maximum output tokens; CPU, 3 threads; cache_prompt=false; one excluded warmup.', '',
+          'Main baseline/candidate comparison uses non-thinking for both. Separate *_thinking '
+          'rows probe the existing capable-device automatic reasoning path for two planning cases; '
+          'they are excluded from the main comparison medians.', '',
           f"Source: {os.environ.get('GITHUB_SHA', 'local')}; host: {platform.platform()}", '',
           'One sample per case/version. These are cloud CPU timings, not Android latency '
           'percentiles. Heuristics flag possible problems; they do not measure overall '

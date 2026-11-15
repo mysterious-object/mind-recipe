@@ -16,14 +16,14 @@ class NavigatorAgentPlan {
   final bool requiresResearchApproval;
 
   /// Saved check-ins are optional evidence, not the conversation's speaker.
-  /// Include them for personal planning, practices or an explicit history
-  /// request; ordinary greetings and factual questions need no mood report.
+  /// Include them when explicitly requested. Personal planning can use the
+  /// member's current message/history without attaching an old mood report.
   String relevantMemberContext(String message, String context) {
-    final personalPlanning = RegExp(
-      r'\b(?:my (?:day|week|plan|energy|check.in|mood|progress|history)|plan (?:my|the rest of my)|based on (?:my|what)|how (?:have|was|am) i|help me (?:plan|organize|prioritize))\b',
+    final requestsBackground = RegExp(
+      r'\b(?:my (?:energy|check.in|mood|progress|history)|based on what i (?:said|told|reported)|how (?:have|was|am) i)\b',
       caseSensitive: false,
     ).hasMatch(message);
-    return tool == 'wellness recipe' || tool == 'progress reflection' || personalPlanning
+    return tool == 'progress reflection' || requestsBackground
         ? context
         : '';
   }

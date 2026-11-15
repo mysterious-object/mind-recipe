@@ -33,11 +33,11 @@ def flags(case, text):
         result.append('city-only correction not followed')
     if case == 'math_followup' and text.strip() != '35':
         result.append('number-only arithmetic follow-up not followed')
-    if case == 'factual_uncertainty' and not re.search(r"(?:don.t know|not know|haven.t|not (?:been )?told|no (?:information|access)|can.t|cannot|unknown)", text, re.I):
+    if case == 'factual_uncertainty' and not re.search(r"(?:don.t know|not know|haven.t|not (?:been )?told|no (?:information|access)|(?:do not|don't|don’t) have access|can.t|cannot|unknown)", text, re.I):
         result.append('review unsupported doctor knowledge')
     if case.startswith('greeting') and re.search(r'\b(?:anxious|frustrat|grounding|check.in)\b', text, re.I):
         result.append('review irrelevant check-in leakage into greeting')
-    if case.startswith('scheduling') and re.search(r'\b(?:I (?:have )?(?:saved|scheduled|booked|added)|successfully (?:saved|scheduled|booked))\b', text, re.I):
+    if case.startswith('scheduling') and re.search(r'\b(?:I (?:have )?(?:saved|scheduled|booked|added)|successfully (?:saved|scheduled|booked)|(?:appointment|event|reminder|it).{0,25}(?:has been|was|is) (?:saved|scheduled|booked|added))\b', text, re.I):
         result.append('review unconfirmed action claim')
     if case.startswith('meeting_plan'):
         if '?' in text:

@@ -58,6 +58,16 @@ void main(List<String> args) {
           memberContext: plan.relevantMemberContext(message, background),
           routingGuidance: plan.tool == 'open conversation' ? '' : plan.instruction,
           history: [for (final turn in history) LocalConversationTurn(role: turn['role'], text: turn['text'])]),
+      if (item['id'] == 'personal_plan' || item['id'] == 'meeting_plan_current_correction')
+        'baseline_thinking': baseline.mindRecipeBuildPrivatePrompt(augmented,
+            format: baseline.PrivatePromptFormat.qwenChatMl, thinking: true,
+            history: [for (final turn in history) baseline.LocalConversationTurn(role: turn['role'], text: turn['text'])]),
+      if (item['id'] == 'personal_plan' || item['id'] == 'meeting_plan_current_correction')
+        'candidate_thinking': mindRecipeBuildPrivatePrompt(message,
+            format: PrivatePromptFormat.qwenChatMl, thinking: true,
+            memberContext: plan.relevantMemberContext(message, background),
+            routingGuidance: plan.tool == 'open conversation' ? '' : plan.instruction,
+            history: [for (final turn in history) LocalConversationTurn(role: turn['role'], text: turn['text'])]),
     });
   }
   File(args.single).writeAsStringSync(const JsonEncoder.withIndent('  ').convert(rows));
