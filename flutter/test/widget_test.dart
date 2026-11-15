@@ -127,6 +127,11 @@ void main() {
       await tester.ensureVisible(find.text('Skip'));
       await tester.tap(find.text('Skip'));
       await pumpFrames(tester);
+      await tester.tap(find.text('Continue'));
+      await pumpFrames(tester);
+      await tester.ensureVisible(find.text('Skip for now'));
+      await tester.tap(find.text('Skip for now'));
+      await pumpFrames(tester);
     }
   }
 

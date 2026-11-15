@@ -8,7 +8,7 @@ import 'mind_recipe_fx.dart';
 class CinematicOnboarding extends StatefulWidget {
   const CinematicOnboarding({super.key, required this.onComplete});
 
-  final VoidCallback onComplete;
+  final Future<void> Function() onComplete;
 
   @override
   State<CinematicOnboarding> createState() => _CinematicOnboardingState();
@@ -24,6 +24,8 @@ class _CinematicOnboardingState extends State<CinematicOnboarding>
   Timer? _sceneTimer;
   int _scene = 0;
   bool _brandDone = false;
+  bool _saving = false;
+  String? _saveError;
 
   static const scenes = [
     (
@@ -86,7 +88,22 @@ class _CinematicOnboardingState extends State<CinematicOnboarding>
     super.dispose();
   }
 
-  void next() => widget.onComplete();
+  Future<void> next() async {
+    if (_saving) return;
+    setState(() {
+      _saving = true;
+      _saveError = null;
+    });
+    try {
+      await widget.onComplete();
+    } catch (_) {
+      if (mounted) {
+        setState(() => _saveError = 'Could not save your progress. Please try again.');
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -120,7 +137,7 @@ class _CinematicOnboardingState extends State<CinematicOnboarding>
                     const _MindRecipeWordmark(),
                     const Spacer(),
                     TextButton(
-                      onPressed: widget.onComplete,
+                      onPressed: _saving ? null : next,
                       child: const Text('Skip'),
                     ),
                   ],
@@ -244,11 +261,20 @@ class _CinematicOnboardingState extends State<CinematicOnboarding>
                   ),
                 ),
               ),
+              if (_saveError != null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Text(_saveError!, semanticsLabel: _saveError),
+                ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
-                child: Row(
+                child: Wrap(
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 12,
+                  runSpacing: 12,
                   children: [
-                    ...List.generate(
+                    Row(mainAxisSize: MainAxisSize.min, children: List.generate(
                       scenes.length,
                       (index) => AnimatedContainer(
                         duration: const Duration(milliseconds: 320),
@@ -270,10 +296,9 @@ class _CinematicOnboardingState extends State<CinematicOnboarding>
                           borderRadius: BorderRadius.circular(99),
                         ),
                       ),
-                    ),
-                    const Spacer(),
+                    )),
                     FilledButton.icon(
-                      onPressed: next,
+                      onPressed: _saving ? null : next,
                       icon: const Icon(Icons.navigation_rounded),
                       label: const Text('Enter MindRecipe'),
                     ),

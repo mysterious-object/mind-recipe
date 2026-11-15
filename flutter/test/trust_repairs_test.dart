@@ -120,6 +120,7 @@ void main() {
   );
   test('onboarding completion survives a fresh state instance', () async {
     final state = SecureAppState();
+    await state.setSession(stored);
     await state.completeOnboarding();
     final restored = SecureAppState();
     await restored.load();
