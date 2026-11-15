@@ -134,8 +134,13 @@ class _CinematicOnboardingState extends State<CinematicOnboarding>
                 padding: const EdgeInsets.fromLTRB(20, 10, 12, 0),
                 child: Row(
                   children: [
-                    const _MindRecipeWordmark(),
-                    const Spacer(),
+                    const Expanded(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: _MindRecipeWordmark(),
+                      ),
+                    ),
                     TextButton(
                       onPressed: _saving ? null : next,
                       child: const Text('Skip'),

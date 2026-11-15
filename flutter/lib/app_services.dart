@@ -1035,7 +1035,9 @@ class ApiException implements Exception {
 }
 
 class SecureAppState extends ChangeNotifier {
-  static const _storage = FlutterSecureStorage();
+  SecureAppState({FlutterSecureStorage? storage})
+      : _storage = storage ?? const FlutterSecureStorage();
+  final FlutterSecureStorage _storage;
   static const _tokenKey = 'mind_recipe_session_token';
   static const _nameKey = 'mind_recipe_display_name';
   static const _emailKey = 'mind_recipe_email';

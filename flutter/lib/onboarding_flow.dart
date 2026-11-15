@@ -18,6 +18,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   late int _step;
   late String _appearance;
   late String _visual;
+  late final String? _owner;
   bool _busy = false;
   String? _error;
 
@@ -25,6 +26,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   void initState() {
     super.initState();
     final draft = widget.appState.onboardingDraft;
+    _owner = widget.appState.session?.email.trim().toLowerCase();
     _step = (draft['step'] as int? ?? 0).clamp(0, 2);
     _name = TextEditingController(text: widget.appState.memberDisplayName);
     _appearance = draft['appearance'] as String? ?? widget.appState.appearanceMode;
@@ -51,13 +53,13 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
         'appearance': _appearance,
         'visual': _visual,
       });
-      if (!mounted) return;
+      if (!_activeAccount) return;
       if (finish) {
         if (!skip) {
           await widget.appState.setAppearanceMode(_appearance);
-          if (!mounted) return;
+          if (!_activeAccount) return;
           await widget.appState.setVisualTheme(_visual);
-          if (!mounted) return;
+          if (!_activeAccount) return;
         }
         await widget.appState.completeOnboarding();
       } else {
@@ -70,6 +72,9 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
       if (mounted) setState(() => _busy = false);
     }
   }
+
+  bool get _activeAccount => mounted &&
+      widget.appState.session?.email.trim().toLowerCase() == _owner;
 
   @override
   Widget build(BuildContext context) {
@@ -88,6 +93,28 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
             tooltip: 'Back',
             onPressed: _busy ? null : () => _save(step: _step - 1),
             icon: const Icon(Icons.arrow_back),
+          ),
+        ),
+        bottomNavigationBar: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (_error != null)
+                  Semantics(liveRegion: true, child: Text(_error!)),
+                FilledButton(
+                  onPressed: _busy ? null : () => _step == 1 ? _save(step: 2) : _save(finish: true),
+                  child: Text(_busy ? 'Saving…' : _step == 1 ? 'Continue' : 'Save and continue'),
+                ),
+                if (_step == 2)
+                  TextButton(
+                    onPressed: _busy ? null : () => _save(finish: true, skip: true),
+                    child: const Text('Skip for now'),
+                  ),
+              ],
+            ),
           ),
         ),
         body: SafeArea(
@@ -131,20 +158,6 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
                   ),
                 ),
               ],
-              if (_error != null) ...[
-                const SizedBox(height: 12),
-                Semantics(liveRegion: true, child: Text(_error!)),
-              ],
-              const SizedBox(height: 24),
-              FilledButton(
-                onPressed: _busy ? null : () => _step == 1 ? _save(step: 2) : _save(finish: true),
-                child: Text(_busy ? 'Saving…' : _step == 1 ? 'Continue' : 'Save and continue'),
-              ),
-              if (_step == 2)
-                TextButton(
-                  onPressed: _busy ? null : () => _save(finish: true, skip: true),
-                  child: const Text('Skip for now'),
-                ),
             ],
           ),
         ),
