@@ -69,4 +69,3 @@ def flags(case, text):
     if case == 'scheduling_truth' and len(text) > 350:
         result.append('review verbosity: short action-status answer requested')
     return result
-

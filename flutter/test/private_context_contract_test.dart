@@ -29,13 +29,13 @@ void main() {
   test('practical scheduling does not invent a Booking tab or completed action', () {
     final route = plan('I feel anxious; help me schedule my report.');
     expect(route.instruction, isNot(contains('Booking tab')));
-    expect(route.instruction, contains('explicit confirmation'));
+    expect(route.instruction, contains('No calendar access/saved action claims'));
   });
   test('explicit meeting plan beats past anxious and current calm words', () {
     const request = 'Test scenario: I felt anxious yesterday, but I am calm now. I have 20 minutes before a meeting. Give me a two-step plan. Do not ask questions.';
     final route = plan(request);
     expect(route.tool, 'practical planning');
-    expect(route.instruction, contains('no-question requests'));
+    expect(route.instruction, contains('Past feelings are not current'));
     expect(route.relevantMemberContext(request, 'Anxious yesterday'), isEmpty);
   });
   test('books, workbook, history facts and source code are not private tools', () {

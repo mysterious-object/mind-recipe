@@ -56,7 +56,7 @@ class NavigatorAgent {
     if (intent(r'\b(?:remind me|wake me|set (?:an? |the )?(?:alarm|reminder|timer)|(?:add|put|save|move|reschedule|cancel).{0,35}(?:calendar|appointment)|book (?:me |an? |the )?(?:appointment|meeting)|schedule (?:an? |the )?appointment)\b')) {
       return const NavigatorAgentPlan(
         tool: 'phone assistance',
-        instruction: 'This is a practical phone task. Ask only for missing task details. The app handles action drafts and confirmation; do not claim a draft, booking or phone action was created or executed unless an actual tool result confirms it. Avoid unrelated emotional framing.',
+        instruction: 'Help with the requested phone task. Missing details are unknown. No calendar/record access or completed action is available without a confirmed tool result.',
       );
     }
     if (intent(r'\b(?:research|find (?:a |some )?(?:studies|papers|sources)|(?:show|give|cite|share).{0,20}(?:evidence|sources|references)|evidence (?:for|that|about)|studies (?:on|about))\b')) {
@@ -97,7 +97,7 @@ class NavigatorAgent {
     if (intent(r"\b(?:(?:help me|let's|please) (?:plan|prepare|organize|prioriti[sz]e|schedule)|(?:make|give|create|draft|suggest|build|write).{0,35}(?:plan|schedule|agenda|priorities)|(?:plan|organize|prioriti[sz]e|schedule) my|prepare (?:me|for)|manage my time|(?:i need|i want|i'd like).{0,20}(?:plan|schedule))\b")) {
       return const NavigatorAgentPlan(
         tool: 'practical planning',
-        instruction: 'Make a practical plan from stated time, constraints and priorities. Respect format and no-question requests; state missing details rather than inventing them. Do not claim calendar access or a saved appointment; phone actions require a reviewed draft and explicit confirmation.',
+        instruction: 'Use only stated task, steps and time budget. Past feelings are not current. Do not replace preparation with a wellness practice. No calendar access/saved action claims.',
       );
     }
     return const NavigatorAgentPlan(
