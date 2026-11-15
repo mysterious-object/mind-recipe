@@ -1035,7 +1035,9 @@ class ApiException implements Exception {
 }
 
 class SecureAppState extends ChangeNotifier {
-  static const _storage = FlutterSecureStorage();
+  SecureAppState({FlutterSecureStorage? storage})
+      : _storage = storage ?? const FlutterSecureStorage();
+  final FlutterSecureStorage _storage;
   static const _tokenKey = 'mind_recipe_session_token';
   static const _nameKey = 'mind_recipe_display_name';
   static const _emailKey = 'mind_recipe_email';
@@ -1064,6 +1066,10 @@ class SecureAppState extends ChangeNotifier {
   String openRouterKey = '';
   bool loaded = false;
   bool onboardingComplete = false;
+  Map<String, dynamic> onboardingDraft = {};
+  Future<void> _onboardingWrite = Future<void>.value();
+  String get memberDisplayName =>
+      (onboardingDraft['name'] as String?) ?? session?.displayName ?? 'Navigator';
   bool sessionTemporarilyUnverified = false;
   bool managedAiAvailable = false;
   bool cloudAiEnabled = true;
@@ -1120,7 +1126,6 @@ class SecureAppState extends ChangeNotifier {
         _storage.read(key: _refreshTokenKey),
         _storage.read(key: _idTokenKey),
         _storage.read(key: _tokenExpiryKey),
-        _storage.read(key: _onboardingKey),
       ]);
       if ((values[0] ?? '').isNotEmpty) {
         session = AccountSession(
@@ -1133,7 +1138,8 @@ class SecureAppState extends ChangeNotifier {
         );
       }
       openRouterKey = values[3] ?? '';
-      onboardingComplete = values[15] == '1';
+      onboardingComplete = await _readOnboarding(session);
+      onboardingDraft = await _readOnboardingDraft(session);
       if ((values[4] ?? '').isNotEmpty) {
         final activity = jsonDecode(values[4]!) as Map<String, dynamic>;
         _activityDate = activity['date']?.toString() ?? '';
@@ -1187,9 +1193,70 @@ class SecureAppState extends ChangeNotifier {
   }
 
   Future<void> completeOnboarding() async {
-    await _storage.write(key: _onboardingKey, value: '1');
-    onboardingComplete = true;
-    notifyListeners();
+    final account = session;
+    final key = _onboardingKeyFor(account);
+    if (key == null) return;
+    await _storage.write(key: key, value: '1');
+    // A delayed write for A must never dismiss B's introduction.
+    if (_onboardingKeyFor(session) == key) {
+      onboardingComplete = true;
+      notifyListeners();
+    }
+  }
+
+  String? _onboardingKeyFor(AccountSession? account) {
+    final owner = account?.email.trim().toLowerCase() ?? '';
+    return owner.isEmpty
+        ? null
+        : '${_onboardingKey}_${base64Url.encode(utf8.encode(owner))}';
+  }
+
+  Future<Map<String, dynamic>> _readOnboardingDraft(AccountSession? account) async {
+    final key = _onboardingKeyFor(account);
+    if (key == null) return {};
+    try {
+      final raw = await _storage.read(key: '${key}_draft');
+      return raw == null ? {} : Map<String, dynamic>.from(jsonDecode(raw) as Map);
+    } catch (_) {
+      return {};
+    }
+  }
+
+  Future<void> saveOnboardingDraft(Map<String, dynamic> draft) async {
+    final key = _onboardingKeyFor(session);
+    if (key == null) throw StateError('Sign in to save setup');
+    final saved = Map<String, dynamic>.from(draft);
+    _onboardingWrite = _onboardingWrite.catchError((Object _) {}).then(
+      (_) => _storage.write(key: '${key}_draft', value: jsonEncode(saved)),
+    );
+    await _onboardingWrite;
+    if (_onboardingKeyFor(session) == key) {
+      onboardingDraft = saved;
+      notifyListeners();
+    }
+  }
+
+  Future<void> replayOnboarding() async {
+    final key = _onboardingKeyFor(session);
+    if (key == null) return;
+    await saveOnboardingDraft({...onboardingDraft, 'step': 0});
+    await _storage.delete(key: key);
+    if (_onboardingKeyFor(session) == key) {
+      onboardingComplete = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> _readOnboarding(AccountSession? account) async {
+    final key = _onboardingKeyFor(account);
+    if (key == null) return false;
+    try {
+      // The old device-wide marker has no owner. Keep it stored, but do not
+      // attribute it to a newly registered or restored account.
+      return await _storage.read(key: key) == '1';
+    } catch (_) {
+      return false;
+    }
   }
 
   Future<void> recordNavigationCompletion() async {
@@ -1512,6 +1579,14 @@ class SecureAppState extends ChangeNotifier {
 
   Future<void> setSession(AccountSession value) async {
     session = value;
+    onboardingComplete = false;
+    onboardingDraft = {};
+    final completed = await _readOnboarding(value);
+    final draft = await _readOnboardingDraft(value);
+    if (!identical(session, value)) return;
+    onboardingComplete = completed;
+    onboardingDraft = draft;
+    sessionTemporarilyUnverified = false;
     notifyListeners();
     try {
       await _storage.write(key: _tokenKey, value: value.token);
@@ -1542,6 +1617,8 @@ class SecureAppState extends ChangeNotifier {
   }
 
   void useLocalDemo() {
+    onboardingComplete = false;
+    onboardingDraft = {};
     session = const AccountSession(
       token: '',
       displayName: 'Local Navigator',
@@ -1602,6 +1679,9 @@ class SecureAppState extends ChangeNotifier {
 
   Future<void> signOut() async {
     session = null;
+    onboardingComplete = false;
+    onboardingDraft = {};
+    sessionTemporarilyUnverified = false;
     _activityDate = '';
     _navigationSessions = 0;
     _messagesSent = 0;
@@ -1621,6 +1701,9 @@ class SecureAppState extends ChangeNotifier {
 
   Future<void> clearSession() async {
     session = null;
+    onboardingComplete = false;
+    onboardingDraft = {};
+    sessionTemporarilyUnverified = false;
     await Future.wait([
       _storage.delete(key: _tokenKey),
       _storage.delete(key: _nameKey),

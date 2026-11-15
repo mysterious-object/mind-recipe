@@ -717,7 +717,7 @@ Latest member request: $text''',
           .toList();
       final context = <String, dynamic>{
         'member_id': widget.appState.session?.email ?? '',
-        'display_name': widget.appState.session?.displayName ?? '',
+        'display_name': widget.appState.memberDisplayName,
         'conversation': recent,
         'context_tags': [
           ...widget.state.contextTags,

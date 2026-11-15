@@ -10,10 +10,12 @@ class LiveVisualThemePicker extends StatelessWidget {
     super.key,
     required this.selectedThemeId,
     required this.onSelected,
+    this.description = 'Choose a live MindRecipe visual theme. Changes apply immediately to the local WebGL renderer and stay on this device.',
   });
 
   final String selectedThemeId;
   final ValueChanged<VisualThemeDefinition> onSelected;
+  final String description;
 
   @override
   Widget build(BuildContext context) {
@@ -46,7 +48,7 @@ class LiveVisualThemePicker extends StatelessWidget {
           ),
           const SizedBox(height: 7),
           Text(
-            'Choose a live MindRecipe visual theme. Changes apply immediately to the local WebGL renderer and stay on this device.',
+            description,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: colors.onSurface.withValues(alpha: .74),
               height: 1.35,

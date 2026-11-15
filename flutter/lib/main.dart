@@ -14,6 +14,7 @@ import 'app_services.dart';
 import 'check_in_state.dart';
 import 'commitments_screen.dart';
 import 'cinematic_experience.dart';
+import 'onboarding_flow.dart';
 import 'daily_navigation.dart';
 import 'design_tokens.dart';
 import 'navigator_chat.dart';
@@ -66,7 +67,13 @@ class _MindRecipeAppState extends State<MindRecipeApp> {
       if (!appState.loaded) await appState.load();
       final restored = appState.session;
       if (restored != null) {
-        final restoredAccount = await api.restoreSession(restored);
+        final restoredAccount = await api.restoreSession(restored).timeout(
+          const Duration(seconds: 8),
+          onTimeout: () => AccountRestoreResult(
+            AccountRestoreStatus.temporarilyUnavailable,
+            restored,
+          ),
+        );
         appState.sessionTemporarilyUnverified =
             restoredAccount.status ==
             AccountRestoreStatus.temporarilyUnavailable;
@@ -83,13 +90,25 @@ class _MindRecipeAppState extends State<MindRecipeApp> {
       if (_themeLiveCheck && appState.session == null) {
         appState.useLocalDemo();
       }
-      if (!appState.sessionTemporarilyUnverified) {
-        await appState.flushPendingCheckIns(api);
-      }
-      appState.setManagedAiAvailable(await api.aiAvailable());
     } finally {
       if (mounted) setState(() => _initializing = false);
     }
+    // Neither AI discovery nor an offline outbox is a prerequisite for
+    // signing in or viewing/completing the introduction.
+    if (!appState.sessionTemporarilyUnverified) {
+      unawaited(appState.flushPendingCheckIns(api));
+    }
+    unawaited(_refreshAiAvailability());
+  }
+
+  Future<void> _refreshAiAvailability() async {
+    var available = false;
+    try {
+      available = await api.aiAvailable().timeout(const Duration(seconds: 4));
+    } catch (_) {
+      // Offline AI discovery must not block the account or onboarding flow.
+    }
+    if (mounted) appState.setManagedAiAvailable(available);
   }
 
   void _refresh() {
@@ -144,10 +163,9 @@ class _MindRecipeAppState extends State<MindRecipeApp> {
           : appState.session == null
           ? AccountGateway(api: api, appState: appState)
           : !appState.onboardingComplete
-          ? CinematicOnboarding(
-              onComplete: () async {
-                await appState.completeOnboarding();
-              },
+          ? OnboardingFlow(
+              key: ValueKey(appState.session!.email.trim().toLowerCase()),
+              appState: appState,
             )
           : practitionerMode
           ? PractitionerHome(
@@ -2186,6 +2204,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
       OutlinedButton(
         onPressed: null,
         child: const Text('Practitioner access is provisioned separately'),
+      ),
+      TextButton.icon(
+        onPressed: () async {
+          try {
+            await widget.appState.replayOnboarding();
+          } catch (_) {
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Could not open setup. Please try again.')),
+              );
+            }
+          }
+        },
+        icon: const Icon(Icons.replay),
+        label: const Text('Replay welcome and setup'),
       ),
       TextButton.icon(
         onPressed: widget.onSignOut,

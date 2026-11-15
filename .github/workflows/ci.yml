@@ -35,6 +35,22 @@ jobs:
           cache: true
       - run: flutter pub get
         working-directory: flutter
+      - name: Reproduce account lifecycle failures on the 2155 source
+        if: github.ref_name == 'codex/mobile-build-2156-onboarding' || github.head_ref == 'codex/mobile-build-2156-onboarding'
+        working-directory: flutter
+        shell: bash
+        run: |
+          cp lib/app_services.dart "$RUNNER_TEMP/candidate-app-services.dart"
+          trap 'cp "$RUNNER_TEMP/candidate-app-services.dart" lib/app_services.dart' EXIT
+          git fetch origin 3990f706ed5195fabd94034ccc3fc219ccbc3390
+          git show 3990f706ed5195fabd94034ccc3fc219ccbc3390:flutter/lib/app_services.dart > lib/app_services.dart
+          if flutter test --no-pub test/onboarding_state_test.dart > "$RUNNER_TEMP/onboarding-2155-baseline.log" 2>&1; then
+            cat "$RUNNER_TEMP/onboarding-2155-baseline.log"
+            echo 'Expected account-isolation failures were not reproduced'
+            exit 1
+          fi
+          cat "$RUNNER_TEMP/onboarding-2155-baseline.log"
+          grep -q 'Expected: false' "$RUNNER_TEMP/onboarding-2155-baseline.log"
       - run: flutter analyze --no-fatal-infos --no-fatal-warnings
         working-directory: flutter
       - run: flutter test
