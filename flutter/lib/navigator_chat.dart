@@ -496,14 +496,25 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
     // Ground the conversation in real navigation data when a session starts.
     // Load on every turn, including resumed threads and the app-wide sheet.
     // The source/time and explicit-report flags survive process restarts.
-    final navigationContext = await widget.appState.navigatorStateContext();
+    final plan = _agent.plan(
+      text,
+      externalResearchApproved: widget.appState.publicResearchEnabled,
+      navigationSessions: widget.appState.navigationSessions,
+      messagesSent: widget.appState.messagesSent,
+      aiReflections: widget.appState.aiReflections,
+    );
+    final needsMemberContext = widget.appState.cloudAiEnabled ||
+        plan.relevantMemberContext(text, 'available').isNotEmpty;
+    final navigationContext = needsMemberContext
+        ? await widget.appState.navigatorStateContext()
+        : '';
     widget.onChanged();
     _scrollToEnd();
     unawaited(MindRecipeDeviceHarness().acknowledgeTurn());
 
     // Private inference is the primary route. It does not require cloud
     // consent, a provider key, or sending conversation context off device.
-    final localStatus = widget.appState.cloudAiEnabled
+    final localStatus = widget.appState.cloudAiEnabled || _localSnapshot.isReady
         ? _localSnapshot
         : await _localInference.refreshStatus();
     if (!mounted) return;
@@ -511,13 +522,6 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
     final cloudCanClarify =
         widget.appState.cloudAiEnabled && widget.appState.aiAvailable;
     if (localStatus.isReady && !widget.appState.cloudAiEnabled) {
-      final plan = _agent.plan(
-        text,
-        externalResearchApproved: widget.appState.publicResearchEnabled,
-        navigationSessions: widget.appState.navigationSessions,
-        messagesSent: widget.appState.messagesSent,
-        aiReflections: widget.appState.aiReflections,
-      );
       // Render tokens as they arrive. First-token latency depends on the
       // device and prompt; it is measured in live validation, not assumed.
       final placeholderIndex = widget.messages.length;

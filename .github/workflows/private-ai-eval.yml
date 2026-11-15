@@ -33,7 +33,7 @@ jobs:
           git clone --filter=blob:none https://github.com/ggml-org/llama.cpp.git "$RUNNER_TEMP/llama-source"
           git -C "$RUNNER_TEMP/llama-source" fetch --depth 1 origin 4ffc47cb2001e7d523f9ff525335bbe34b1a2858
           git -C "$RUNNER_TEMP/llama-source" checkout --detach 4ffc47cb2001e7d523f9ff525335bbe34b1a2858
-          cmake -S "$RUNNER_TEMP/llama-source" -B "$RUNNER_TEMP/llama-build" -DCMAKE_BUILD_TYPE=Release -DGGML_CUDA=OFF -DGGML_NATIVE=OFF -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF -DLLAMA_BUILD_SERVER=ON
+          cmake -S "$RUNNER_TEMP/llama-source" -B "$RUNNER_TEMP/llama-build" -DCMAKE_BUILD_TYPE=Release -DGGML_CUDA=OFF -DGGML_NATIVE=OFF -DLLAMA_CURL=OFF -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF -DLLAMA_BUILD_SERVER=ON
           cmake --build "$RUNNER_TEMP/llama-build" --target llama-server -j 3
       - name: Download and verify pinned Qwen model
         run: |

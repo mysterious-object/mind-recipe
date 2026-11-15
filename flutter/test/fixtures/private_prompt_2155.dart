@@ -97,4 +97,3 @@ String mindRecipeBuildPrivatePrompt(
 /// block is prompt text, not generated content to show to the member.
 String mindRecipeQwenAssistantPrefix({required bool thinking}) =>
     '<|im_start|>assistant\n${thinking ? '' : '<think>\n\n</think>\n\n'}';
-
