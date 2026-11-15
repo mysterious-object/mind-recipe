@@ -13,9 +13,11 @@ on:
       - 'ci/private_ai_eval.py'
       - 'ci/private_ai_heuristics.py'
       - 'ci/test_private_ai_heuristics.py'
+      - 'ci/verify_private_mode_choice.py'
       - '.github/workflows/private-ai-eval.yml'
 permissions:
   contents: read
+  actions: read
 jobs:
   evaluate:
     runs-on: ubuntu-latest
@@ -41,6 +43,14 @@ jobs:
           mkdir -p "$RUNNER_TEMP/private-eval"
           dart run tool/private_eval/export.dart "$RUNNER_TEMP/private-eval/prompts.json"
         working-directory: flutter
+      - uses: actions/download-artifact@v4
+        with:
+          name: synthetic-private-ai-evaluation
+          run-id: 43769714359
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/paired-39ffd35
+      - name: Verify gate-only prompt provenance
+        run: python3 ci/verify_private_mode_choice.py "$RUNNER_TEMP/paired-39ffd35" "$RUNNER_TEMP/private-eval"
       - name: Build pinned CPU evaluation runtime
         run: |
           git clone --filter=blob:none https://github.com/ggml-org/llama.cpp.git "$RUNNER_TEMP/llama-source"
@@ -66,5 +76,6 @@ jobs:
             ${{ runner.temp }}/private-eval/prompts.json
             ${{ runner.temp }}/private-eval/results.json
             ${{ runner.temp }}/private-eval/report.md
+            ${{ runner.temp }}/private-eval/mode-choice-proof.json
             ${{ runner.temp }}/private-eval/server.log
           retention-days: 14

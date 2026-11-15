@@ -197,14 +197,16 @@ bool mindRecipeShouldDeliberate(String message) {
   ].any(text.contains);
 }
 
-/// Qwen's visible thinking tokens consume most of the small generation budget
-/// on low-memory phones. Keep deliberate generation for capable devices while
-/// preserving the answer budget on the 3–4 GB class.
+/// Interactive profiles share a bounded 320–384 token generation budget.
+/// More RAM permits loading a larger context, but does not reserve tokens for
+/// a final answer. Paired GGUF probes exhausted/truncated this budget in
+/// thinking mode while the same non-thinking prompt completed correctly.
+/// Keep hidden thinking off until it has its own validated answer budget.
 @visibleForTesting
 bool mindRecipeShouldEmitThinking({
   required bool deliberationRequested,
   required int totalMemoryMiB,
-}) => deliberationRequested && totalMemoryMiB >= 6144;
+}) => false;
 
 /// Returns only member-visible model output while a private response is still
 /// arriving. Qwen may emit an empty or populated `<think>` block even when the

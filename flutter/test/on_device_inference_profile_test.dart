@@ -41,7 +41,7 @@ void main() {
   });
 
   test(
-    'low-memory profiles preserve answer tokens instead of emitting thought',
+    'bounded interactive profiles preserve answer tokens at every memory size',
     () {
       expect(
         mindRecipeShouldEmitThinking(
@@ -55,10 +55,31 @@ void main() {
           deliberationRequested: true,
           totalMemoryMiB: 8192,
         ),
-        isTrue,
+        isFalse,
       );
     },
   );
+
+  test('capable-device planning uses the measured non-thinking final-answer path', () {
+    for (final request in [
+      'Help me plan my next hour. I have 20 minutes of email and a 30 minute report. Include a break.',
+      'Test scenario: I felt anxious yesterday, but I am calm now. I have 20 minutes before a meeting. Give me a two-step plan. Do not ask questions.',
+      'Help me schedule my calendar appointment.',
+    ]) {
+      expect(mindRecipeShouldDeliberate(request), isTrue);
+      for (final memory in [6144, 8192, 12288]) {
+        final thinking = mindRecipeShouldEmitThinking(
+          deliberationRequested: mindRecipeShouldDeliberate(request),
+          totalMemoryMiB: memory,
+        );
+        final prompt = mindRecipeBuildPrivatePrompt(request,
+            format: PrivatePromptFormat.qwenChatMl, thinking: thinking);
+        expect(thinking, isFalse, reason: 'RAM $memory is not an answer-token budget');
+        expect(prompt, contains('/no_think'));
+        expect(prompt, endsWith(mindRecipeQwenAssistantPrefix(thinking: false)));
+      }
+    }
+  });
 
   test('complete model without a receipt is verified in place', () async {
     final directory = await Directory.systemTemp.createTemp(

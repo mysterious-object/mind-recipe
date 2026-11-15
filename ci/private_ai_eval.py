@@ -78,6 +78,7 @@ for index, case in enumerate(json.loads((root / 'prompts.json').read_text())):
     for version in order:
         row = {'source_commit': metadata['source_commit'],
                'id': case['id'], 'version': version, 'message': case['message'],
+               'prompt_sha256': hashlib.sha256(case[version].encode()).hexdigest(),
                **infer(case[version])}
         row['heuristic_flags'] = flags(case['id'], row['visible_output'])
         rows.append(row)
@@ -87,9 +88,10 @@ for index, case in enumerate(json.loads((root / 'prompts.json').read_text())):
 report = ['# Synthetic private-model comparison', '',
           'Pinned Qwen3 1.7B Q4_K_M; llama.cpp 4ffc47cb; seed 42; T0.7/P0.8/K20; '
           '384 maximum output tokens; CPU, 3 threads; cache_prompt=false; one excluded warmup.', '',
-          'Main baseline/candidate comparison uses non-thinking for both. Separate *_thinking '
-          'rows probe the existing capable-device automatic reasoning path for two planning cases; '
-          'they are excluded from the main comparison medians.', '',
+          'Main baseline/candidate comparison uses non-thinking for both. Candidate interactive '
+          'gate now selects this measured path at every memory size. Separate *_thinking rows '
+          'are counterfactual probes of the removed RAM-based automatic-thinking policy for '
+          'two planning cases; they are excluded from the main comparison medians.', '',
           f"Source: {os.environ.get('GITHUB_SHA', 'local')}; host: {platform.platform()}", '',
           'One sample per case/version. These are cloud CPU timings, not Android latency '
           'percentiles. Heuristics flag possible problems; they do not measure overall '
