@@ -547,7 +547,9 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
       _scrollToEnd();
 
       var reply = await _localInference.infer(
-        plan.augment(text, context: navigationContext),
+        text,
+        memberContext: plan.relevantMemberContext(text, navigationContext),
+        routingGuidance: plan.tool == 'open conversation' ? '' : plan.instruction,
         history: priorConversation,
         onToken: onToken,
         rawMemberMessage: text,

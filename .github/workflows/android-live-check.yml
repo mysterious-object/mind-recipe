@@ -9,8 +9,8 @@ permissions:
 
 env:
   MIND_RECIPE_STAGING_API_URL: https://staging-api.mindrecipe.142.93.201.156.sslip.io
-  ORG_GRADLE_PROJECT_mindRecipeApplicationIdSuffix: .onboarding2156
-  ORG_GRADLE_PROJECT_mindRecipeAppLabel: MindRecipe Onboarding 2156
+  ORG_GRADLE_PROJECT_mindRecipeApplicationIdSuffix: .onboarding2157
+  ORG_GRADLE_PROJECT_mindRecipeAppLabel: MindRecipe Candidate 2157
 
 jobs:
   apk:
@@ -34,8 +34,20 @@ jobs:
           flutter build apk --release --target-platform android-arm64 --no-pub --dart-define=MIND_RECIPE_API_BASE=${MIND_RECIPE_STAGING_API_URL}
         working-directory: flutter
       - run: test -s flutter/build/app/outputs/flutter-apk/app-release.apk
+      - name: Record candidate identity and checksum
+        shell: bash
+        run: |
+          apk=flutter/build/app/outputs/flutter-apk/app-release.apk
+          aapt=$(find "$ANDROID_HOME/build-tools" -name aapt -type f | sort -V | tail -1)
+          "$aapt" dump badging "$apk" > flutter/build/app/outputs/flutter-apk/package-badging.txt
+          sha256sum "$apk" > flutter/build/app/outputs/flutter-apk/SHA256SUMS.txt
+          python3 ci/apk_manifest.py "$apk" flutter/build/app/outputs/flutter-apk/package-badging.txt > flutter/build/app/outputs/flutter-apk/candidate-manifest.json
       - uses: actions/upload-artifact@v4
         with:
           name: mind-recipe-android-live-check-apk
-          path: flutter/build/app/outputs/flutter-apk/app-release.apk
+          path: |
+            flutter/build/app/outputs/flutter-apk/app-release.apk
+            flutter/build/app/outputs/flutter-apk/candidate-manifest.json
+            flutter/build/app/outputs/flutter-apk/package-badging.txt
+            flutter/build/app/outputs/flutter-apk/SHA256SUMS.txt
           retention-days: 3

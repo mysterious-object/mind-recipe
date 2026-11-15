@@ -1,0 +1,57 @@
+name: Synthetic private AI evaluation
+on:
+  workflow_dispatch:
+  push:
+    branches: ['codex/mobile-build-2157-private-onboarding']
+permissions:
+  contents: read
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.0'
+          channel: stable
+          cache: true
+      - run: flutter pub get
+        working-directory: flutter
+      - name: Analyze and test app
+        run: |
+          flutter analyze --no-fatal-infos --no-fatal-warnings
+          flutter test
+        working-directory: flutter
+      - name: Export exact synthetic prompts
+        run: |
+          mkdir -p "$RUNNER_TEMP/private-eval"
+          dart run tool/private_eval/export.dart "$RUNNER_TEMP/private-eval/prompts.json"
+        working-directory: flutter
+      - name: Build pinned CPU evaluation runtime
+        run: |
+          git clone --filter=blob:none https://github.com/ggml-org/llama.cpp.git "$RUNNER_TEMP/llama-source"
+          git -C "$RUNNER_TEMP/llama-source" fetch --depth 1 origin 4ffc47cb2001e7d523f9ff525335bbe34b1a2858
+          git -C "$RUNNER_TEMP/llama-source" checkout --detach 4ffc47cb2001e7d523f9ff525335bbe34b1a2858
+          cmake -S "$RUNNER_TEMP/llama-source" -B "$RUNNER_TEMP/llama-build" -DCMAKE_BUILD_TYPE=Release -DGGML_CUDA=OFF -DGGML_NATIVE=OFF -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF -DLLAMA_BUILD_SERVER=ON
+          cmake --build "$RUNNER_TEMP/llama-build" --target llama-server -j 3
+      - name: Download and verify pinned Qwen model
+        run: |
+          curl --fail --location --retry 2 https://huggingface.co/ggml-org/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q4_K_M.gguf -o "$RUNNER_TEMP/private-eval/model.gguf"
+          echo "d2387ca2dbfee2ffabce7120d3770dadca0b293052bc2f0e138fdc940d9bc7b5  $RUNNER_TEMP/private-eval/model.gguf" | sha256sum --check
+      - name: Measure identical runtime before and after
+        run: |
+          "$RUNNER_TEMP/llama-build/bin/llama-server" -m "$RUNNER_TEMP/private-eval/model.gguf" --host 127.0.0.1 --port 8091 -c 4096 -t 3 -b 4096 -ub 128 > "$RUNNER_TEMP/private-eval/server.log" 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" || true' EXIT
+          python3 ci/private_ai_eval.py "$RUNNER_TEMP/private-eval"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: synthetic-private-ai-evaluation
+          path: |
+            ${{ runner.temp }}/private-eval/prompts.json
+            ${{ runner.temp }}/private-eval/results.json
+            ${{ runner.temp }}/private-eval/report.md
+            ${{ runner.temp }}/private-eval/server.log
+          retention-days: 14

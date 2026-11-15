@@ -15,6 +15,19 @@ class NavigatorAgentPlan {
   final String instruction;
   final bool requiresResearchApproval;
 
+  /// Saved check-ins are optional evidence, not the conversation's speaker.
+  /// Include them for personal planning, practices or an explicit history
+  /// request; ordinary greetings and factual questions need no mood report.
+  String relevantMemberContext(String message, String context) {
+    final personalPlanning = RegExp(
+      r'\b(?:my (?:day|week|plan|energy|check.in|mood|progress|history)|plan (?:my|the rest of my)|based on (?:my|what)|how (?:have|was|am) i|help me (?:plan|organize|prioritize))\b',
+      caseSensitive: false,
+    ).hasMatch(message);
+    return tool == 'wellness recipe' || tool == 'progress reflection' || personalPlanning
+        ? context
+        : '';
+  }
+
   String augment(String memberMessage, {String context = ''}) {
     // Avoid spending the mobile prompt budget on generic routing prose.
     // Preserve the actual latest request as the final part of the user turn.
@@ -67,7 +80,7 @@ class NavigatorAgent {
         ])) {
       return const NavigatorAgentPlan(
         tool: 'phone assistance',
-        instruction: 'This is a practical phone task, not a therapy moment. Reply in one short sentence confirming what you can do; the app shows an on-device action card for the member to approve. No emotional framing, no questions about feelings.',
+        instruction: 'This is a practical phone task. Ask only for missing task details. The app handles action drafts and confirmation; do not claim a draft, booking or phone action was created or executed unless an actual tool result confirms it. Avoid unrelated emotional framing.',
       );
     }
     if (_contains(text, const [
@@ -104,8 +117,8 @@ class NavigatorAgent {
     }
     if (_contains(text, const ['book', 'booking', 'appointment', 'schedule'])) {
       return const NavigatorAgentPlan(
-        tool: 'booking',
-        instruction: 'Explain that the member can open the clearly labeled Booking tab. Do not choose a level of care or claim an appointment was made.',
+        tool: 'practical planning',
+        instruction: 'Help organize a realistic plan from the member\'s stated time, constraints and priorities. Ask for important missing details rather than inventing them. Do not claim calendar access or a saved appointment; phone actions require a reviewed draft and explicit confirmation.',
       );
     }
     if (_contains(text, const [

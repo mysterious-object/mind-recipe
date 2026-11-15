@@ -33,7 +33,7 @@ void main() {
         );
         expect(prompt, isNot(contains('Understood.')));
         if (format == PrivatePromptFormat.gemmaTurns) {
-          expect(prompt, startsWith('<start_of_turn>user\nYou are Mind Nav'));
+          expect(prompt, startsWith('<start_of_turn>user\nYou are MindRecipe Navigator'));
           expect(prompt, endsWith('<start_of_turn>model\n'));
           expect(prompt, isNot(contains('<bos>')));
           expect(prompt, isNot(contains('/no_think')));

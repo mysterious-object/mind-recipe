@@ -7,6 +7,7 @@ import 'package:mind_recipe/app_services.dart';
 import 'package:mind_recipe/cinematic_experience.dart';
 import 'package:mind_recipe/main.dart';
 import 'package:mind_recipe/onboarding_flow.dart';
+import 'onboarding_storage_test.dart' show ControlledStorage;
 
 const account = AccountSession(token: 'synthetic-token', displayName: 'Member', email: 'member@example.test');
 
@@ -132,6 +133,46 @@ void main() {
     await frames(tester);
     expect(attempts, 2);
     expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('stale mounted setup cannot save to the newly active account', (tester) async {
+    final value = await state();
+    await value.saveOnboardingDraft({'step': 1, 'name': 'Member'});
+    await tester.pumpWidget(MaterialApp(home: OnboardingFlow(appState: value)));
+    await value.setSession(const AccountSession(token: 'other', displayName: 'Other', email: 'other@example.test'));
+    await tester.tap(find.text('Continue'));
+    await frames(tester);
+    expect(value.onboardingDraft, isEmpty);
+    expect(value.onboardingComplete, isFalse);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('switching accounts during setup save cannot apply or complete the next account', (tester) async {
+    final storage = ControlledStorage();
+    final value = SecureAppState(storage: storage);
+    await value.setSession(account);
+    await value.saveOnboardingDraft({'step': 2, 'name': 'Member', 'appearance': 'dark'});
+    await tester.pumpWidget(MaterialApp(home: OnboardingFlow(appState: value)));
+    storage.gate = Completer<void>();
+    await tester.tap(find.text('Save and continue'));
+    await tester.pump();
+    await value.setSession(const AccountSession(token: 'other', displayName: 'Other', email: 'other@example.test'));
+    storage.gate!.complete();
+    await frames(tester);
+    expect(value.onboardingComplete, isFalse);
+    expect(value.onboardingDraft, isEmpty);
+    expect(value.appearanceMode, 'system');
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('setup provides an opaque surface under the transparent app theme', (tester) async {
+    final value = await state();
+    await value.saveOnboardingDraft({'step': 1, 'name': 'Member'});
+    await tester.pumpWidget(MaterialApp(theme: ThemeData(scaffoldBackgroundColor: Colors.transparent),
+        home: OnboardingFlow(appState: value)));
+    final scaffold = tester.widget<Scaffold>(find.byType(Scaffold));
+    expect(scaffold.backgroundColor?.a, 1);
     await tester.pumpWidget(const SizedBox());
   });
 }

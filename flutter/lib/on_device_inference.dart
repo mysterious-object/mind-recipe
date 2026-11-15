@@ -14,6 +14,8 @@ import 'package:llama_cpp_dart/llama_cpp_dart.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'mind_recipe_device_harness.dart';
+import 'private_prompt.dart';
+export 'private_prompt.dart';
 
 Future<void> _inferLog(String msg) async {
   try {
@@ -58,101 +60,10 @@ abstract class LocalInference {
     List<LocalConversationTurn> history = const [],
     void Function(String token)? onToken,
     String? rawMemberMessage,
+    String memberContext = '',
+    String routingGuidance = '',
   });
   Future<void> removeModel();
-}
-
-class LocalConversationTurn {
-  const LocalConversationTurn({required this.role, required this.text});
-
-  final String role;
-  final String text;
-}
-
-/// Model-specific serialization with real alternating turns, not a fabricated
-/// acknowledgement. Keep the newest answers intact within a bounded budget.
-/// Native tokenization adds BOS, including for Gemma; do not add a second BOS.
-@visibleForTesting
-String mindRecipeBuildPrivatePrompt(
-  String message, {
-  List<LocalConversationTurn> history = const [],
-  required PrivatePromptFormat format,
-  bool thinking = false,
-}) {
-  const instruction =
-      'You are Mind Nav, a private assistant. Answer the latest request directly '
-      'in its requested format. Use the conversation: follow-ups refer to the '
-      'latest relevant answer, and user corrections override older details. '
-      'Ask only when needed. Do not invent memory or completed phone actions. '
-      'Actions need approval. Never diagnose or prescribe; immediate danger '
-      'needs emergency help.';
-  String clean(String value) => value
-      .replaceAll(
-        RegExp(r'<\|[^>]*\|>|<start_of_turn>|<end_of_turn>|<bos>|<eos>'),
-        '',
-      )
-      .trim();
-  final recent = <LocalConversationTurn>[];
-  var remaining = 1800;
-  for (final turn in history.reversed) {
-    if (turn.role != 'user' && turn.role != 'assistant') continue;
-    final text = clean(turn.text);
-    if (text.isEmpty) continue;
-    // Do not truncate a short result/name/correction after an arbitrary 220
-    // characters. Drop older whole turns first. A single oversized turn keeps
-    // its beginning and end, explicitly marked as incomplete.
-    if (text.length > remaining && recent.isNotEmpty) break;
-    final bounded = text.length <= remaining
-        ? text
-        : '${text.substring(0, remaining ~/ 2)}\n[earlier turn shortened]\n${text.substring(text.length - remaining ~/ 2)}';
-    recent.insert(0, LocalConversationTurn(role: turn.role, text: bounded));
-    remaining -= bounded.length;
-    if (remaining < 100 || recent.length == 6) break;
-  }
-  // Gemma expects user/model alternation; do not start with an orphan answer.
-  while (recent.isNotEmpty && recent.first.role != 'user') {
-    recent.removeAt(0);
-  }
-  final turns = <LocalConversationTurn>[];
-  for (final turn in [
-    ...recent,
-    LocalConversationTurn(role: 'user', text: clean(message)),
-  ]) {
-    if (turns.isNotEmpty && turns.last.role == turn.role) {
-      final previous = turns.removeLast();
-      turns.add(
-        LocalConversationTurn(
-          role: turn.role,
-          text: '${previous.text}\n\n${turn.text}',
-        ),
-      );
-    } else {
-      turns.add(turn);
-    }
-  }
-  final prompt = StringBuffer();
-  if (format == PrivatePromptFormat.gemmaTurns) {
-    for (var i = 0; i < turns.length; i++) {
-      final turn = turns[i];
-      prompt.write(
-        '<start_of_turn>${turn.role == 'assistant' ? 'model' : 'user'}\n',
-      );
-      if (i == 0) prompt.write('$instruction\n\n');
-      prompt.write('${turn.text}<end_of_turn>\n');
-    }
-    prompt.write('<start_of_turn>model\n');
-  } else {
-    prompt.write('<|im_start|>system\n$instruction<|im_end|>\n');
-    for (var i = 0; i < turns.length; i++) {
-      final turn = turns[i];
-      prompt.write('<|im_start|>${turn.role}\n${turn.text}');
-      if (i == turns.length - 1)
-        prompt.write(thinking ? '\n/think' : '\n/no_think');
-      prompt.write('<|im_end|>\n');
-    }
-    prompt.write(mindRecipeQwenAssistantPrefix(thinking: thinking));
-  }
-  return prompt.toString();
 }
 
 class OnDeviceModelManifest {
@@ -177,7 +88,6 @@ class OnDeviceModelManifest {
   final Uri? licenseUrl;
 }
 
-enum PrivatePromptFormat { qwenChatMl, gemmaTurns }
 
 /// llama.cpp requires a negative GPU index when a model is intentionally
 /// CPU-only. Passing its default index (0) with no GPU backend makes model
@@ -295,12 +205,6 @@ bool mindRecipeShouldEmitThinking({
   required bool deliberationRequested,
   required int totalMemoryMiB,
 }) => deliberationRequested && totalMemoryMiB >= 6144;
-
-/// Match Qwen's official enable_thinking=false generation prefix. The empty
-/// block is prompt text, not generated content to show to the member.
-@visibleForTesting
-String mindRecipeQwenAssistantPrefix({required bool thinking}) =>
-    '<|im_start|>assistant\n${thinking ? '' : '<think>\n\n</think>\n\n'}';
 
 /// Returns only member-visible model output while a private response is still
 /// arriving. Qwen may emit an empty or populated `<think>` block even when the
@@ -992,6 +896,8 @@ class OnDeviceInference implements LocalInference {
     List<LocalConversationTurn> history = const [],
     void Function(String token)? onToken,
     String? rawMemberMessage,
+    String memberContext = '',
+    String routingGuidance = '',
   }) async {
     // Use the broadcast snapshot — refreshStatus() here would re-scan the
     // model files on every message and add avoidable first-token latency.
@@ -1046,6 +952,8 @@ class OnDeviceInference implements LocalInference {
         history: history,
         format: _activeManifest.promptFormat,
         deliberationMessage: rawMemberMessage ?? userMessage,
+        memberContext: memberContext,
+        routingGuidance: routingGuidance,
       );
       await _inferLog('infer prompt length=${prompt.length}');
       final promptId = await _engine!.sendPrompt(prompt);
@@ -1464,10 +1372,14 @@ class OnDeviceInference implements LocalInference {
     List<LocalConversationTurn> history = const [],
     required PrivatePromptFormat format,
     required String deliberationMessage,
+    String memberContext = '',
+    String routingGuidance = '',
   }) => mindRecipeBuildPrivatePrompt(
     userMessage,
     history: history,
     format: format,
+    memberContext: memberContext,
+    routingGuidance: routingGuidance,
     thinking: mindRecipeShouldEmitThinking(
       deliberationRequested: mindRecipeShouldDeliberate(deliberationMessage),
       totalMemoryMiB: _thinkingAllowed ? 6144 : 4096,
