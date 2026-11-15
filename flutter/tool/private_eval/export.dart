@@ -32,6 +32,10 @@ void main(List<String> args) {
     {'id': 'personal_plan', 'message': 'Help me plan my next hour. I have 20 minutes of email and a 30 minute report. Include a break.', 'context': context},
     {'id': 'scheduling_truth', 'message': 'Did you actually save my appointment to my calendar? No action has been confirmed.'},
     {'id': 'scheduling_emotional_context', 'message': 'I was anxious earlier. Help me schedule 30 minutes to write my report at 3 pm. Do not claim it is saved.', 'context': context},
+    {'id': 'meeting_plan_current_correction', 'message': 'Test scenario: I felt anxious yesterday, but I am calm now. I have 20 minutes before a meeting. Give me a two-step plan. Do not ask questions.'},
+    {'id': 'meeting_plan_stale_checkin', 'message': 'Test scenario: I felt anxious yesterday, but I am calm now. I have 20 minutes before a meeting. Give me a two-step plan. Do not ask questions.', 'context': context},
+    {'id': 'books_false_positive', 'message': 'What is the difference between fiction and nonfiction books? Answer briefly.'},
+    {'id': 'history_false_positive', 'message': 'Explain one reason the history of Rome is studied today. Answer briefly.'},
   ];
   final rows = <Map<String, dynamic>>[];
   for (final item in cases) {

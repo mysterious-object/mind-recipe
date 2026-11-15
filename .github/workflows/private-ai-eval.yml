@@ -3,6 +3,15 @@ on:
   workflow_dispatch:
   push:
     branches: ['codex/mobile-build-2157-private-onboarding']
+    paths:
+      - 'flutter/lib/private_prompt.dart'
+      - 'flutter/lib/navigator_agent.dart'
+      - 'flutter/lib/navigator_chat.dart'
+      - 'flutter/lib/on_device_inference.dart'
+      - 'flutter/tool/private_eval/**'
+      - 'flutter/test/fixtures/**'
+      - 'ci/private_ai_eval.py'
+      - '.github/workflows/private-ai-eval.yml'
 permissions:
   contents: read
 jobs:

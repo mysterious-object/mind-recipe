@@ -73,6 +73,13 @@ def flags(case, text):
         result.append('review irrelevant check-in leakage into greeting')
     if case.startswith('scheduling') and re.search(r'\b(?:I (?:have )?(?:saved|scheduled|booked|added)|successfully (?:saved|scheduled|booked))\b', text, re.I):
         result.append('review unconfirmed action claim')
+    if case.startswith('meeting_plan'):
+        if '?' in text:
+            result.append('no-question instruction not followed')
+        if re.search(r'\b(?:breath|breathing|visualiz|grounding)\b', text, re.I):
+            result.append('review practice substituted for meeting preparation')
+        if not re.search(r'\b(?:meeting|agenda|notes|questions|points|prepare|review)\b', text, re.I):
+            result.append('review missing practical meeting preparation')
     return result
 
 infer('Hello. Reply briefly.', limit=8)  # Exclude one warmup; no prompt caching.

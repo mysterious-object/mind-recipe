@@ -30,4 +30,26 @@ void main() {
     expect(route.instruction, isNot(contains('Booking tab')));
     expect(route.instruction, contains('explicit confirmation'));
   });
+  test('explicit meeting plan beats past anxious and current calm words', () {
+    const request = 'Test scenario: I felt anxious yesterday, but I am calm now. I have 20 minutes before a meeting. Give me a two-step plan. Do not ask questions.';
+    final route = plan(request);
+    expect(route.tool, 'practical planning');
+    expect(route.instruction, contains('no-question requests'));
+    expect(route.relevantMemberContext(request, 'Anxious yesterday'), isEmpty);
+  });
+  test('books, workbook, history facts and source code are not private tools', () {
+    for (final request in ['Recommend books about Rome.', 'What is a workbook?',
+      'Explain the history of Rome.', 'Explain source code.',
+      'Of course I can do that.', 'What is a project plan?']) {
+      expect(plan(request).tool, 'open conversation', reason: request);
+      expect(plan(request).relevantMemberContext(request, 'Anxious yesterday'), isEmpty);
+    }
+  });
+  test('past or rejected exercises do not request a practice', () {
+    for (final request in ['I tried a breathing exercise yesterday. I am calm now.',
+      'Do not give me a breathing exercise; give me a meeting plan.']) {
+      expect(plan(request).tool, isNot('wellness recipe'));
+    }
+    expect(plan('Show me a breathing exercise. Do not ask questions.').tool, 'wellness recipe');
+  });
 }

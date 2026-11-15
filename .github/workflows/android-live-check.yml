@@ -41,7 +41,7 @@ jobs:
           aapt=$(find "$ANDROID_HOME/build-tools" -name aapt -type f | sort -V | tail -1)
           "$aapt" dump badging "$apk" > flutter/build/app/outputs/flutter-apk/package-badging.txt
           sha256sum "$apk" > flutter/build/app/outputs/flutter-apk/SHA256SUMS.txt
-          python3 ci/apk_manifest.py "$apk" flutter/build/app/outputs/flutter-apk/package-badging.txt > flutter/build/app/outputs/flutter-apk/candidate-manifest.json
+          python3 ci/apk_manifest.py "$apk" flutter/build/app/outputs/flutter-apk/package-badging.txt | tee flutter/build/app/outputs/flutter-apk/candidate-manifest.json
       - uses: actions/upload-artifact@v4
         with:
           name: mind-recipe-android-live-check-apk

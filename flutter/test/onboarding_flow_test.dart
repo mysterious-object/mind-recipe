@@ -22,6 +22,12 @@ class SlowRestoreApi extends SlowAiApi {
   Future<AccountRestoreResult> restoreSession(AccountSession stored) => Completer<AccountRestoreResult>().future;
 }
 
+class VerifiedApi extends SlowAiApi {
+  @override
+  Future<AccountRestoreResult> restoreSession(AccountSession stored) async =>
+      AccountRestoreResult(AccountRestoreStatus.verified, stored);
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUp(() => FlutterSecureStorage.setMockInitialValues({}));
@@ -173,6 +179,21 @@ void main() {
         home: OnboardingFlow(appState: value)));
     final scaffold = tester.widget<Scaffold>(find.byType(Scaffold));
     expect(scaffold.backgroundColor?.a, 1);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('same-account session refresh resumes usable saved setup', (tester) async {
+    final value = await state();
+    await value.saveOnboardingDraft({'step': 1, 'name': 'Member'});
+    final api = VerifiedApi();
+    await tester.pumpWidget(MindRecipeApp(initialAppState: value, initialApi: api));
+    await frames(tester);
+    await value.setSession(const AccountSession(token: 'refreshed', displayName: 'Member', email: 'member@example.test'));
+    await frames(tester);
+    await tester.tap(find.text('Continue'));
+    await frames(tester);
+    expect(value.onboardingDraft['step'], 2);
+    api.pending.complete(false);
     await tester.pumpWidget(const SizedBox());
   });
 }
