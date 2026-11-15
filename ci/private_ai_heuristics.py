@@ -46,5 +46,27 @@ def flags(case, text):
             result.append('review practice substituted for meeting preparation')
         if not re.search(r'\b(?:meeting|agenda|notes|questions|points|prepare|review)\b', text, re.I):
             result.append('review missing practical meeting preparation')
+    if case.startswith('greeting') and len(text) > 200:
+        result.append('review greeting verbosity')
+    if case == 'support':
+        items = re.findall(r'(?:^|\n)\s*(?:[-*] |\d+[.)] )', text)
+        if len(items) > 1 or len(text) > 350 or re.search(r'\b(?:matrix|framework)\b', text, re.I):
+            result.append('review granularity: one manageable step requested')
+    if case == 'personal_plan':
+        if re.search(r'\b\d{1,2}:\d{2}\b', text):
+            result.append('review invented clock time: no start time supplied')
+        clock_ranges = re.findall(r'(\d{1,2}):(\d{2})\s*[-–—]\s*(\d{1,2}):(\d{2})', text)
+        duration = sum((int(h2) - int(h1)) * 60 + int(m2) - int(m1)
+                       for h1, m1, h2, m2 in clock_ranges)
+        if duration > 60:
+            result.append('review time budget: listed intervals exceed 60 minutes')
+        relative_ranges = re.findall(r'\b(\d+)\s*[-–—]\s*(\d+)\s*(?:minutes?|mins?)\b', text, re.I)
+        if any(int(end) > 60 for _, end in relative_ranges):
+            result.append('review time budget: relative endpoint exceeds 60 minutes')
+    if case == 'factual_uncertainty' and re.search(r'\bpermission\b', text, re.I):
+        if re.search(r'\b(?:check|retrieve|look up)\b', text, re.I):
+            result.append('review unsupported permission/access offer; inspect negation manually')
+    if case == 'scheduling_truth' and len(text) > 350:
+        result.append('review verbosity: short action-status answer requested')
     return result
 

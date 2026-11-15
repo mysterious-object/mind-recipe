@@ -95,6 +95,11 @@ report = ['# Synthetic private-model comparison', '',
           'percentiles. Heuristics flag possible problems; they do not measure overall '
           'helpfulness, safety, factual accuracy or clinical efficacy. Full synthetic outputs '
           'are in results.json and the job log. Subjective review must be reported separately.', '',
+          'Human-review rubric: verify speaker ownership; no historical mood treated as current; '
+          'no invented doctor facts or access offers; requested answer length/step count; '
+          'relative offsets and a total 60-minute plan with 20 minutes email, 30 minutes report '
+          'and a break; practical two-step meeting preparation without questions; no saved-action '
+          'claim without confirmation. A zero-flag answer is not a pass on this rubric.', '',
           '| Version | Cases | Flagged cases | Median first visible ms | Median completion ms |',
           '|---|---:|---:|---:|---:|']
 for version in ('baseline', 'candidate'):

@@ -34,6 +34,17 @@ class EmotionAttributionHeuristics(unittest.TestCase):
         self.assertTrue(possible_assistant_emotion_claim(
             'You said "I feel anxious." I am frustrated too.'))
 
+    def test_observed_planning_and_capability_regressions_are_reviewed(self):
+        self.assertTrue(flags('personal_plan', '10:00 - 10:20 Email\n10:20 - 10:50 Report\n10:50 - 11:00 Break\n11:00 - 11:30 Continue work'))
+        self.assertIn('review time budget: listed intervals exceed 60 minutes',
+                      flags('personal_plan', '10:00 - 10:20 Email\n10:20 - 10:50 Report\n10:50 - 11:00 Break\n11:00 - 11:30 Continue work'))
+        self.assertFalse(flags('personal_plan', '0–20 minutes: email. 20–30 minutes: break. 30–60 minutes: report.'))
+        self.assertTrue(flags('support', 'Use the Eisenhower matrix:\n- Important and urgent\n- Important but not urgent\n- Other tasks'))
+        self.assertIn('review unconfirmed action claim', flags('scheduling_truth',
+                      'I can confirm that the appointment has been saved to your calendar.'))
+        self.assertTrue(flags('factual_uncertainty',
+                             'I would need your permission to check this information.'))
+
 
 if __name__ == '__main__':
     unittest.main()
