@@ -11,6 +11,8 @@ on:
       - 'flutter/tool/private_eval/**'
       - 'flutter/test/fixtures/**'
       - 'ci/private_ai_eval.py'
+      - 'ci/private_ai_heuristics.py'
+      - 'ci/test_private_ai_heuristics.py'
       - '.github/workflows/private-ai-eval.yml'
 permissions:
   contents: read
@@ -32,6 +34,8 @@ jobs:
           flutter analyze --no-fatal-infos --no-fatal-warnings
           flutter test
         working-directory: flutter
+      - name: Test evaluator attribution heuristics
+        run: python3 -m unittest discover -s ci -p test_private_ai_heuristics.py
       - name: Export exact synthetic prompts
         run: |
           mkdir -p "$RUNNER_TEMP/private-eval"

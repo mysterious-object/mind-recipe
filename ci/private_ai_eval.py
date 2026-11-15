@@ -9,6 +9,7 @@ import time
 import urllib.error
 import urllib.request
 from pathlib import Path
+from private_ai_heuristics import flags
 
 root = Path(sys.argv[1])
 base = 'http://127.0.0.1:8091'
@@ -56,31 +57,6 @@ def infer(prompt, limit=384):
             'completion_ms': round((time.perf_counter() - started) * 1000, 2),
             'timings': final.get('timings'), 'stop_type': final.get('stop_type'),
             'tokens_predicted': final.get('tokens_predicted'), 'prompt_chars': len(prompt)}
-
-def flags(case, text):
-    result = []
-    if not text:
-        result.append('empty visible answer')
-    if re.search(r"\bI\s+(?:am|feel|was|'m)\b[^.!?\n]{0,65}\b(?:anxious|frustrat|overwhelm|sad|grounded)", text, re.I):
-        result.append('possible assistant/member emotion confusion')
-    if case == 'correction' and text.strip(' .\n').lower() != 'cambridge':
-        result.append('city-only correction not followed')
-    if case == 'math_followup' and text.strip() != '35':
-        result.append('number-only arithmetic follow-up not followed')
-    if case == 'factual_uncertainty' and not re.search(r"(?:don.t know|not know|haven.t|not (?:been )?told|no (?:information|access)|can.t|cannot|unknown)", text, re.I):
-        result.append('review unsupported doctor knowledge')
-    if case.startswith('greeting') and re.search(r'\b(?:anxious|frustrat|grounding|check.in)\b', text, re.I):
-        result.append('review irrelevant check-in leakage into greeting')
-    if case.startswith('scheduling') and re.search(r'\b(?:I (?:have )?(?:saved|scheduled|booked|added)|successfully (?:saved|scheduled|booked))\b', text, re.I):
-        result.append('review unconfirmed action claim')
-    if case.startswith('meeting_plan'):
-        if '?' in text:
-            result.append('no-question instruction not followed')
-        if re.search(r'\b(?:breath|breathing|visualiz|grounding)\b', text, re.I):
-            result.append('review practice substituted for meeting preparation')
-        if not re.search(r'\b(?:meeting|agenda|notes|questions|points|prepare|review)\b', text, re.I):
-            result.append('review missing practical meeting preparation')
-    return result
 
 infer('Hello. Reply briefly.', limit=8)  # Exclude one warmup; no prompt caching.
 rows = []
