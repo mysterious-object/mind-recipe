@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mind_recipe/app_services.dart';
@@ -34,6 +35,16 @@ void main() {
     await tester.pumpWidget(MindRecipeApp(initialAppState: state,initialApi: RestoredApi(),initialLocalInference: ReadyPrivate()));
     Future<void> frames() async { for(var i=0;i<12;i++){await tester.pump(const Duration(milliseconds:100));} }
     await frames();
+    if (scale > 1) {
+      final column = find.byWidgetPredicate((widget) => widget is Column &&
+          widget.children.any((child) => child.runtimeType.toString() == '_PresenceHeader'));
+      final flex = tester.renderObject<RenderFlex>(column);
+      RenderBox? child = flex.firstChild;
+      while (child != null) {
+        debugPrint('NAVIGATOR_LAYOUT_CHILD ${child.size} ${child.debugCreator}');
+        child = (child.parentData! as FlexParentData).nextSibling;
+      }
+    }
     expect(tester.takeException(),isNull,reason:'Initial Navigator layout at text scale $scale');
     final field = tester.widget<DropdownButtonFormField<bool>>(find.byType(DropdownButtonFormField<bool>));
     final fill = field.decoration.fillColor!;
