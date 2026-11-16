@@ -1054,8 +1054,20 @@ Latest member request: $text''',
             ),
           ),
         ),
-        Column(
+        LayoutBuilder(builder: (context, constraints) => Column(
           children: [
+            Expanded(
+              child: ListView.builder(
+                controller: scrollController,
+                keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 18),
+                itemCount:
+                    widget.messages.length +
+                    1 +
+                    (sending ? 1 : 0) +
+                    (turn == 0 ? 1 : 0),
+                itemBuilder: (context, index) {
+                  if (index == 0) return Column(children: [
             _PresenceHeader(
               animation: fxController,
               cloudAvailable: widget.appState.cloudAiEnabled && cloudAvailable,
@@ -1119,30 +1131,6 @@ Latest member request: $text''',
                 ],
               ),
             ),
-            Expanded(
-              child: ListView.builder(
-                controller: scrollController,
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 18),
-                itemCount:
-                    widget.messages.length +
-                    (sending ? 1 : 0) +
-                    (turn == 0 ? 1 : 0),
-                itemBuilder: (context, index) {
-                  if (index < widget.messages.length) {
-                    return _ChatBubble(
-                      message: widget.messages[index],
-                      onEdit: sending
-                          ? null
-                          : (newText) => _editMessage(index, newText),
-                    );
-                  }
-                  if (sending && index == widget.messages.length) {
-                    return const _ThinkingBubble();
-                  }
-                  return _OpeningSuggestions(onFunction: _runQuickFunction);
-                },
-              ),
-            ),
             if (_pendingPhoneAction != null)
               _PhoneActionCard(
                 action: _pendingPhoneAction!,
@@ -1162,7 +1150,26 @@ Latest member request: $text''',
                       if (mounted) setState(() {});
                     },
             ),
-            _Composer(
+                  ]);
+                  index -= 1;
+                  if (index < widget.messages.length) {
+                    return _ChatBubble(
+                      message: widget.messages[index],
+                      onEdit: sending
+                          ? null
+                          : (newText) => _editMessage(index, newText),
+                    );
+                  }
+                  if (sending && index == widget.messages.length) {
+                    return const _ThinkingBubble();
+                  }
+                  return _OpeningSuggestions(onFunction: _runQuickFunction);
+                },
+              ),
+            ),
+            ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: constraints.maxHeight * .5),
+              child: SingleChildScrollView(child: _Composer(
               controller: composer,
               focusNode: composerFocus,
               canSend: canSend,
@@ -1174,9 +1181,10 @@ Latest member request: $text''',
               isSpeaking: _isSpeaking,
               voiceConversationEnabled: _voiceConversationEnabled,
               onToggleVoiceConversation: _toggleVoiceConversation,
+            )),
             ),
           ],
-        ),
+        )),
       ],
     );
   }
@@ -1312,11 +1320,6 @@ class _PresenceHeader extends StatelessWidget {
         ? (Theme.of(context).brightness == Brightness.light
             ? Theme.of(context).colorScheme.primary : MindRecipeFxPalette.livingGreen)
         : Theme.of(context).colorScheme.error;
-    final statusLabel = localReady
-        ? 'PRIVATE'
-        : cloudAvailable
-        ? 'CLOUD'
-        : 'OFFLINE';
 
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
@@ -1388,23 +1391,6 @@ class _PresenceHeader extends StatelessWidget {
                       ?.copyWith(fontSize: 11.5),
                 ),
               ],
-            ),
-          ),
-          // Status pill
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: statusColor.withValues(alpha: 0.14),
-              borderRadius: BorderRadius.circular(99),
-            ),
-            child: Text(
-              statusLabel,
-              style: TextStyle(
-                fontSize: 9,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 1,
-                color: statusColor,
-              ),
             ),
           ),
         ],

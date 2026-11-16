@@ -77,6 +77,7 @@ jobs:
           mkdir -p Payload
           cp -R build/ios/iphoneos/Runner.app Payload/
           zip -qr MindRecipe-2158-UNSIGNED.ipa Payload
+          codesign -d --verbose=4 build/ios/iphoneos/Runner.app > ios-signing-inspection.txt 2>&1 || true
           python3 ../ci/ios_artifact_manifest.py MindRecipe-2158-UNSIGNED.ipa | tee ios-candidate-manifest.json
           shasum -a 256 MindRecipe-2158-UNSIGNED.ipa | tee ios-SHA256SUMS.txt
 
@@ -87,5 +88,6 @@ jobs:
             flutter/MindRecipe-2158-UNSIGNED.ipa
             flutter/ios-candidate-manifest.json
             flutter/ios-SHA256SUMS.txt
+            flutter/ios-signing-inspection.txt
           if-no-files-found: error
           retention-days: 14

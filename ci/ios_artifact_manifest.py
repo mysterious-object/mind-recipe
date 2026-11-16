@@ -22,7 +22,8 @@ print(json.dumps({
     'version_code': info['CFBundleVersion'], 'display_version': info['CFBundleShortVersionString'],
     'label': info.get('CFBundleDisplayName', info['CFBundleName']),
     'size_bytes': ipa.stat().st_size, 'sha256': hashlib.sha256(ipa.read_bytes()).hexdigest(),
-    'signing_status': 'UNSIGNED: no application signature or provisioning profile; not device-installable as delivered',
+    'signing_status': 'UNSIGNED (--no-codesign): no root signature directory or provisioning profile; not device-installable as delivered',
     'certificate_sha256': None, 'zip_integrity': 'passed',
+    'codesign_inspection': (ipa.parent / 'ios-signing-inspection.txt').read_text() if (ipa.parent / 'ios-signing-inspection.txt').exists() else None,
     'native_tests': 'same-run iPhone simulator RunnerTests results uploaded separately',
 }, indent=2))
