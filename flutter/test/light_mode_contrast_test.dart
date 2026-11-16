@@ -18,6 +18,12 @@ void main() {
   testWidgets('actual Light app is readable at 320dp, text $scale', (tester) async {
     tester.platformDispatcher.textScaleFactorTestValue=scale;
     addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    final originalErrorHandler = FlutterError.onError;
+    FlutterError.onError = (details) {
+      FlutterError.dumpErrorToConsole(details, forceReport:true);
+      originalErrorHandler?.call(details);
+    };
+    addTearDown(() => FlutterError.onError = originalErrorHandler);
     tester.view.physicalSize = const Size(320, 886);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -28,6 +34,7 @@ void main() {
     await tester.pumpWidget(MindRecipeApp(initialAppState: state,initialApi: RestoredApi(),initialLocalInference: ReadyPrivate()));
     Future<void> frames() async { for(var i=0;i<12;i++){await tester.pump(const Duration(milliseconds:100));} }
     await frames();
+    expect(tester.takeException(),isNull,reason:'Initial Navigator layout at text scale $scale');
     final field = tester.widget<DropdownButtonFormField<bool>>(find.byType(DropdownButtonFormField<bool>));
     final fill = field.decoration.fillColor!;
     final dropdown = tester.widget<DropdownButton<bool>>(find.descendant(
