@@ -1073,6 +1073,8 @@ class SecureAppState extends ChangeNotifier {
   bool sessionTemporarilyUnverified = false;
   bool managedAiAvailable = false;
   bool cloudAiEnabled = true;
+  bool _privateModelReady = false;
+  bool _managedAiChecked = false;
   bool publicResearchEnabled = false;
   String selectedCloudModel = 'openrouter/auto';
   String appearanceMode = 'system';
@@ -1105,7 +1107,19 @@ class SecureAppState extends ChangeNotifier {
 
   void setManagedAiAvailable(bool value) {
     managedAiAvailable = value;
+    _managedAiChecked = true;
+    if (!aiAvailable && _privateModelReady) cloudAiEnabled = false;
     notifyListeners();
+  }
+
+  /// Readiness can arrive after sign-in or a model download. Never enable
+  /// cloud automatically: a private choice stays private across outages.
+  void reconcilePrivateReadiness(bool ready) {
+    _privateModelReady = ready;
+    if (ready && _managedAiChecked && !aiAvailable && cloudAiEnabled) {
+      cloudAiEnabled = false;
+      notifyListeners();
+    }
   }
 
   Future<void> load() async {

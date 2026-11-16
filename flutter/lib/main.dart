@@ -135,13 +135,13 @@ class _MindRecipeAppState extends State<MindRecipeApp> {
     final scheme = ColorScheme.fromSeed(
       seedColor: seed,
       brightness: Brightness.light,
-    ).copyWith(primary: seed, secondary: secondary, tertiary: tertiary);
+    );
     return MaterialApp(
       title: 'MindRecipe',
       theme: ThemeData(
         colorScheme: scheme,
         useMaterial3: true,
-        scaffoldBackgroundColor: Colors.transparent,
+        scaffoldBackgroundColor: scheme.surface,
       ),
       darkTheme: ThemeData(
         colorScheme:
@@ -285,6 +285,7 @@ class _MemberHomeState extends State<MemberHome> {
   Future<void> _primeNavigator() async {
     final local = await (widget.localInference ?? OnDeviceInference())
         .refreshStatus();
+    widget.appState.reconcilePrivateReadiness(local.isReady);
     if (!widget.appState.aiAvailable) {
       widget.appState.setManagedAiAvailable(await widget.api.aiAvailable());
     }
@@ -505,8 +506,9 @@ class _MemberHomeState extends State<MemberHome> {
             ? pageController.page ?? index.toDouble()
             : index.toDouble();
         return Scaffold(
-          backgroundColor: visualThemeFor(widget.appState.visualThemeId)
-              .background,
+          backgroundColor: Theme.of(context).brightness == Brightness.dark
+              ? visualThemeFor(widget.appState.visualThemeId).background
+              : Theme.of(context).colorScheme.surface,
           appBar: AppBar(
             title: MindRecipePageTitle(
               title: labels[index],
@@ -545,6 +547,9 @@ class _MemberHomeState extends State<MemberHome> {
                               .engineTheme,
                         ),
                       ),
+                      if (Theme.of(context).brightness == Brightness.light)
+                        Positioned.fill(child: IgnorePointer(child: ColoredBox(
+                          color: Theme.of(context).colorScheme.surface.withValues(alpha: .96)))),
                       PageView(
                         controller: pageController,
                         physics: MediaQuery.disableAnimationsOf(context)
