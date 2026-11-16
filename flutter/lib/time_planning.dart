@@ -59,7 +59,7 @@ PlanningReply? resolveTimePlanning(List<String> memberTurns) {
   for (final message in memberTurns) {
     latest = null;
     final lower = message.toLowerCase().replaceAll('’', "'");
-    final requestsPlan = RegExp(r'\b(?:plan|time budget|time allocation|minute ranges|organize my|prepare for|prepare me)\b').hasMatch(lower);
+    final requestsPlan = RegExp(r'^\s*plan\b|\b(?:help me plan|plan\s+(?:for|exactly|my|the|next|\d)|(?:give|make|create|draft|suggest|build|write|need|want).{0,40}\b(?:plan|schedule)|organize my|prepare for|prepare me)\b').hasMatch(lower);
     final edits = state != null && RegExp(r'\b(?:change|make|reduce|increase|instead|actually|only have|have only|start|begin|move|replace|correction|keep)\b').hasMatch(lower) &&
         (duration.hasMatch(message) || RegExp(r'\b(?:start|begin)\b').hasMatch(lower));
     if (!requestsPlan && !edits) continue;

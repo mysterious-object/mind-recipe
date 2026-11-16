@@ -98,6 +98,8 @@ void main() {
     }
     expect(await send('Change the budget to 50 minutes.'),contains('45–50 min: Unallocated buffer (5 minutes)'));
     expect(local.calls,1);
+    await send('What is a project plan?');
+    expect(local.calls,2);
     await send('I feel anxious right now and need support.');
     expect(local.calls, greaterThan(1));
     expect(api.calls, 0);

@@ -51,6 +51,8 @@ void main() {
   test('current distress without a planning request remains conversation', () {
     expect(resolveTimePlanning(['I feel anxious right now. Help me.']), isNull);
     expect(resolveTimePlanning(['I tried a breathing exercise yesterday.']), isNull);
+    expect(resolveTimePlanning(['What is a project plan?']),isNull);
+    expect(resolveTimePlanning(['Explain the history of time planning.']),isNull);
   });
   test('natural task/budget boundaries, compound edits and labels before durations', () {
     final anchored = resolveTimePlanning(['Starting at 9:40 am, plan 15 minutes email, 25 minutes report, and 5 minutes break.'])!;
