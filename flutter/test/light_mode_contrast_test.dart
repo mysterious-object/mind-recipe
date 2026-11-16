@@ -14,7 +14,10 @@ class RestoredApi extends FakeMindRecipeApi {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUp(() => FlutterSecureStorage.setMockInitialValues({}));
-  testWidgets('actual Light app has opaque light surface, readable selector/chat and Settings at 320dp', (tester) async {
+  for (final scale in [1.0, 2.0]) {
+  testWidgets('actual Light app is readable at 320dp, text $scale', (tester) async {
+    tester.platformDispatcher.textScaleFactorTestValue=scale;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
     tester.view.physicalSize = const Size(320, 886);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -45,4 +48,5 @@ void main() {
     expect(tester.takeException(),isNull);
     await tester.pumpWidget(const SizedBox());
   });
+  }
 }
