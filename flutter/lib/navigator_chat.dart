@@ -1257,14 +1257,15 @@ class _PhoneActionCard extends StatelessWidget {
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
+            Wrap(
+              alignment: WrapAlignment.end,
+              spacing: 4,
+              runSpacing: 4,
               children: [
                 TextButton(
                   onPressed: busy ? null : onDismiss,
                   child: const Text('Not now'),
                 ),
-                const SizedBox(width: 4),
                 FilledButton.icon(
                   onPressed: busy ? null : onAllow,
                   icon: busy
