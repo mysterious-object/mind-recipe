@@ -430,135 +430,48 @@ class MindRecipePageRail extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final reduceMotion = MediaQuery.disableAnimationsOf(context);
-    final duration = reduceMotion
-        ? Duration.zero
-        : const Duration(milliseconds: 360);
-    final pageFraction = labels.isEmpty
-        ? 0.0
-        : ((progress + 1) / labels.length).clamp(0.0, 1.0);
-
+    final height = math.max(76.0, 44 + MediaQuery.textScalerOf(context).scale(12) * 2.5);
     return Material(
-      color: Color.alphaBlend(
-        scheme.primary.withValues(alpha: 0.04),
-        scheme.surface,
-      ),
+      color: scheme.surface,
       elevation: 4,
       child: SafeArea(
         top: false,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Align(
-              alignment: Alignment.centerLeft,
-              child: FractionallySizedBox(
-                widthFactor: math.max(0.06, pageFraction),
-                child: Container(
-                  height: 3,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [
-                        MindRecipeFxPalette.primary,
-                        MindRecipeFxPalette.livingGreen,
-                        MindRecipeFxPalette.secondary,
-                      ],
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+          child: SizedBox(
+            height: height,
+            child: Row(children: [
+              for (var i = 0; i < labels.length; i++)
+                Expanded(child: Semantics(
+                  container: true,
+                  excludeSemantics: true,
+                  selected: i == selectedIndex,
+                  button: true,
+                  label: '${labels[i]}, tab ${i + 1} of ${labels.length}',
+                  child: Material(
+                    color: i == selectedIndex ? scheme.primaryContainer : scheme.surface,
+                    borderRadius: BorderRadius.circular(20),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(20),
+                      onTap: () => onSelected(i),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+                        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                          iconAssets[i] == null
+                              ? Icon(icons[i], color: i == selectedIndex ? scheme.onPrimaryContainer : scheme.onSurfaceVariant)
+                              : ImageIcon(AssetImage(iconAssets[i]!), size: 24,
+                                  color: i == selectedIndex ? scheme.onPrimaryContainer : scheme.onSurfaceVariant),
+                          const SizedBox(height: 4),
+                          Flexible(child: Text(labels[i], textAlign: TextAlign.center, maxLines: 2,
+                            style: theme.textTheme.labelMedium?.copyWith(
+                              color: i == selectedIndex ? scheme.onPrimaryContainer : scheme.onSurfaceVariant))),
+                        ]),
+                      ),
                     ),
-                    borderRadius: BorderRadius.circular(999),
                   ),
-                ),
-              ),
-            ),
-            SizedBox(
-              height: 74,
-              child: ListView.separated(
-                controller: scrollController,
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                scrollDirection: Axis.horizontal,
-                itemCount: labels.length,
-                separatorBuilder: (_, _) => const SizedBox(width: 4),
-                itemBuilder: (context, itemIndex) {
-                  final selected = itemIndex == selectedIndex;
-                  return Semantics(
-                    container: true,
-                    excludeSemantics: true,
-                    selected: selected,
-                    button: true,
-                    label:
-                        '${labels[itemIndex]}, tab ${itemIndex + 1} of ${labels.length}',
-                    child: AnimatedContainer(
-                      duration: duration,
-                      curve: Curves.easeOutCubic,
-                      width: selected ? 156 : 62,
-                      decoration: BoxDecoration(
-                        color: selected
-                            ? scheme.primaryContainer
-                            : Colors.transparent,
-                        borderRadius: BorderRadius.circular(22),
-                        boxShadow: selected
-                            ? [
-                                BoxShadow(
-                                  color: scheme.primary.withValues(alpha: 0.16),
-                                  blurRadius: 14,
-                                  offset: const Offset(0, 5),
-                                ),
-                              ]
-                            : null,
-                      ),
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(22),
-                        onTap: () => onSelected(itemIndex),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            AnimatedScale(
-                              duration: duration,
-                              scale: selected ? 1.08 : 1,
-                              child: iconAssets[itemIndex] != null
-                                  ? ImageIcon(
-                                      AssetImage(iconAssets[itemIndex]!),
-                                      size: 24,
-                                      color: selected
-                                          ? scheme.onPrimaryContainer
-                                          : scheme.onSurfaceVariant,
-                                    )
-                                  : Icon(
-                                      icons[itemIndex],
-                                      color: selected
-                                          ? scheme.onPrimaryContainer
-                                          : scheme.onSurfaceVariant,
-                                    ),
-                            ),
-                            Flexible(
-                              child: AnimatedSize(
-                                duration: duration,
-                                curve: Curves.easeOutCubic,
-                                child: selected
-                                    ? Padding(
-                                        padding: const EdgeInsets.only(left: 7),
-                                        child: Text(
-                                          labels[itemIndex],
-                                          maxLines: 1,
-                                          softWrap: false,
-                                          overflow: TextOverflow.fade,
-                                          style: theme.textTheme.labelLarge
-                                              ?.copyWith(
-                                                color:
-                                                    scheme.onPrimaryContainer,
-                                              ),
-                                        ),
-                                      )
-                                    : const SizedBox.shrink(),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
+                )),
+            ]),
+          ),
         ),
       ),
     );

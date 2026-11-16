@@ -100,6 +100,7 @@ class _VisualThemeCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final themeColors = Theme.of(context).colorScheme;
     final foreground = themeColors.onSurface;
+    final light = Theme.of(context).brightness == Brightness.light;
     return Semantics(
       button: true,
       selected: selected,
@@ -117,14 +118,14 @@ class _VisualThemeCard extends StatelessWidget {
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(20),
-              color: theme.background.withValues(alpha: .78),
+              color: light ? themeColors.surface : theme.background.withValues(alpha: .78),
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  theme.primary.withValues(alpha: selected ? .30 : .18),
-                  theme.secondary.withValues(alpha: selected ? .26 : .12),
-                  theme.background.withValues(alpha: .92),
+                  light ? Color.alphaBlend(theme.primary.withValues(alpha: .10),themeColors.surface) : theme.primary.withValues(alpha: selected ? .30 : .18),
+                  light ? Color.alphaBlend(theme.secondary.withValues(alpha: .07),themeColors.surface) : theme.secondary.withValues(alpha: selected ? .26 : .12),
+                  light ? themeColors.surface : theme.background.withValues(alpha: .92),
                 ],
               ),
               border: Border.all(

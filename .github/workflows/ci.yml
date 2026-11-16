@@ -55,6 +55,13 @@ jobs:
         working-directory: flutter
       - run: flutter test
         working-directory: flutter
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mindrecipe-2158-app-routing-evidence
+          path: flutter/build/test-evidence
+          if-no-files-found: warn
+          retention-days: 14
 
   web:
     name: Web build

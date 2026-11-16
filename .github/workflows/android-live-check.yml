@@ -6,11 +6,12 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 env:
   MIND_RECIPE_STAGING_API_URL: https://staging-api.mindrecipe.142.93.201.156.sslip.io
-  ORG_GRADLE_PROJECT_mindRecipeApplicationIdSuffix: .onboarding2157
-  ORG_GRADLE_PROJECT_mindRecipeAppLabel: MindRecipe Candidate 2157
+  ORG_GRADLE_PROJECT_mindRecipeApplicationIdSuffix: .onboarding2158
+  ORG_GRADLE_PROJECT_mindRecipeAppLabel: MindRecipe Candidate 2158
 
 jobs:
   apk:
@@ -34,12 +35,21 @@ jobs:
           flutter build apk --release --target-platform android-arm64 --no-pub --dart-define=MIND_RECIPE_API_BASE=${MIND_RECIPE_STAGING_API_URL}
         working-directory: flutter
       - run: test -s flutter/build/app/outputs/flutter-apk/app-release.apk
+      - uses: actions/download-artifact@v4
+        with:
+          name: mind-recipe-android-live-check-apk
+          run-id: 43770977104
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/previous-2157
       - name: Record candidate identity and checksum
         shell: bash
         run: |
           apk=flutter/build/app/outputs/flutter-apk/app-release.apk
           aapt=$(find "$ANDROID_HOME/build-tools" -name aapt -type f | sort -V | tail -1)
           "$aapt" dump badging "$apk" > flutter/build/app/outputs/flutter-apk/package-badging.txt
+          apksigner="$(dirname "$aapt")/apksigner"
+          "$apksigner" verify --verbose --print-certs "$apk" > flutter/build/app/outputs/flutter-apk/signer-certificate.txt
+          "$apksigner" verify --print-certs "$RUNNER_TEMP/previous-2157/app-release.apk" > flutter/build/app/outputs/flutter-apk/previous-2157-certificate.txt
           sha256sum "$apk" > flutter/build/app/outputs/flutter-apk/SHA256SUMS.txt
           python3 ci/apk_manifest.py "$apk" flutter/build/app/outputs/flutter-apk/package-badging.txt | tee flutter/build/app/outputs/flutter-apk/candidate-manifest.json
       - uses: actions/upload-artifact@v4
@@ -50,4 +60,6 @@ jobs:
             flutter/build/app/outputs/flutter-apk/candidate-manifest.json
             flutter/build/app/outputs/flutter-apk/package-badging.txt
             flutter/build/app/outputs/flutter-apk/SHA256SUMS.txt
+            flutter/build/app/outputs/flutter-apk/signer-certificate.txt
+            flutter/build/app/outputs/flutter-apk/previous-2157-certificate.txt
           retention-days: 3

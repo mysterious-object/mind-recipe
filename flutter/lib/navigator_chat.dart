@@ -7,6 +7,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'app_services.dart';
+import 'time_planning.dart';
 import 'chat_actions.dart';
 import 'phone_action_review.dart';
 import 'phone_action_draft_store.dart';
@@ -139,6 +140,7 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
   void _onSnapshotChanged() {
     if (!mounted) return;
     setState(() => _localSnapshot = OnDeviceInference.snapshotNotifier.value);
+    widget.appState.reconcilePrivateReadiness(_localSnapshot.isReady);
   }
 
   /// Executes a consented phone action through the on-device harness
@@ -302,7 +304,10 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
 
   Future<void> _refreshLocalStatus() async {
     final snapshot = await _localInference.refreshStatus();
-    if (mounted) setState(() => _localSnapshot = snapshot);
+    if (mounted) {
+      setState(() => _localSnapshot = snapshot);
+      widget.appState.reconcilePrivateReadiness(snapshot.isReady);
+    }
   }
 
   void _startActivityTimer() {
@@ -313,6 +318,10 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
       }
       final target = _isListening ? 0.8 : (sending ? 0.6 : 0.0);
       final diff = target - _smoothActivity;
+      if (diff.abs() < .005) {
+        if (_smoothActivity != target) setState(() => _smoothActivity = target);
+        return;
+      }
       setState(() => _smoothActivity += diff * 0.15);
     });
   }
@@ -493,6 +502,19 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
       _scrollToEnd();
       return;
     }
+    final calculated = resolveTimePlanning(widget.messages
+        .where((message) => message.role == ChatRole.member)
+        .map((message) => message.text).toList());
+    if (calculated != null) {
+      setState(() {
+        sending = false;
+        widget.messages.add(ChatMessage(role: ChatRole.assistant, text: calculated.text,
+            systemGenerated: true));
+      });
+      widget.onChanged();
+      _scrollToEnd();
+      return;
+    }
     // Ground the conversation in real navigation data when a session starts.
     // Load on every turn, including resumed threads and the app-wide sheet.
     // The source/time and explicit-report flags survive process restarts.
@@ -519,6 +541,7 @@ class _NavigatorChatExperienceState extends State<NavigatorChatExperience>
         : await _localInference.refreshStatus();
     if (!mounted) return;
     if (mounted) setState(() => _localSnapshot = localStatus);
+    widget.appState.reconcilePrivateReadiness(localStatus.isReady);
     final cloudCanClarify =
         widget.appState.cloudAiEnabled && widget.appState.aiAvailable;
     if (localStatus.isReady && !widget.appState.cloudAiEnabled) {
@@ -1031,8 +1054,21 @@ Latest member request: $text''',
             ),
           ),
         ),
-        Column(
+        LayoutBuilder(builder: (context, constraints) => Column(
           children: [
+            Expanded(
+              child: ListView.builder(
+                controller: scrollController,
+                keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 18),
+                itemCount:
+                    widget.messages.length +
+                    1 +
+                    (_pendingPhoneAction != null ? 1 : 0) +
+                    (sending ? 1 : 0) +
+                    (turn == 0 ? 1 : 0),
+                itemBuilder: (context, index) {
+                  if (index == 0) return Column(children: [
             _PresenceHeader(
               animation: fxController,
               cloudAvailable: widget.appState.cloudAiEnabled && cloudAvailable,
@@ -1096,37 +1132,6 @@ Latest member request: $text''',
                 ],
               ),
             ),
-            Expanded(
-              child: ListView.builder(
-                controller: scrollController,
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 18),
-                itemCount:
-                    widget.messages.length +
-                    (sending ? 1 : 0) +
-                    (turn == 0 ? 1 : 0),
-                itemBuilder: (context, index) {
-                  if (index < widget.messages.length) {
-                    return _ChatBubble(
-                      message: widget.messages[index],
-                      onEdit: sending
-                          ? null
-                          : (newText) => _editMessage(index, newText),
-                    );
-                  }
-                  if (sending && index == widget.messages.length) {
-                    return const _ThinkingBubble();
-                  }
-                  return _OpeningSuggestions(onFunction: _runQuickFunction);
-                },
-              ),
-            ),
-            if (_pendingPhoneAction != null)
-              _PhoneActionCard(
-                action: _pendingPhoneAction!,
-                busy: _executingPhoneAction,
-                onAllow: () => _executePhoneAction(_pendingPhoneAction!),
-                onDismiss: () => _setPhoneDraft(null),
-              ),
             _ModelRouteSelector(
               useCloud: widget.appState.cloudAiEnabled,
               localReady: _localSnapshot.isReady,
@@ -1139,7 +1144,35 @@ Latest member request: $text''',
                       if (mounted) setState(() {});
                     },
             ),
-            _Composer(
+                  ]);
+                  index -= 1;
+                  if (index < widget.messages.length) {
+                    return _ChatBubble(
+                      message: widget.messages[index],
+                      onEdit: sending
+                          ? null
+                          : (newText) => _editMessage(index, newText),
+                    );
+                  }
+                  if (_pendingPhoneAction != null && index == widget.messages.length + (sending ? 1 : 0)) {
+                    return _PhoneActionCard(
+                      action: _pendingPhoneAction!, busy: _executingPhoneAction,
+                      onAllow: () => _executePhoneAction(_pendingPhoneAction!),
+                      onDismiss: () => _setPhoneDraft(null),
+                    );
+                  }
+                  if (sending && index == widget.messages.length) {
+                    return const _ThinkingBubble();
+                  }
+                  return _OpeningSuggestions(onFunction: _runQuickFunction);
+                },
+              ),
+            ),
+            ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: constraints.maxHeight * .5),
+              child: SingleChildScrollView(child: _Composer(
+              onShowModels: () => scrollController.animateTo(0, duration: const Duration(milliseconds: 300), curve: Curves.easeOut),
+              modelLabel: widget.appState.cloudAiEnabled ? 'API model' : 'Private · ${OnDeviceInference().activeModelDisplayName}',
               controller: composer,
               focusNode: composerFocus,
               canSend: canSend,
@@ -1151,9 +1184,10 @@ Latest member request: $text''',
               isSpeaking: _isSpeaking,
               voiceConversationEnabled: _voiceConversationEnabled,
               onToggleVoiceConversation: _toggleVoiceConversation,
+            )),
             ),
           ],
-        ),
+        )),
       ],
     );
   }
@@ -1223,14 +1257,15 @@ class _PhoneActionCard extends StatelessWidget {
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
+            Wrap(
+              alignment: WrapAlignment.end,
+              spacing: 4,
+              runSpacing: 4,
               children: [
                 TextButton(
                   onPressed: busy ? null : onDismiss,
                   child: const Text('Not now'),
                 ),
-                const SizedBox(width: 4),
                 FilledButton.icon(
                   onPressed: busy ? null : onAllow,
                   icon: busy
@@ -1286,13 +1321,9 @@ class _PresenceHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final online = localReady || cloudAvailable;
     final statusColor = online
-        ? MindRecipeFxPalette.livingGreen
-        : Colors.orange;
-    final statusLabel = localReady
-        ? 'PRIVATE'
-        : cloudAvailable
-        ? 'CLOUD'
-        : 'OFFLINE';
+        ? (Theme.of(context).brightness == Brightness.light
+            ? Theme.of(context).colorScheme.primary : MindRecipeFxPalette.livingGreen)
+        : Theme.of(context).colorScheme.error;
 
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
@@ -1343,6 +1374,8 @@ class _PresenceHeader extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Text(localReady ? 'PRIVATE' : cloudAvailable ? 'CLOUD' : 'OFFLINE',
+                  style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: statusColor)),
                 Text(
                   thinking
                       ? 'Thinking…'
@@ -1364,23 +1397,6 @@ class _PresenceHeader extends StatelessWidget {
                       ?.copyWith(fontSize: 11.5),
                 ),
               ],
-            ),
-          ),
-          // Status pill
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: statusColor.withValues(alpha: 0.14),
-              borderRadius: BorderRadius.circular(99),
-            ),
-            child: Text(
-              statusLabel,
-              style: TextStyle(
-                fontSize: 9,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 1,
-                color: statusColor,
-              ),
             ),
           ),
         ],
@@ -1412,23 +1428,34 @@ class _ModelRouteSelector extends StatelessWidget {
         const SizedBox(width: 8),
         Expanded(
           child: DropdownButtonFormField<bool>(
+            key: ValueKey(useCloud),
             initialValue: useCloud,
+            isExpanded: true,
+            itemHeight: null,
             isDense: true,
-            decoration: const InputDecoration(
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.onSurface),
+            dropdownColor: Theme.of(context).colorScheme.surface,
+            decoration: InputDecoration(
+              filled: true,
+              fillColor: Theme.of(context).colorScheme.surface,
               labelText: 'Navigator model',
               border: OutlineInputBorder(),
             ),
             items: [
               DropdownMenuItem(
                 value: false,
+                enabled: localReady,
                 child: Text(
                   'Private · $localModelName${localReady ? ' · ready' : ' · unavailable'}',
+                  maxLines: 2,
                 ),
               ),
               DropdownMenuItem(
                 value: true,
+                enabled: cloudReady,
                 child: Text(
                   'API model${cloudReady ? ' · connected' : ' · unavailable'}',
+                  maxLines: 2,
                 ),
               ),
             ],
@@ -1469,8 +1496,8 @@ class _ChatBubble extends StatelessWidget {
           padding: const EdgeInsets.all(15),
           decoration: BoxDecoration(
             gradient: member
-                ? const LinearGradient(
-                    colors: [Color(0xff006b60), Color(0xff2f6cfa)],
+                ? LinearGradient(
+                    colors: [Theme.of(context).colorScheme.primary, Theme.of(context).colorScheme.primary],
                   )
                 : status
                 ? null
@@ -1478,7 +1505,7 @@ class _ChatBubble extends StatelessWidget {
                     colors: [
                       Theme.of(context).colorScheme.surface
                           .withValues(alpha: 0.96),
-                      MindRecipeFxPalette.secondary.withValues(alpha: 0.10),
+                      Color.alphaBlend(MindRecipeFxPalette.secondary.withValues(alpha: 0.10), Theme.of(context).colorScheme.surface),
                     ],
                   ),
             color: status
@@ -1522,7 +1549,7 @@ class _ChatBubble extends StatelessWidget {
                   fontWeight: FontWeight.w900,
                   letterSpacing: 1.3,
                   color: member
-                      ? Colors.white70
+                      ? Theme.of(context).colorScheme.onPrimary
                       : Theme.of(context).colorScheme.primary,
                 ),
               ),
@@ -1532,7 +1559,7 @@ class _ChatBubble extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 16,
                   height: 1.35,
-                  color: member ? Colors.white : null,
+                  color: member ? Theme.of(context).colorScheme.onPrimary : Theme.of(context).colorScheme.onSurface,
                 ),
               ),
               if (message.localGenerated || message.cloudGenerated)
@@ -1644,6 +1671,8 @@ class _ThinkingBubble extends StatelessWidget {
 
 class _Composer extends StatelessWidget {
   const _Composer({
+    required this.onShowModels,
+    required this.modelLabel,
     required this.controller,
     required this.focusNode,
     required this.canSend,
@@ -1656,6 +1685,8 @@ class _Composer extends StatelessWidget {
     this.voiceConversationEnabled = false,
     this.onToggleVoiceConversation,
   });
+  final VoidCallback onShowModels;
+  final String modelLabel;
   final TextEditingController controller;
   final FocusNode focusNode;
   final bool canSend;
@@ -1742,7 +1773,8 @@ class _Composer extends StatelessWidget {
             const Expanded(
               child: Text('Voice conversation', style: TextStyle(fontSize: 11)),
             ),
-            const Icon(Icons.record_voice_over_rounded, size: 16),
+            IconButton(onPressed: onShowModels, tooltip: 'Choose model: $modelLabel',
+              icon: const Icon(Icons.tune_rounded, size: 20)),
           ],
         ),
       ],
