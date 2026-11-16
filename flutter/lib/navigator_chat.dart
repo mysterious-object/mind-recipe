@@ -1064,6 +1064,7 @@ Latest member request: $text''',
                 itemCount:
                     widget.messages.length +
                     1 +
+                    (_pendingPhoneAction != null ? 1 : 0) +
                     (sending ? 1 : 0) +
                     (turn == 0 ? 1 : 0),
                 itemBuilder: (context, index) {
@@ -1131,13 +1132,6 @@ Latest member request: $text''',
                 ],
               ),
             ),
-            if (_pendingPhoneAction != null)
-              _PhoneActionCard(
-                action: _pendingPhoneAction!,
-                busy: _executingPhoneAction,
-                onAllow: () => _executePhoneAction(_pendingPhoneAction!),
-                onDismiss: () => _setPhoneDraft(null),
-              ),
             _ModelRouteSelector(
               useCloud: widget.appState.cloudAiEnabled,
               localReady: _localSnapshot.isReady,
@@ -1158,6 +1152,13 @@ Latest member request: $text''',
                       onEdit: sending
                           ? null
                           : (newText) => _editMessage(index, newText),
+                    );
+                  }
+                  if (_pendingPhoneAction != null && index == widget.messages.length + (sending ? 1 : 0)) {
+                    return _PhoneActionCard(
+                      action: _pendingPhoneAction!, busy: _executingPhoneAction,
+                      onAllow: () => _executePhoneAction(_pendingPhoneAction!),
+                      onDismiss: () => _setPhoneDraft(null),
                     );
                   }
                   if (sending && index == widget.messages.length) {
