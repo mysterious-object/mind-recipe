@@ -1370,6 +1370,8 @@ class _PresenceHeader extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Text(localReady ? 'PRIVATE' : cloudAvailable ? 'CLOUD' : 'OFFLINE',
+                  style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: statusColor)),
                 Text(
                   thinking
                       ? 'Thinking…'
