@@ -107,6 +107,18 @@ PlanningReply? resolveTimePlanning(List<String> memberTurns) {
     }
     final tasks = <PlanTask>[];
     var invalid = false;
+    String associated(String interval, {required bool before, required bool betweenDurations}) {
+      final punctuation = interval.split(RegExp(r'[,.;:\n]'));
+      if (punctuation.length > 1) return (before ? punctuation.last : punctuation.first).trim();
+      if (betweenDurations) {
+        final joins = RegExp(r'\band\b',caseSensitive:false).allMatches(interval).toList();
+        if (joins.isNotEmpty) {
+          final join = joins.last;
+          return (before ? interval.substring(join.end) : interval.substring(0,join.start)).trim();
+        }
+      }
+      return interval.trim();
+    }
     for (var i = 0; i < all.length; i++) {
       final match = all[i];
       if (budgetMatch != null && match.start >= budgetMatch.start && match.end <= budgetMatch.end) continue;
@@ -114,16 +126,17 @@ PlanningReply? resolveTimePlanning(List<String> memberTurns) {
       final value = minutes(match);
       if (value == null) { invalid = true; break; }
       final stop = i + 1 < all.length ? all[i + 1].start : message.length;
-      var label = message.substring(match.end, stop).split(RegExp(r'[,.;:\n]')).first.trim();
+      var label = associated(message.substring(match.end, stop),before:false,betweenDurations:i+1<all.length);
       label = label.replaceFirst(RegExp(r'^(?:of|for)\s+', caseSensitive: false), '').replaceFirst(RegExp(r'\s+and$', caseSensitive: false), '').trim();
-      final before = message.substring(i == 0 ? 0 : all[i - 1].end, match.start).split(RegExp(r'[,.;:\n]')).last.trim();
-      final beforeLabel = before.replaceFirst(RegExp(r'^(?:(?:and|then)\s+)?(?:(?:make|change|reduce|increase|set|keep)\s+)?(?:the\s+)?', caseSensitive: false), '')
+      final before = associated(message.substring(i == 0 ? 0 : all[i - 1].end, match.start),before:true,betweenDurations:i>0);
+      final beforeLabel = before.replaceFirst(RegExp(r'^(?:(?:and|then)\s+)?(?:(?:make|change|reduce|increase|set|keep|plan)\s+)?(?:the\s+)?', caseSensitive: false), '')
           .replaceFirst(RegExp(r'\s+(?:to|for|is|=|at)$', caseSensitive: false), '').trim();
       final knownBefore = state?.tasks.any((t) => t.label.toLowerCase() == beforeLabel.toLowerCase()) ?? false;
       if (label.isEmpty || (edits && knownBefore)) label = beforeLabel;
       // A time anchor is not part of the task's name.
       label = label.replaceFirst(RegExp(r'\s+(?:starting|start|beginning|at)\b.*$', caseSensitive: false), '').trim();
-      if (RegExp(r'^(?:before|until|available|total|budget|plan|i have|exactly|at|starting)', caseSensitive: false).hasMatch(label)) continue;
+      if (RegExp(r'^(?:before|until|available|at|starting)\b', caseSensitive: false).hasMatch(label)) continue;
+      if (RegExp(r'^(?:total|budget|plan|i have|exactly)$',caseSensitive:false).hasMatch(label)) { invalid = true; break; }
       if (label.isEmpty || label.length > 70 || label.contains(RegExp(r'\d')) || label.contains('?')) { invalid = true; break; }
       tasks.add(PlanTask(label, value));
     }

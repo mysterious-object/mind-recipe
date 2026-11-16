@@ -74,4 +74,24 @@ void main() {
     expect(() => const TimePlan([PlanTask('work',40)],30).render(),throwsStateError);
     expect(() => const TimePlan([PlanTask('work',-5)],30).render(),throwsStateError);
   });
+  test('and-joined and mixed clauses never steal neighbouring task names', () {
+    for (final request in [
+      'Plan for 45 minutes: email 15 minutes and report 20 minutes and break 10 minutes.',
+      'Plan for 45 minutes: 15 minutes email, report 20 minutes, 10 minutes break.',
+    ]) {
+      final reply = resolveTimePlanning([request])!;
+      expect(reply.clarification,isFalse,reason:request);
+      expect(reply.plan!.tasks.map((t)=>t.label),['email','report','break']);
+      expect(reply.text,contains('0–15 min: email (15 minutes)'));
+      expect(reply.text,contains('15–35 min: report (20 minutes)'));
+      expect(reply.text,contains('35–45 min: break (10 minutes)'));
+    }
+    final updated = resolveTimePlanning([
+      'Plan for 45 minutes: email 15 minutes, report 20 minutes, break 10 minutes.',
+      'Change the budget to 50 minutes.',
+    ])!;
+    expect(updated.plan!.budget,50);
+    expect(updated.plan!.tasks.any((t)=>t.label.toLowerCase().contains('budget')),isFalse);
+    expect(updated.text,contains('45–50 min: Unallocated buffer (5 minutes)'));
+  });
 }

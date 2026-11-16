@@ -87,6 +87,17 @@ void main() {
     expect(await send('Plan for 45 minutes: email 15 minutes, report 20 minutes, break 10 minutes.'),
         contains('15–35 min: report (20 minutes)'));
     expect(local.calls,1);
+    for (final request in [
+      'Plan for 45 minutes: email 15 minutes and report 20 minutes and break 10 minutes.',
+      'Plan for 45 minutes: 15 minutes email, report 20 minutes, 10 minutes break.',
+    ]) {
+      final reply = await send(request);
+      expect(reply,contains('0–15 min: email (15 minutes)'));
+      expect(reply,contains('15–35 min: report (20 minutes)'));
+      expect(reply,contains('35–45 min: break (10 minutes)'));
+    }
+    expect(await send('Change the budget to 50 minutes.'),contains('45–50 min: Unallocated buffer (5 minutes)'));
+    expect(local.calls,1);
     await send('I feel anxious right now and need support.');
     expect(local.calls, greaterThan(1));
     expect(api.calls, 0);
