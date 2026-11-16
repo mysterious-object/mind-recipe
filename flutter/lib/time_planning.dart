@@ -13,6 +13,9 @@ class TimePlan {
   int get allocated => tasks.fold(0, (sum, task) => sum + task.minutes);
 
   String render() {
+    if (budget <= 0 || tasks.any((task) => task.minutes <= 0) || allocated > budget) {
+      throw StateError('Invalid plan must be clarified before rendering ranges');
+    }
     var offset = 0;
     String point(int minute) {
       if (startMinute == null) return '$minute';
@@ -56,22 +59,40 @@ PlanningReply? resolveTimePlanning(List<String> memberTurns) {
   for (final message in memberTurns) {
     latest = null;
     final lower = message.toLowerCase().replaceAll('’', "'");
+    final requestsPlan = RegExp(r'\b(?:plan|time budget|time allocation|minute ranges|organize my|prepare for|prepare me)\b').hasMatch(lower);
+    final edits = state != null && RegExp(r'\b(?:change|make|reduce|increase|instead|actually|only have|have only|start|begin|move|replace|correction|keep)\b').hasMatch(lower) &&
+        (duration.hasMatch(message) || RegExp(r'\b(?:start|begin)\b').hasMatch(lower));
+    if (!requestsPlan && !edits) continue;
     if (RegExp(r'-\s*\d+(?:\.\d+)?\s*(?:minutes?|mins?|hours?|hrs?)\b').hasMatch(lower)) {
-      latest = const PlanningReply('Durations must be positive. Which task duration should change?', clarification: true);
+      latest = const PlanningReply('Durations must be positive. Revise the invalid task duration to calculate ranges.', clarification: true);
       continue;
     }
-    final requestsPlan = RegExp(r'\b(?:plan|time budget|time allocation|minute ranges|organize my|prepare for|prepare me)\b').hasMatch(lower);
-    final edits = state != null && RegExp(r'\b(?:change|make|reduce|increase|instead|actually|only have|start|begin|move|replace|correction)\b').hasMatch(lower);
-    if (!requestsPlan && !edits) continue;
     final all = duration.allMatches(message).toList();
-    var budgetMatch = RegExp(r'(?:plan\s+(?:exactly\s+|for\s+)?|(?:i\s+)?(?:only\s+)?have\s+|within\s+|budget\s*(?:to\s+|of\s+|is\s+)?|total\s*(?:to\s+|of\s+|is\s+)?|exactly\s+|next\s+)(\d+(?:\.\d+)?)\s*(minutes?|mins?|hours?|hrs?)\b', caseSensitive: false).firstMatch(message);
-    if (budgetMatch != null && RegExp(r'^(?:i\s+)?(?:only\s+)?have', caseSensitive: false).hasMatch(budgetMatch[0]!) &&
-        RegExp(r'^\s+of\s+', caseSensitive: false).hasMatch(message.substring(budgetMatch.end))) budgetMatch = null;
+    RegExpMatch? budgetMatch;
+    final budgets = RegExp(r'(?:plan\s+(?:exactly\s+|for\s+)?|(?:i\s+)?(?:only\s+)?have\s+(?:only\s+)?|within\s+|budget\s*(?:to\s+|of\s+|is\s+)?|total\s*(?:to\s+|of\s+|is\s+)?|exactly\s+|next\s+)(\d+(?:\.\d+)?)\s*(minutes?|mins?|hours?|hrs?)\b', caseSensitive: false);
+    for (final candidate in budgets.allMatches(message)) {
+      final suffix = message.substring(candidate.end).trimLeft();
+      final prefix = candidate[0]!.toLowerCase();
+      // "Plan 15 minutes email" describes a task. "Plan for 45 minutes:"
+      // and "I have only 30 minutes" explicitly bound the whole plan.
+      final plainPlan = prefix.startsWith('plan ') && !RegExp(r'^plan\s+(?:for|exactly)\b').hasMatch(prefix);
+      final have = RegExp(r'^(?:i\s+)?(?:only\s+)?have\b').hasMatch(prefix);
+      final boundary = suffix.isEmpty || RegExp(r'^[,.;:\n\d]').hasMatch(suffix);
+      if (plainPlan && !boundary) continue;
+      if (have && !boundary && !RegExp(r'^(?:before|until|available|to spend|in total)\b',caseSensitive:false).hasMatch(suffix)) continue;
+      budgetMatch = candidate;
+      break;
+    }
     int? budget = budgetMatch == null ? null : minutes(budgetMatch);
     if (RegExp(r'\bnext hour\b').hasMatch(lower)) budget = 60;
     if (budget == null && edits && all.length == 1 && RegExp(r'\b(?:make it|change (?:the )?(?:total|budget))\b').hasMatch(lower)) budget = minutes(all.single);
     var anchor = state?.startMinute;
-    final anchorMatch = RegExp(r'\b(?:start(?:ing)?(?: at)?|begin(?:ning)?(?: at)?|from|at)\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b', caseSensitive: false).firstMatch(message);
+    RegExpMatch? anchorMatch;
+    for (final candidate in RegExp(r'\b(?:start(?:ing)?(?: at)?|begin(?:ning)?(?: at)?|from|at)\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b', caseSensitive: false).allMatches(message)) {
+      if (RegExp(r'^\s*(?:minutes?|mins?|hours?|hrs?)\b',caseSensitive:false).hasMatch(message.substring(candidate.end))) continue;
+      anchorMatch = candidate;
+      break;
+    }
     if (anchorMatch != null) {
       var hour = int.parse(anchorMatch[1]!);
       final minute = int.tryParse(anchorMatch[2] ?? '0')!;
@@ -95,15 +116,15 @@ PlanningReply? resolveTimePlanning(List<String> memberTurns) {
       final stop = i + 1 < all.length ? all[i + 1].start : message.length;
       var label = message.substring(match.end, stop).split(RegExp(r'[,.;:\n]')).first.trim();
       label = label.replaceFirst(RegExp(r'^(?:of|for)\s+', caseSensitive: false), '').replaceFirst(RegExp(r'\s+and$', caseSensitive: false), '').trim();
-      if (label.isEmpty) {
-        final before = message.substring(i == 0 ? 0 : all[i - 1].end, match.start).split(RegExp(r'[,.;:\n]')).last.trim();
-        label = before.replaceFirst(RegExp(r'^(?:and\s+)?(?:(?:make|change|reduce|increase|set)\s+)?(?:the\s+)?', caseSensitive: false), '')
-            .replaceFirst(RegExp(r'\s+(?:to|for|is|=)$', caseSensitive: false), '').trim();
-      }
-      if (RegExp(r'^(?:before|until|available|total|budget|plan|i have|exactly|at|starting|of email and)', caseSensitive: false).hasMatch(label)) continue;
-      if (label.isEmpty || label.length > 70 || label.contains(RegExp(r'\d')) || label.contains('?')) { invalid = true; break; }
+      final before = message.substring(i == 0 ? 0 : all[i - 1].end, match.start).split(RegExp(r'[,.;:\n]')).last.trim();
+      final beforeLabel = before.replaceFirst(RegExp(r'^(?:(?:and|then)\s+)?(?:(?:make|change|reduce|increase|set|keep)\s+)?(?:the\s+)?', caseSensitive: false), '')
+          .replaceFirst(RegExp(r'\s+(?:to|for|is|=|at)$', caseSensitive: false), '').trim();
+      final knownBefore = state?.tasks.any((t) => t.label.toLowerCase() == beforeLabel.toLowerCase()) ?? false;
+      if (label.isEmpty || (edits && knownBefore)) label = beforeLabel;
       // A time anchor is not part of the task's name.
       label = label.replaceFirst(RegExp(r'\s+(?:starting|start|beginning|at)\b.*$', caseSensitive: false), '').trim();
+      if (RegExp(r'^(?:before|until|available|total|budget|plan|i have|exactly|at|starting)', caseSensitive: false).hasMatch(label)) continue;
+      if (label.isEmpty || label.length > 70 || label.contains(RegExp(r'\d')) || label.contains('?')) { invalid = true; break; }
       tasks.add(PlanTask(label, value));
     }
     if (invalid || (budgetMatch != null && budget == null)) {
@@ -137,7 +158,7 @@ PlanningReply? resolveTimePlanning(List<String> memberTurns) {
         PlanTask('Rehearse a concise update and check meeting logistics', budget - first)];
     }
     if (nextTasks.isEmpty || invalid) {
-      latest = const PlanningReply('Which tasks and durations should this plan include? Name the task to edit if you are correcting a previous plan.', clarification: true);
+      latest = const PlanningReply('Missing or ambiguous task details. Specify task names and durations; identify the existing task when editing a plan.', clarification: true);
       continue;
     }
     budget ??= (fresh ? null : state?.budget) ?? nextTasks.fold<int>(0, (sum, task) => sum + task.minutes);
@@ -153,7 +174,7 @@ PlanningReply? resolveTimePlanning(List<String> memberTurns) {
     }
     state = TimePlan(List.unmodifiable(nextTasks), budget, startMinute: anchor);
     if (sum > budget) {
-      latest = PlanningReply('These tasks total $sum minutes, exceeding the $budget-minute budget by ${sum - budget} minutes. Which duration should change, or should the total budget increase? Nothing has been scheduled.', clarification: true);
+      latest = PlanningReply('These tasks total $sum minutes, exceeding the $budget-minute budget by ${sum - budget} minutes. Revise a duration or increase the budget before calculating ranges. Nothing has been scheduled.', clarification: true);
       continue;
     }
     latest = PlanningReply(state.render(), plan: state);

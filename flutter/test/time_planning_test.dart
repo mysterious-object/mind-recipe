@@ -52,4 +52,26 @@ void main() {
     expect(resolveTimePlanning(['I feel anxious right now. Help me.']), isNull);
     expect(resolveTimePlanning(['I tried a breathing exercise yesterday.']), isNull);
   });
+  test('natural task/budget boundaries, compound edits and labels before durations', () {
+    final anchored = resolveTimePlanning(['Starting at 9:40 am, plan 15 minutes email, 25 minutes report, and 5 minutes break.'])!;
+    expect(anchored.plan!.budget,45);
+    expect(anchored.text,contains('09:40–09:55: email (15 minutes)'));
+    expect(anchored.text,contains('09:55–10:20: report (25 minutes)'));
+    expect(anchored.text,contains('10:20–10:25: break (5 minutes)'));
+    final edited = resolveTimePlanning(['Plan exactly 60 minutes: 20 minutes email, 30 minutes report, 10 minutes break.',
+      'Change the report to 25 minutes and the break to 15 minutes. Keep email at 20 minutes.'])!;
+    expect(edited.plan!.allocated,60);
+    expect(edited.text,contains('20–45 min: report (25 minutes)'));
+    expect(edited.text,contains('45–60 min: break (15 minutes)'));
+    final over = resolveTimePlanning(['I have only 30 minutes. Plan 20 minutes email and 25 minutes report.'])!;
+    expect(over.clarification,isTrue);
+    expect(over.text,contains('total 45 minutes, exceeding the 30-minute budget by 15'));
+    final reversed = resolveTimePlanning(['Plan for 45 minutes: email 15 minutes, report 20 minutes, break 10 minutes.'])!;
+    expect(reversed.plan!.allocated,45);
+    expect(reversed.text,contains('15–35 min: report (20 minutes)'));
+  });
+  test('invalid plan rendering cannot leak inconsistent ranges', () {
+    expect(() => const TimePlan([PlanTask('work',40)],30).render(),throwsStateError);
+    expect(() => const TimePlan([PlanTask('work',-5)],30).render(),throwsStateError);
+  });
 }

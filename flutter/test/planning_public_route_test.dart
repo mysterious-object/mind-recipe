@@ -75,6 +75,18 @@ void main() {
     expect(await send('Start at 3 pm'), contains('15:00–15:20'));
     expect(await send('Plan exactly 35 minutes: 7 minutes inbox, 23 minutes drafting, 5 minutes break.'), contains('7–30 min: drafting (23 minutes)'));
     expect(local.calls, 1);
+    final anchored = await send('Starting at 9:40 am, plan 15 minutes email, 25 minutes report, and 5 minutes break.');
+    expect(anchored,contains('09:40–09:55: email (15 minutes)'));
+    expect(anchored,contains('10:20–10:25: break (5 minutes)'));
+    await send('Plan exactly 60 minutes: 20 minutes email, 30 minutes report, 10 minutes break.');
+    final compound = await send('Change the report to 25 minutes and the break to 15 minutes. Keep email at 20 minutes.');
+    expect(compound,contains('20–45 min: report (25 minutes)'));
+    expect(compound,contains('45–60 min: break (15 minutes)'));
+    expect(await send('I have only 30 minutes. Plan 20 minutes email and 25 minutes report.'),
+        contains('total 45 minutes, exceeding the 30-minute budget by 15'));
+    expect(await send('Plan for 45 minutes: email 15 minutes, report 20 minutes, break 10 minutes.'),
+        contains('15–35 min: report (20 minutes)'));
+    expect(local.calls,1);
     await send('I feel anxious right now and need support.');
     expect(local.calls, greaterThan(1));
     expect(api.calls, 0);
