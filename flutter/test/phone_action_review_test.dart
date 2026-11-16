@@ -59,6 +59,38 @@ class InterruptedCloudApi extends FakeMindRecipeApi {
 void main() {
   setUp(() => FlutterSecureStorage.setMockInitialValues({}));
 
+  testWidgets('long thread reveals new phone review and model control keeps composer', (tester) async {
+    tester.view.physicalSize = const Size(320, 886);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final messages = List.generate(60, (i) => ChatMessage(role: ChatRole.member, text: 'Older message $i with ordinary conversation context.'));
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: NavigatorChatExperience(
+      state: CheckInState(), onChanged: () {}, api: FakeMindRecipeApi(),
+      appState: SecureAppState()..loaded=true, messages: messages,
+      localInference: FakeLocalInference()))));
+    Future<void> frames() async { for(var i=0;i<12;i++){ await tester.pump(const Duration(milliseconds:100)); } }
+    await frames();
+    await tester.enterText(find.byType(TextField).first, 'Create a meeting with Sarah');
+    await tester.tap(find.byTooltip('Send to Navigator'));
+    await frames();
+    final review = find.text('Review');
+    expect(review, findsOneWidget);
+    expect(tester.getRect(review).top, greaterThanOrEqualTo(0));
+    expect(tester.getRect(review).bottom, lessThanOrEqualTo(tester.getRect(find.byType(TextField).first).top));
+    await tester.tap(review);
+    await frames();
+    expect(find.text('Choose date and time'), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await frames();
+    await tester.tap(find.byWidgetPredicate((w) => w is IconButton && (w.tooltip?.startsWith('Choose model:') ?? false)));
+    await frames();
+    expect(find.byType(DropdownButtonFormField<bool>), findsOneWidget);
+    expect(find.byTooltip('Send to Navigator').hitTestable(), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+  });
+
   for (final scenario in [
     'private stream',
     'private short answer',

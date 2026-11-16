@@ -1171,6 +1171,8 @@ Latest member request: $text''',
             ConstrainedBox(
               constraints: BoxConstraints(maxHeight: constraints.maxHeight * .5),
               child: SingleChildScrollView(child: _Composer(
+              onShowModels: () => scrollController.animateTo(0, duration: const Duration(milliseconds: 300), curve: Curves.easeOut),
+              modelLabel: widget.appState.cloudAiEnabled ? 'API model' : 'Private · ${OnDeviceInference().activeModelDisplayName}',
               controller: composer,
               focusNode: composerFocus,
               canSend: canSend,
@@ -1668,6 +1670,8 @@ class _ThinkingBubble extends StatelessWidget {
 
 class _Composer extends StatelessWidget {
   const _Composer({
+    required this.onShowModels,
+    required this.modelLabel,
     required this.controller,
     required this.focusNode,
     required this.canSend,
@@ -1680,6 +1684,8 @@ class _Composer extends StatelessWidget {
     this.voiceConversationEnabled = false,
     this.onToggleVoiceConversation,
   });
+  final VoidCallback onShowModels;
+  final String modelLabel;
   final TextEditingController controller;
   final FocusNode focusNode;
   final bool canSend;
@@ -1766,7 +1772,8 @@ class _Composer extends StatelessWidget {
             const Expanded(
               child: Text('Voice conversation', style: TextStyle(fontSize: 11)),
             ),
-            const Icon(Icons.record_voice_over_rounded, size: 16),
+            IconButton(onPressed: onShowModels, tooltip: 'Choose model: $modelLabel',
+              icon: const Icon(Icons.tune_rounded, size: 20)),
           ],
         ),
       ],
