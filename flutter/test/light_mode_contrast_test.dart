@@ -20,13 +20,16 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     final state = SecureAppState()..loaded=true..appearanceMode='light'..cloudAiEnabled=false..onboardingComplete=true;
-    state.session = const AccountSession(token:'test', displayName:'Member', email:'member@example.test');
+    await state.setSession(const AccountSession(token:'test', displayName:'Member', email:'member@example.test'));
+    await state.completeOnboarding();
     await tester.pumpWidget(MindRecipeApp(initialAppState: state,initialApi: RestoredApi(),initialLocalInference: ReadyPrivate()));
     Future<void> frames() async { for(var i=0;i<12;i++){await tester.pump(const Duration(milliseconds:100));} }
     await frames();
     final field = tester.widget<DropdownButtonFormField<bool>>(find.byType(DropdownButtonFormField<bool>));
     final fill = field.decoration.fillColor!;
-    final foreground = field.style!.color!;
+    final dropdown = tester.widget<DropdownButton<bool>>(find.descendant(
+      of: find.byType(DropdownButtonFormField<bool>), matching: find.byType(DropdownButton<bool>)));
+    final foreground = dropdown.style!.color!;
     final contrast = (fill.computeLuminance()+.05)/(foreground.computeLuminance()+.05);
     expect(fill.a,1);
     expect(fill.computeLuminance(),greaterThan(.7));
@@ -38,7 +41,7 @@ void main() {
     expect(tester.getRect(settings).right,lessThanOrEqualTo(320));
     await tester.tap(settings);
     await frames();
-    expect(find.text('Sign out'),findsOneWidget);
+    expect(find.byType(ProfileScreen),findsOneWidget);
     expect(tester.takeException(),isNull);
     await tester.pumpWidget(const SizedBox());
   });
