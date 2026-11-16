@@ -1929,6 +1929,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   DropdownButtonFormField<OnDeviceModelChoice>(
+                    isExpanded: true,
+                    itemHeight: null,
                     value: _selectedPrivateChoice,
                     decoration: const InputDecoration(
                       labelText: 'Private model',
@@ -1977,28 +1979,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              crossAxisAlignment: WrapCrossAlignment.center,
                               children: [
                                 const Icon(Icons.shield_rounded, size: 20),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
+                                Text(
                                     choice.name,
-                                    maxLines: 1,
-                                    softWrap: false,
+                                    maxLines: 2,
                                     overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(
                                       fontWeight: FontWeight.w800,
                                       fontSize: 16,
                                     ),
-                                  ),
                                 ),
                                 if (isActive)
                                   const Chip(
                                     avatar: Icon(Icons.check_circle, size: 16),
                                     label: Text('Active'),
                                   ),
-                                if (isActive) const SizedBox(width: 8),
                                 const Chip(label: Text('On-device')),
                               ],
                             ),
