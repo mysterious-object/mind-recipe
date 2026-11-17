@@ -230,9 +230,9 @@ void main() {
     );
 
     test('user-visible source strings contain no retired product language', () {
+      // Mind Recipe is the approved learning-tab label in the Figma pivot.
       const banned = <String>[
         'darkstar',
-        'mind recipe',
         'living vfx',
         'vfx composition',
       ];
