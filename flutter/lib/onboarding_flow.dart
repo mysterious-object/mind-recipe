@@ -131,7 +131,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
                   style: Theme.of(context).textTheme.headlineMedium),
               const SizedBox(height: 16),
               if (_step == 1) ...[
-                const Text('Your name or nickname is used by Navigator on this device. Your account name stays unchanged.'),
+                const Text('Your name or nickname is used on this device. Your account name stays unchanged.'),
                 const SizedBox(height: 16),
                 TextField(
                   controller: _name,

@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:mind_recipe/app_services.dart';
+import 'package:mind_recipe/clarity_experience.dart';
 import 'package:mind_recipe/daily_navigation_scan.dart';
 import 'package:mind_recipe/main.dart';
 import 'package:mind_recipe/navigator_agent.dart';
@@ -45,6 +46,17 @@ class FakeMindRecipeApi extends MindRecipeApiClient {
     required String password,
   }) async =>
       AccountSession(token: 'test-token', displayName: name, email: email);
+
+  @override
+  Future<Map<String, dynamic>> getCurriculumProgress({
+    required String token,
+  }) async => {};
+
+  @override
+  Future<Map<String, dynamic>> putCurriculumProgress({
+    required String token,
+    required Map<String, dynamic> progress,
+  }) async => progress;
 
   @override
   Future<bool> aiAvailable() async => true;
@@ -101,7 +113,6 @@ void main() {
     return MindRecipeApp(
       initialAppState: state,
       initialApi: api ?? FakeMindRecipeApi(),
-      initialLocalInference: FakeLocalInference(),
     );
   }
 
@@ -125,21 +136,6 @@ void main() {
     await tester.ensureVisible(find.text('Create account'));
     await tester.tap(find.text('Create account'));
     await pumpFrames(tester, 20);
-    if (skipOnboarding) {
-      await tester.ensureVisible(find.text('Skip'));
-      await tester.tap(find.text('Skip'));
-      await pumpFrames(tester);
-      await tester.tap(find.text('Continue'));
-      await pumpFrames(tester);
-      await tester.ensureVisible(find.text('Skip for now'));
-      await tester.tap(find.text('Skip for now'));
-      await pumpFrames(tester);
-    }
-  }
-
-  Future<void> enterCheckIn(WidgetTester tester) async {
-    await enterMemberApp(tester);
-    expect(find.bySemanticsLabel('Navigator, tab 1 of 4'), findsOneWidget);
   }
 
   testWidgets('login and registration gateway is the first app surface', (
@@ -149,7 +145,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
     expect(find.byType(ThreeIntroScreen), findsNothing);
     await tester.pump();
-    expect(find.text('Welcome back, navigator'), findsOneWidget);
+    expect(find.text('Welcome back'), findsOneWidget);
     expect(find.text('Sign in'), findsOneWidget);
     await tester.ensureVisible(find.text('Create a new account'));
     await tester.tap(find.text('Create a new account'));
@@ -232,53 +228,14 @@ void main() {
     );
   });
 
-  testWidgets('cinematic onboarding follows the account gateway', (
+  testWidgets('the Figma experience follows account registration', (
     tester,
   ) async {
     await enterMemberApp(tester, skipOnboarding: false);
-    await tester.pump(const Duration(seconds: 7));
-    expect(find.text('The weather of your mind.'), findsOneWidget);
-    expect(find.text('A guided path—not a test.'), findsOneWidget);
-  });
-
-  testWidgets('Check-in is a full Navigator conversation', (tester) async {
-    await enterCheckIn(tester);
-    expect(find.text('Navigator online'), findsOneWidget);
-    expect(find.text('Cloud · connected'), findsOneWidget);
-    expect(find.text('CLOUD'), findsOneWidget);
-    expect(find.text('Begin daily navigation'), findsOneWidget);
-    expect(find.text('Tell Navigator what you want…'), findsOneWidget);
-    expect(find.text('Begin today’s signal scan'), findsNothing);
-  });
-
-  testWidgets('AI chat dynamically responds to free conversation', (
-    tester,
-  ) async {
-    await enterCheckIn(tester);
-    await tester.enterText(
-      find.byType(TextField).last,
-      'Help me decide what to do next.',
-    );
-    await tester.tap(find.byTooltip('Send to Navigator'));
-    await tester.pump();
-    await pumpFrames(tester, 40);
-    expect(
-      find.text('Let’s begin gently. What emotion feels closest right now?'),
-      findsOneWidget,
-    );
-    expect(
-      find.text('Cloud AI · journal excluded · suggestion, not fact'),
-      findsOneWidget,
-    );
-  });
-
-  testWidgets('Navigator is the first and default tab', (tester) async {
-    await enterMemberApp(tester);
-    expect(find.text('Begin daily navigation'), findsOneWidget);
-    expect(find.bySemanticsLabel('Navigator, tab 1 of 4'), findsOneWidget);
-    expect(find.text('Pulse'), findsNothing);
-    expect(find.bySemanticsLabel('Actions, tab 3 of 4'), findsOneWidget);
-    expect(find.bySemanticsLabel('Settings, tab 4 of 4'), findsOneWidget);
+    await pumpFrames(tester);
+    expect(find.byType(ClarityExperience), findsOneWidget);
+    expect(find.byType(ThreeIntroScreen), findsNothing);
+    expect(find.byTooltip('Send to Navigator'), findsNothing);
   });
 
   test('motion summary describes only device movement', () {

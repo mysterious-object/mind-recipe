@@ -93,7 +93,8 @@ void main() {
     expect(main, isNot(contains('PulseScreen')));
     expect(main, isNot(contains("'Pulse'")));
     expect(daily, isNot(contains('onSeePulse')));
-    expect(daily, contains('onReturnToNavigator'));
+    expect(daily, contains('Return home'));
+    expect(daily, isNot(contains('OnDeviceInference')));
     expect(File('lib/pulse_screen.dart').existsSync(), isFalse);
     expect(File('assets/familiar/index.html').existsSync(), isFalse);
     expect(File('assets/familiar/background.html').existsSync(), isTrue);

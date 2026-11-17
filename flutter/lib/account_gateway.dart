@@ -250,7 +250,7 @@ class _AccountGatewayState extends State<AccountGateway> {
                                     : 'Reset your password')
                               : creating
                               ? 'Create your private space'
-                              : 'Welcome back, navigator',
+                              : 'Welcome back',
                           textAlign: TextAlign.center,
                           style: Theme.of(context).textTheme.headlineSmall
                               ?.copyWith(fontWeight: FontWeight.w800),

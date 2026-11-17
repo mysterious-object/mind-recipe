@@ -1,10 +1,9 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 
 import 'app_services.dart';
-import 'lesson_generator.dart';
-import 'on_device_inference.dart';
 import 'recipe_practices.dart';
 
 const _curriculumVersion = '2026.08.24';
@@ -34,7 +33,7 @@ class RecipeLesson {
     json['title']?.toString() ?? 'Untitled lesson',
     json['summary']?.toString() ?? '',
     json['practice']?.toString() ?? '',
-    json['source']?.toString() ?? 'Navigator-generated',
+    json['source']?.toString() ?? 'Saved lesson',
   );
 
   Map<String, dynamic> toJson() => {
@@ -187,10 +186,9 @@ const recipeLessons = <RecipeLesson>[
 ];
 
 class RecipesScreen extends StatefulWidget {
-  const RecipesScreen({super.key, required this.api, required this.appState, this.onAskNavigator});
+  const RecipesScreen({super.key, required this.api, required this.appState});
   final MindRecipeApiClient api;
   final SecureAppState appState;
-  final void Function(String prompt, String response)? onAskNavigator;
   @override
   State<RecipesScreen> createState() => _RecipesScreenState();
 }
@@ -201,13 +199,6 @@ class _RecipesScreenState extends State<RecipesScreen> {
   bool _loading = true;
   bool _savedPractices = false;
   List<RecipeLesson> _generated = [];
-  bool _generating = false;
-  String? _generateError;
-  String _journeyMode = 'guided_foundations';
-  List<Map<String, dynamic>> _proposals = const [];
-  String? _recommendedLessonId;
-  String _recommendationReason = '';
-  late final LessonGenerator _generator = LessonGenerator(widget.appState);
 
   @override
   void initState() {
@@ -215,25 +206,32 @@ class _RecipesScreenState extends State<RecipesScreen> {
     unawaited(_load());
   }
 
+  Future<List<RecipeLesson>> _loadSavedLessons() async {
+    try {
+      final raw = await widget.appState.readRaw(
+        'mind_recipe_generated_lessons',
+      );
+      if (raw == null || raw.isEmpty) return const [];
+      return (jsonDecode(raw) as List)
+          .map(
+            (value) =>
+                RecipeLesson.fromJson(Map<String, dynamic>.from(value as Map)),
+          )
+          .toList();
+    } catch (_) {
+      return const [];
+    }
+  }
+
   Future<void> _load() async {
-    final generated = await _generator.loadGenerated();
+    final generated = await _loadSavedLessons();
     if (mounted) setState(() => _generated = generated);
     final local = await widget.appState.loadCurriculumProgress();
     if (local != null) _apply(local);
     if (widget.appState.session != null) {
       try {
         final token = widget.appState.session!.token;
-        final journey = await widget.api.getJourney(token);
-        final proposals = await widget.api.getRecipeProposals(token);
-        if (mounted) setState(() {
-          _journeyMode = journey['mode']?.toString() ?? 'guided_foundations';
-          _proposals = proposals;
-          _recommendedLessonId = journey['recommended_module_id']?.toString();
-          _recommendationReason = journey['recommendation_reason']?.toString() ?? '';
-        });
-        final remote = await widget.api.getCurriculumProgress(
-          token: token,
-        );
+        final remote = await widget.api.getCurriculumProgress(token: token);
         _apply(_merge(local ?? _payload(), remote));
         await _persist(sync: true);
       } catch (_) {
@@ -241,37 +239,6 @@ class _RecipesScreenState extends State<RecipesScreen> {
       }
     }
     if (mounted) setState(() => _loading = false);
-  }
-
-  bool get _coreComplete => _completed.length >= recipeLessons.length;
-
-  Future<void> _generateLessons() async {
-    if (_generating) return;
-    setState(() {
-      _generating = true;
-      _generateError = null;
-    });
-    try {
-      final added = await _generator.generateBatch(count: 3);
-      if (!mounted) return;
-      if (added.isEmpty) {
-        setState(() => _generateError =
-            'Navigator needs the private model installed (or cloud AI on) to write your next lessons. Install it in Profile, then try again — your progress and reflections are already saved.');
-      } else {
-        final refreshed = await _generator.loadGenerated();
-        setState(() {
-          _generated = refreshed;
-          final firstNew = added.first;
-          _current = firstNew.id;
-        });
-      }
-    } catch (_) {
-      if (mounted) {
-        setState(() => _generateError = 'Could not write the next lesson right now. Try again in a moment.');
-      }
-    } finally {
-      if (mounted) setState(() => _generating = false);
-    }
   }
 
   Map<String, dynamic> _payload() => {
@@ -340,36 +307,6 @@ class _RecipesScreenState extends State<RecipesScreen> {
       _current = next.isEmpty ? lesson.id : next.first.id;
     });
     await _persist(sync: true);
-    final token = widget.appState.session?.token;
-    if (token == null) return;
-    try {
-      final journey = await widget.api.getJourney(token);
-      final recommended = journey['recommended_module_id']?.toString();
-      if (!mounted) return;
-      setState(() {
-        _recommendedLessonId = recommended;
-        _recommendationReason = journey['recommendation_reason']?.toString() ?? '';
-        if (recommended != null && !_completed.contains(recommended)) {
-          _current = recommended;
-        }
-      });
-    } catch (_) {
-      // Completion remains useful offline; the recommendation refreshes later.
-    }
-  }
-
-  Future<void> _reviewProposal(Map<String, dynamic> proposal) async {
-    final approved = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
-      title: Text(proposal['name']?.toString() ?? 'Custom Recipe'),
-      content: Text('${proposal['purpose'] ?? 'Suggested from your journey.'}\n\nNothing is added until you approve it.'),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Defer')),
-        FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Approve')),
-      ],
-    ));
-    if (approved == null || widget.appState.session == null) return;
-    await widget.api.decideRecipeProposal(widget.appState.session!.token, proposal['id'].toString(), approved: approved);
-    if (mounted) setState(() => _proposals = _proposals.where((item) => item['id'] != proposal['id']).toList());
   }
 
   @override
@@ -418,7 +355,7 @@ class _RecipesScreenState extends State<RecipesScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Recipes',
+                    'Mind Recipe',
                     style: Theme.of(context).textTheme.headlineMedium
                         ?.copyWith(fontWeight: FontWeight.w800),
                   ),
@@ -433,60 +370,6 @@ class _RecipesScreenState extends State<RecipesScreen> {
           ],
         ),
         const SizedBox(height: 18),
-        Card(child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Text('Journey mode', style: TextStyle(fontWeight: FontWeight.w800)),
-            const SizedBox(height: 8),
-            SegmentedButton<String>(
-              segments: const [
-                ButtonSegment(value: 'guided_foundations', label: Text('Guided')),
-                ButtonSegment(value: 'co_created', label: Text('Co-created')),
-              ],
-              selected: {_journeyMode},
-              onSelectionChanged: (value) async {
-                final mode = value.first;
-                setState(() => _journeyMode = mode);
-                final token = widget.appState.session?.token;
-                if (token != null) await widget.api.saveJourney(token, {'mode': mode});
-              },
-            ),
-            const SizedBox(height: 8),
-            Text(_journeyMode == 'co_created'
-                ? 'Navigator may draft custom modules and Recipes. You approve every change.'
-                : 'Reviewed foundations stay canonical while Navigator adapts the path.'),
-          ]),
-        )),
-        if (_proposals.any((item) => item['status'] == 'proposed')) ...[
-          const SizedBox(height: 12),
-          Text('Navigator proposals', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
-          ..._proposals.where((item) => item['status'] == 'proposed').map((proposal) => Card(child: ListTile(
-            title: Text(proposal['name']?.toString() ?? 'Custom Recipe'),
-            subtitle: Text(proposal['purpose']?.toString() ?? 'Suggested from your journey.'),
-            trailing: FilledButton(onPressed: () => _reviewProposal(proposal), child: const Text('Review')),
-          ))),
-        ],
-        if (_recommendedLessonId != null && _recommendationReason.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          Card(
-            color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: .55),
-            child: ListTile(
-              leading: const Icon(Icons.route_outlined),
-              title: Text(
-                'Suggested next: ${allLessons.firstWhere(
-                  (lesson) => lesson.id == _recommendedLessonId,
-                  orElse: () => next,
-                ).title}',
-              ),
-              subtitle: Text(_recommendationReason),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => _open(allLessons.firstWhere(
-                (lesson) => lesson.id == _recommendedLessonId,
-                orElse: () => next,
-              )),
-            ),
-          ),
-        ],
         _JourneyCard(
           completed: _completed.length,
           next: next,
@@ -494,20 +377,38 @@ class _RecipesScreenState extends State<RecipesScreen> {
         ),
         const SizedBox(height: 12),
         Card(
-          color: Theme.of(context).colorScheme.secondaryContainer.withValues(alpha: 0.5),
+          color: Theme.of(context).colorScheme.secondaryContainer
+              .withValues(alpha: 0.5),
           child: Padding(
             padding: const EdgeInsets.all(14),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(children: [
-                Icon(Icons.calendar_today_rounded, size: 18, color: Theme.of(context).colorScheme.primary),
-                const SizedBox(width: 8),
-                const Text('Why daily?', style: TextStyle(fontWeight: FontWeight.w800)),
-                const Spacer(),
-                Text('${_completed.length}/15', style: Theme.of(context).textTheme.labelLarge),
-              ]),
-              const SizedBox(height: 6),
-              const Text('One lesson a day builds the “workable zone” — small, steady practice is more effective than bingeing. Your Progress tab shows the streak and which practices you actually return to. Nothing is locked; daily is a gentle rhythm, not a rule.'),
-            ]),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.calendar_today_rounded,
+                      size: 18,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Why daily?',
+                      style: TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                    const Spacer(),
+                    Text(
+                      '${_completed.length}/15',
+                      style: Theme.of(context).textTheme.labelLarge,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'One lesson a day builds the “workable zone” — small, steady practice is more effective than bingeing. Your Progress tab shows the streak and which practices you actually return to. Nothing is locked; daily is a gentle rhythm, not a rule.',
+                ),
+              ],
+            ),
           ),
         ),
         const SizedBox(height: 12),
@@ -524,7 +425,7 @@ class _RecipesScreenState extends State<RecipesScreen> {
         ),
         const SizedBox(height: 4),
         Text(
-          'Every lesson stays open. The recommendation simply shows a useful next step.',
+          'Every lesson stays open. Pick up where you left off or choose any lesson.',
           style: Theme.of(context).textTheme.bodyMedium
               ?.copyWith(color: scheme.onSurfaceVariant),
         ),
@@ -540,7 +441,7 @@ class _RecipesScreenState extends State<RecipesScreen> {
             currentLessonId: _current,
             onLessonTap: _open,
           ),
-        if (_coreComplete || _generated.isNotEmpty)
+        if (_generated.isNotEmpty)
           _ModuleCard(
             module: 4,
             title: _moduleTitle(4),
@@ -549,50 +450,6 @@ class _RecipesScreenState extends State<RecipesScreen> {
             currentLessonId: _current,
             onLessonTap: _open,
           ),
-        if (_coreComplete) ...[
-          const SizedBox(height: 8),
-          Card(
-            color: Theme.of(context).colorScheme.tertiaryContainer.withValues(alpha: 0.5),
-            child: Padding(
-              padding: const EdgeInsets.all(14),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Row(children: [
-                  Icon(Icons.auto_awesome_rounded, size: 18, color: Theme.of(context).colorScheme.primary),
-                  const SizedBox(width: 8),
-                  const Expanded(child: Text('Your path continues', style: TextStyle(fontWeight: FontWeight.w800))),
-                ]),
-                const SizedBox(height: 6),
-                const Text('You finished all 15 core lessons. Navigator can now write new lessons shaped by your daily navigation, reflections, and completed modules — generated privately on your device.'),
-                const SizedBox(height: 10),
-                if (_generateError != null) ...[
-                  Text(_generateError!, style: Theme.of(context).textTheme.bodySmall),
-                  const SizedBox(height: 8),
-                ],
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                    onPressed: _generating ? null : _generateLessons,
-                    icon: _generating
-                        ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                        : const Icon(Icons.auto_fix_high_rounded, size: 18),
-                    label: Text(_generating ? 'Writing your next lessons…' : 'Generate next lessons'),
-                  ),
-                ),
-              ]),
-            ),
-          ),
-        ] else if (_completed.length >= recipeLessons.length - 2) ...[
-          const SizedBox(height: 8),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(14),
-              child: Text(
-                'Almost there — finish the last core lessons and Navigator will start writing personalized lessons for you.',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ),
-          ),
-        ],
       ],
     );
   }
@@ -601,7 +458,7 @@ class _RecipesScreenState extends State<RecipesScreen> {
     1 => 'Foundations — Notice What Is Present',
     2 => 'Patterns — Work With the Conditions',
     3 => 'Direction — Choose and Move Forward',
-    _ => 'Your Path — Navigator-Written',
+    _ => 'Saved lessons',
   };
 
   Future<void> _open(RecipeLesson lesson) async {
@@ -618,7 +475,6 @@ class _RecipesScreenState extends State<RecipesScreen> {
           completed: _completed.contains(lesson.id),
           onComplete: () => _complete(lesson),
           appState: widget.appState,
-          onAskNavigator: widget.onAskNavigator,
         ),
       ),
     );
@@ -859,13 +715,11 @@ class _LessonDetail extends StatefulWidget {
     required this.completed,
     required this.onComplete,
     required this.appState,
-    this.onAskNavigator,
   });
   final RecipeLesson lesson;
   final bool completed;
   final Future<void> Function() onComplete;
   final SecureAppState appState;
-  final void Function(String prompt, String response)? onAskNavigator;
   @override
   State<_LessonDetail> createState() => _LessonDetailState();
 }
@@ -873,17 +727,11 @@ class _LessonDetail extends StatefulWidget {
 class _LessonDetailState extends State<_LessonDetail> {
   bool reflection = false;
   late bool completed;
-  bool _useAi = false;
-  bool _aiLoading = false;
-  String? _aiResponse;
-  bool _navigatorOnline = false;
   final _practiceController = TextEditingController();
   @override
   void initState() {
     super.initState();
     completed = widget.completed;
-    OnDeviceInference.snapshotNotifier.addListener(_updateOnline);
-    _updateOnline();
     // Load persisted reflection for this lesson (stays on device)
     widget.appState.loadLessonReflections().then((all) {
       final saved = all[widget.lesson.id];
@@ -893,52 +741,17 @@ class _LessonDetailState extends State<_LessonDetail> {
     });
   }
 
-  void _updateOnline() {
-    if (!mounted) return;
-    final local = OnDeviceInference.snapshotNotifier.value.isReady;
-    final cloud = widget.appState.cloudAiEnabled && widget.appState.aiAvailable;
-    setState(() => _navigatorOnline = local || cloud);
-  }
-
   @override
   void dispose() {
-    OnDeviceInference.snapshotNotifier.removeListener(_updateOnline);
     // Persist reflection on dispose
-    unawaited(widget.appState.saveLessonReflection(widget.lesson.id, _practiceController.text));
+    unawaited(
+      widget.appState.saveLessonReflection(
+        widget.lesson.id,
+        _practiceController.text,
+      ),
+    );
     _practiceController.dispose();
     super.dispose();
-  }
-
-  Future<void> _askNavigator() async {
-    final prompt = _practiceController.text.trim().isEmpty
-        ? 'How can I work with "${widget.lesson.title}" – ${widget.lesson.practice}'
-        : 'For lesson "${widget.lesson.title}": ${widget.lesson.summary}. My reflection: ${_practiceController.text.trim()}. What is one gentle next step?';
-    // Persist the reflection immediately (daily persistence)
-    unawaited(widget.appState.saveLessonReflection(widget.lesson.id, _practiceController.text));
-    setState(() {
-      _aiLoading = true;
-      _aiResponse = null;
-    });
-    try {
-      final local = await OnDeviceInference().infer(prompt);
-      final response = local ??
-          'Navigator is not ready yet. Try the private model in Settings or connect cloud AI – your reflection was saved privately on device.';
-      if (mounted) {
-        setState(() => _aiResponse = response);
-      }
-      // Connect to main Navigator chat (persisted across tabs)
-      if (widget.onAskNavigator != null) {
-        widget.onAskNavigator!(prompt, response);
-      }
-    } catch (_) {
-      if (mounted) {
-        setState(() {
-          _aiResponse = 'Could not reach Navigator right now. Your reflection stays on this device; try again later.';
-        });
-      }
-    } finally {
-      if (mounted) setState(() => _aiLoading = false);
-    }
   }
 
   @override
@@ -995,9 +808,15 @@ class _LessonDetailState extends State<_LessonDetail> {
                       controller: _practiceController,
                       minLines: 2,
                       maxLines: 4,
-                      onChanged: (v) => unawaited(widget.appState.saveLessonReflection(widget.lesson.id, v)),
+                      onChanged: (v) => unawaited(
+                        widget.appState.saveLessonReflection(
+                          widget.lesson.id,
+                          v,
+                        ),
+                      ),
                       decoration: const InputDecoration(
-                        labelText: 'Your reflection (optional, stays on device)',
+                        labelText:
+                            'Your reflection (optional, stays on device)',
                         hintText: 'What came up as you tried this?',
                         border: OutlineInputBorder(),
                       ),
@@ -1015,70 +834,6 @@ class _LessonDetailState extends State<_LessonDetail> {
                   title: const Text('Reflection pause'),
                   subtitle: const Text(
                     'Check this when you have taken a moment to notice what came up.',
-                  ),
-                ),
-              ),
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(14),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      SwitchListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: const Text('AI assistance (optional)'),
-                        subtitle: const Text(
-                          'Ask Navigator for a brief, private reflection on this lesson. On-device if installed, otherwise cloud if enabled.',
-                        ),
-                        secondary: const Icon(Icons.auto_awesome_outlined),
-                        value: _useAi && _navigatorOnline,
-                        onChanged: _navigatorOnline
-                            ? (v) => setState(() => _useAi = v)
-                            : null,
-                      ),
-                      if (!_navigatorOnline)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 4),
-                          child: Text(
-                            'Navigator is offline — install the private model (Profile) or enable cloud AI to use Ask Navigator.',
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.error),
-                          ),
-                        ),
-                      if (_useAi) ...[
-                        const SizedBox(height: 8),
-                        SizedBox(
-                          width: double.infinity,
-                          child: FilledButton.tonalIcon(
-                            onPressed: _navigatorOnline && !_aiLoading ? _askNavigator : null,
-                            icon: _aiLoading
-                                ? const SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(strokeWidth: 2),
-                                  )
-                                : const Icon(Icons.chat_bubble_outline_rounded),
-                            label: Text(_aiLoading ? 'Thinking…' : 'Ask Navigator'),
-                          ),
-                        ),
-                        if (_aiResponse != null) ...[
-                          const SizedBox(height: 12),
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(_aiResponse!),
-                          ),
-                        ],
-                        const SizedBox(height: 4),
-                        Text(
-                          'AI is optional and stays on this device when the private model is ready. No journal is sent.',
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                      ],
-                    ],
                   ),
                 ),
               ),

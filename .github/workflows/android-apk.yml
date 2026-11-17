@@ -25,6 +25,14 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: clarity/package-lock.json
+      - name: Build bundled Figma interface
+        run: npm ci --prefix clarity && npm run build --prefix clarity
+
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.47.0'

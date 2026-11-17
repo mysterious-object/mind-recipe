@@ -67,3 +67,21 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+
+  clarity:
+    name: Figma interface and mobile flows
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: clarity/package-lock.json
+      - run: npm ci
+        working-directory: clarity
+      - run: npx playwright install --with-deps chromium
+        working-directory: clarity
+      - run: npm run build && npm test
+        working-directory: clarity
+      - run: git diff --exit-code -- flutter/assets/clarity/index.html

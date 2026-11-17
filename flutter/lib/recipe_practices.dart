@@ -285,23 +285,12 @@ class _WellnessRecipePracticeState extends State<WellnessRecipePractice> {
               ),
             ),
             const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: FilledButton(
-                    onPressed: _saving ? null : _saveTool,
-                    child: Text(_saving ? 'Saving…' : 'Save practice'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: _saving ? null : () => _showAiCreateDialog(),
-                    icon: const Icon(Icons.auto_awesome),
-                    label: const Text('Create with AI'),
-                  ),
-                ),
-              ],
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: _saving ? null : _saveTool,
+                child: Text(_saving ? 'Saving…' : 'Save practice'),
+              ),
             ),
           ],
         ),
@@ -340,88 +329,6 @@ class _WellnessRecipePracticeState extends State<WellnessRecipePractice> {
       if (mounted) _showError(error);
     } finally {
       if (mounted) setState(() => _saving = false);
-    }
-  }
-
-  Future<void> _showAiCreateDialog() async {
-    final descCtl = TextEditingController();
-    final result = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Create with AI'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Describe what kind of wellness tool you need. The AI will research and create a personalized practice based on your history and patterns.',
-              style: TextStyle(fontSize: 13, color: Colors.grey),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: descCtl,
-              maxLines: 3,
-              decoration: const InputDecoration(
-                labelText: 'What do you need help with?',
-                hintText: 'e.g., "A quick grounding practice for when I feel overwhelmed at work"',
-                border: OutlineInputBorder(),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, descCtl.text.trim()),
-            child: const Text('Create with AI'),
-          ),
-        ],
-      ),
-    );
-    if (result != null && result.isNotEmpty) {
-      await _createWithAi(result);
-    }
-  }
-
-  Future<void> _createWithAi(String description) async {
-    // Show loading
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => const Center(child: CircularProgressIndicator()),
-    );
-
-    try {
-      final api = MindRecipeApiClient();
-      final data = await api.createAiRecipePracticeItem(
-        token: _token,
-        description: description,
-        providerKey: widget.appState.openRouterKey,
-      );
-
-      if (!mounted) return;
-      Navigator.pop(context); // Close loading
-
-      final proposal = data['recipe_proposal'] as Map<String, dynamic>?;
-      setState(() => _showAddForm = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            proposal == null
-                ? 'Navigator could not prepare that Recipe.'
-                : 'Navigator drafted “${proposal['name']}”. Review it in your MindRecipe journey before it is added.',
-          ),
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      Navigator.pop(context); // Close loading
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Failed to create with AI: $e')));
     }
   }
 

@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'app_services.dart';
-import 'on_device_inference.dart';
 import 'mind_recipe_fx.dart';
 import 'design_tokens.dart';
 import 'daily_navigation_result.dart';
@@ -31,7 +30,7 @@ class DailyNavigation extends StatefulWidget {
     super.key,
     required this.appState,
     required this.onComplete,
-    required this.onReturnToNavigator,
+    required this.onDone,
     this.onCheckInQueued,
     this.syncSummary = '',
   });
@@ -39,11 +38,11 @@ class DailyNavigation extends StatefulWidget {
   final Future<void> Function(DailyNavigationResult result) onComplete;
   final Future<void> Function()? onCheckInQueued;
 
-  /// Live activity summary shown on the greeting step (chat ↔ nav sync).
+  /// Live activity summary shown on the greeting step.
   final String syncSummary;
 
-  /// Returns to the assistant without losing the completed check-in.
-  final VoidCallback onReturnToNavigator;
+  /// Closes the check-in and returns home.
+  final VoidCallback onDone;
 
   @override
   State<DailyNavigation> createState() => _DailyNavigationState();
@@ -63,7 +62,6 @@ class _DailyNavigationState extends State<DailyNavigation> {
   String _chosenAction = '';
   bool _consentGiven = false;
   bool _completing = false;
-  String? _completedEntryId;
   int _availableMinutes = 3;
   String _desiredMode = 'Guidance';
   String _capacity = 'Steady';
@@ -114,11 +112,10 @@ class _DailyNavigationState extends State<DailyNavigation> {
     if (_current == NavStep.complete) {
       if (_completing) return;
       _completing = true;
-      // Persist the navigation — greeting summaries and AI grounding
+      // Save the structured check-in and its local journal.
       // all read this history.
       final recordedAt = DateTime.now();
       final entryId = 'daily-nav-${recordedAt.microsecondsSinceEpoch}';
-      _completedEntryId = entryId;
       final result = DailyNavigationResult(
         id: entryId,
         recordedAt: recordedAt,
@@ -355,16 +352,7 @@ class _DailyNavigationState extends State<DailyNavigation> {
         action: _chosenAction,
         zone: _zoneLabel,
       ),
-      NavStep.complete => _CompleteStep(
-        appState: widget.appState,
-        entryId: _completedEntryId,
-        emotions: _selectedEmotions.isEmpty
-            ? 'Not recorded'
-            : _selectedEmotions.join(', '),
-        activation: _activationLevel,
-        journal: _journalController.text.trim(),
-        onReturnToNavigator: widget.onReturnToNavigator,
-      ),
+      NavStep.complete => const _CompleteStep(),
     };
   }
 
@@ -410,9 +398,9 @@ class _DailyNavigationState extends State<DailyNavigation> {
             ),
           if (_current == NavStep.complete)
             FilledButton.icon(
-              onPressed: widget.onReturnToNavigator,
-              icon: const Icon(Icons.chat_bubble_outline_rounded),
-              label: const Text('Return to Mind Nav'),
+              onPressed: widget.onDone,
+              icon: const Icon(Icons.home_outlined),
+              label: const Text('Return home'),
             )
           else
             Semantics(
@@ -595,9 +583,7 @@ class _ConsentStep extends StatelessWidget {
                   'MindRecipe does not diagnose, prescribe, or provide emergency care.',
                 ),
               ),
-              const Text(
-                'This navigation works without AI. Optional reflections use your private model; your journal stays on this device.',
-              ),
+              const Text('Your journal stays on this device.'),
             ],
           ),
         ),
@@ -870,86 +856,8 @@ class _RowItem extends StatelessWidget {
   );
 }
 
-class _CompleteStep extends StatefulWidget {
-  const _CompleteStep({
-    required this.appState,
-    required this.entryId,
-    required this.emotions,
-    required this.activation,
-    required this.journal,
-    required this.onReturnToNavigator,
-  });
-  final SecureAppState appState;
-  final String? entryId;
-  final String emotions;
-  final int activation;
-  final String journal;
-  final VoidCallback onReturnToNavigator;
-
-  @override
-  State<_CompleteStep> createState() => _CompleteStepState();
-}
-
-class _CompleteStepState extends State<_CompleteStep> {
-  bool _wantAi = false;
-  bool _aiBusy = false;
-  bool _navigatorOnline = false;
-  String? _reflection;
-
-  @override
-  void initState() {
-    super.initState();
-    OnDeviceInference.snapshotNotifier.addListener(_updateOnline);
-    _updateOnline();
-  }
-
-  @override
-  void dispose() {
-    OnDeviceInference.snapshotNotifier.removeListener(_updateOnline);
-    super.dispose();
-  }
-
-  void _updateOnline() {
-    if (!mounted) return;
-    final local = OnDeviceInference.snapshotNotifier.value.isReady;
-    setState(() => _navigatorOnline = local);
-  }
-
-  Future<void> _reflect() async {
-    setState(() => _aiBusy = true);
-    final prompt =
-        'A member just completed a daily navigation. Emotions: ${widget.emotions}. '
-        'Activation: ${widget.activation} on a -5 to +5 scale. '
-        '${widget.journal.isNotEmpty ? 'Their words: "${widget.journal}". ' : ''}'
-        'Give one grounded observation and one small next step. 35-80 words. '
-        'No diagnosis, no clinical claims.';
-    String? reply;
-    try {
-      reply = await OnDeviceInference().infer(prompt);
-      if (reply != null && reply.trim().isNotEmpty) {
-        await widget.appState.recordAiReflection();
-      }
-    } catch (_) {}
-    if (mounted) {
-      setState(() {
-        _reflection =
-            reply ??
-            'Navigator could not reflect right now — your navigation is saved.';
-        _aiBusy = false;
-      });
-    }
-    if (reply != null && reply.trim().isNotEmpty && widget.entryId != null) {
-      final all = await widget.appState.loadNavigationHistory();
-      // Inference can finish after another session. Attach only to the session
-      // that asked for this reflection, never whichever entry is newest.
-      final index = all.indexWhere((entry) => entry['id'] == widget.entryId);
-      if (index >= 0) {
-        final entry = Map<String, dynamic>.from(all[index]);
-        entry['ai_reflection'] = reply;
-        await widget.appState.saveNavigationEntry(entry);
-      }
-    }
-  }
+class _CompleteStep extends StatelessWidget {
+  const _CompleteStep();
 
   @override
   Widget build(BuildContext context) => Semantics(
@@ -972,53 +880,6 @@ class _CompleteStepState extends State<_CompleteStep> {
               style: MindRecipeTokens.bodyMedium(context),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 8),
-            TextButton(
-              onPressed: widget.onReturnToNavigator,
-              child: const Text('Continue with Mind Nav'),
-            ),
-            const Divider(height: 28),
-            SwitchListTile.adaptive(
-              contentPadding: EdgeInsets.zero,
-              value: _wantAi && _navigatorOnline,
-              onChanged: _navigatorOnline
-                  ? (v) => setState(() => _wantAi = v)
-                  : null,
-              title: const Text('AI reflection (optional)'),
-              subtitle: Text(
-                _navigatorOnline
-                    ? 'A brief private reflection on this navigation — saved with it.'
-                    : 'Install or activate your private model to reflect on this navigation.',
-              ),
-            ),
-            if (_wantAi && _navigatorOnline) ...[
-              FilledButton.tonalIcon(
-                onPressed: _aiBusy ? null : _reflect,
-                icon: _aiBusy
-                    ? const SizedBox(
-                        width: 14,
-                        height: 14,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.auto_awesome_rounded, size: 16),
-                label: Text(
-                  _aiBusy ? 'Reflecting…' : 'Reflect on this navigation',
-                ),
-              ),
-              if (_reflection != null) ...[
-                const SizedBox(height: 12),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surfaceContainerHighest
-                        .withValues(alpha: 0.6),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(_reflection!),
-                ),
-              ],
-            ],
           ],
         ),
       ),
