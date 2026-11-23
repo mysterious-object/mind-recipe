@@ -2,15 +2,15 @@ name: MindRecipe Android live-check APK
 
 on:
   push:
-    branches: ['codex/mobile-build-*']
+    branches: ['codex/clarity-2159-fold2']
 
 permissions:
   contents: read
 
 env:
   MIND_RECIPE_STAGING_API_URL: https://staging-api.mindrecipe.142.93.201.156.sslip.io
-  ORG_GRADLE_PROJECT_mindRecipeApplicationIdSuffix: .onboarding2157
-  ORG_GRADLE_PROJECT_mindRecipeAppLabel: MindRecipe Candidate 2157
+  ORG_GRADLE_PROJECT_mindRecipeApplicationIdSuffix: .onboarding2159
+  ORG_GRADLE_PROJECT_mindRecipeAppLabel: MindRecipe Candidate 2159
 
 jobs:
   apk:
