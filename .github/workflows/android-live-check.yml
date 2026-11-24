@@ -9,8 +9,8 @@ permissions:
 
 env:
   MIND_RECIPE_STAGING_API_URL: https://staging-api.mindrecipe.142.93.201.156.sslip.io
-  ORG_GRADLE_PROJECT_mindRecipeApplicationIdSuffix: .onboarding2160
-  ORG_GRADLE_PROJECT_mindRecipeAppLabel: MindRecipe Candidate 2160
+  ORG_GRADLE_PROJECT_mindRecipeApplicationIdSuffix: .onboarding2161
+  ORG_GRADLE_PROJECT_mindRecipeAppLabel: MindRecipe Candidate 2161
 
 jobs:
   apk:
