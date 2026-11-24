@@ -29,6 +29,15 @@ void main() {
         await tester.runAsync(() async {
           final fontDir =
               "${Platform.environment['FLUTTER_ROOT']}/bin/cache/artifacts/material_fonts";
+          final icons = FontLoader('MaterialIcons')
+            ..addFont(
+              Future.value(
+                ByteData.sublistView(
+                  File('$fontDir/MaterialIcons-Regular.otf').readAsBytesSync(),
+                ),
+              ),
+            );
+          await icons.load();
           for (final family in ['Roboto', 'Ahem']) {
             final fonts = FontLoader(family);
             for (final weight in ['Regular', 'Bold']) {
@@ -43,6 +52,17 @@ void main() {
             await fonts.load();
           }
         });
+      if (output != null) {
+        const placeholder = SizedBox(key: ValueKey('preload'));
+        await tester.pumpWidget(const MaterialApp(home: placeholder));
+        await tester.runAsync(
+          () => precacheImage(
+            const AssetImage('assets/branding/mind-recipe-mark.png'),
+            tester.element(find.byKey(placeholder.key!)),
+          ),
+        );
+        await tester.pump();
+      }
       await tester.pumpWidget(
         RepaintBoundary(
           key: boundary,
@@ -55,6 +75,12 @@ void main() {
       Future<void> capture(String name, String heading) async {
         await tester.pumpAndSettle();
         expect(find.text(heading), findsOneWidget);
+        if (output != null) {
+          expect(
+            tester.widget<RawImage>(find.byType(RawImage).first).image,
+            isNotNull,
+          );
+        }
         expect(tester.takeException(), isNull);
         if (output == null) return;
         await tester.runAsync(() async {

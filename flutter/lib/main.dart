@@ -81,6 +81,7 @@ class _MindRecipeAppState extends State<MindRecipeApp> {
       borderSide: const BorderSide(color: Color(0xffd7d4e2)),
     );
     return MaterialApp(
+      debugShowCheckedModeBanner: false,
       title: 'MindRecipe',
       theme: ThemeData(
         colorScheme: scheme,

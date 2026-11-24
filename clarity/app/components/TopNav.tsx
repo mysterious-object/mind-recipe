@@ -47,7 +47,7 @@ export function TopNav() {
       <div className="max-w-7xl mx-auto px-6 py-4">
         {/* Branding */}
         <div className="mb-3">
-          <div className="flex items-center gap-2"><img src={brandMark} alt="" className="w-8 h-8 rounded-lg" /><h1 className="text-2xl font-semibold text-purple-600 dark:text-purple-400">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1"><img src={brandMark} alt="" className="w-8 h-8 rounded-lg" /><h1 className="text-2xl font-semibold text-purple-600 dark:text-purple-400">
             MindRecipe
           </h1><span className="text-xs text-gray-600 dark:text-gray-300">by Context Field</span></div>
           <p className="text-sm text-gray-600 dark:text-gray-400">

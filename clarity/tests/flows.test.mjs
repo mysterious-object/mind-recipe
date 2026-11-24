@@ -219,6 +219,8 @@ test('learning search, favorites, completion and private reflection survive relo
   await page.reload();
   await page.getByRole('textbox', { name: 'Search resources' }).fill('mindfulness');
   await button(page, 'Favorite Mindfulness').click();
+  await page.addStyleTag({ content: 'html { font-size: 125% !important; }' });
+  await noOverflow(page);
   await button(page, 'Favorites').click();
   await button(page, 'View Mindfulness').click();
   await page.getByLabel('Private reflection').fill('An example reflection');

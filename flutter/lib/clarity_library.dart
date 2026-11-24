@@ -59,7 +59,8 @@ class ClarityLibrary {
       ]);
       if (!_active) return;
       final merged = await update('mergeRemote', packet);
-      if (merged['needsSync'] == true && packet.containsKey('progress')) await _sendProgress();
+      if (merged['needsSync'] == true && packet.containsKey('progress'))
+        await _sendProgress();
     });
     _network = read.catchError((Object _) {});
     await read;
