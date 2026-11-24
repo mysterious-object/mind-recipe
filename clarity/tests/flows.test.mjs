@@ -213,13 +213,19 @@ test('Help now stays inside the support footer at mobile and desktop sizes', asy
 
 test('learning search, favorites, completion and private reflection survive reload at cover width', async t => {
   const page = await open(t);
-  await page.setViewportSize({ width: 320, height: 720 });
   await page.evaluate(() => localStorage.setItem('mindrecipe-clarity-preview-v1',
     JSON.stringify({ screen: 'learn', onboardingComplete: true, profile: {name: 'Alex'} })));
   await page.reload();
   await page.getByRole('textbox', { name: 'Search resources' }).fill('mindfulness');
   await button(page, 'Favorite Mindfulness').click();
+  await page.setViewportSize({ width: 320, height: 720 });
   await page.addStyleTag({ content: 'html { font-size: 125% !important; }' });
+  await page.waitForFunction(() => {
+    const nav = document.querySelector('nav[aria-label="Main navigation"]');
+    const viewport = nav.getBoundingClientRect();
+    const tab = nav.querySelector('[aria-current="page"]').getBoundingClientRect();
+    return tab.left >= viewport.left - 1 && tab.right <= viewport.right + 1;
+  });
   await noOverflow(page);
   await button(page, 'Favorites').click();
   await button(page, 'View Mindfulness').click();

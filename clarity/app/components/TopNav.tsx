@@ -12,11 +12,18 @@ export function TopNav() {
     const nav = navRef.current;
     const active = nav?.querySelector<HTMLElement>('[aria-current="page"]');
     if (!nav || !active) return;
-    // Each screen mounts its own shell. Reveal the active tab without scrolling the page.
-    const viewport = nav.getBoundingClientRect();
-    const tab = active.getBoundingClientRect();
-    if (tab.left < viewport.left) nav.scrollLeft += tab.left - viewport.left;
-    else if (tab.right > viewport.right) nav.scrollLeft += tab.right - viewport.right;
+    const reveal = () => {
+      const viewport = nav.getBoundingClientRect();
+      const tab = active.getBoundingClientRect();
+      if (tab.left < viewport.left) nav.scrollLeft += tab.left - viewport.left;
+      else if (tab.right > viewport.right) nav.scrollLeft += tab.right - viewport.right;
+    };
+    reveal();
+    // Folding the device or resizing text changes both the viewport and tab widths.
+    const observer = new ResizeObserver(reveal);
+    observer.observe(nav);
+    for (const tab of nav.children) observer.observe(tab);
+    return () => observer.disconnect();
   }, [screen]);
 
   const displayName = userProfile.name || 'friend';
