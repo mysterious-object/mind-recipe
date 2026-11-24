@@ -205,7 +205,10 @@ class _AccountGatewayState extends State<AccountGateway> {
         SafeArea(
           child: Center(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
+              padding: EdgeInsets.symmetric(
+                horizontal: MediaQuery.sizeOf(context).width < 360 ? 12 : 24,
+                vertical: 24,
+              ),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 460),
                 child: Card(
@@ -215,7 +218,12 @@ class _AccountGatewayState extends State<AccountGateway> {
                     borderRadius: BorderRadius.circular(28),
                   ),
                   child: Padding(
-                    padding: const EdgeInsets.all(24),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: MediaQuery.sizeOf(context).width < 360
+                          ? 12
+                          : 24,
+                      vertical: 24,
+                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
@@ -306,6 +314,7 @@ class _AccountGatewayState extends State<AccountGateway> {
                               autocorrect: false,
                               decoration: const InputDecoration(
                                 labelText: 'Reset code',
+                                helperMaxLines: 3,
                                 helperText:
                                     'From the reset link or support message',
                                 prefixIcon: Icon(Icons.vpn_key_outlined),
@@ -322,6 +331,7 @@ class _AccountGatewayState extends State<AccountGateway> {
                                 labelText: resetting
                                     ? 'New password'
                                     : 'Password',
+                                helperMaxLines: 3,
                                 helperText:
                                     (!resetting && creating) ||
                                         (resetting && resetTokenStage)
