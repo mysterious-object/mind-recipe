@@ -174,3 +174,39 @@ test('a configured code word opens support without sending anything', async t =>
   assert.equal(await page.getByRole('dialog').count(), 0);
   assert.equal(await page.getByRole('textbox').inputValue(), 'anchor');
 });
+
+test('narrow navigation reveals the selected tab after each screen mounts and reloads', async t => {
+  const page = await open(t);
+  await page.setViewportSize({ width: 320, height: 568 });
+  await onboard(page);
+  for (const name of ['Connect', 'Insights', 'Home']) {
+    await button(page, name).click();
+    await page.waitForFunction(({ key, screen }) => JSON.parse(localStorage.getItem(key)).screen === screen, { key, screen: name.toLowerCase() });
+    await page.reload();
+    assert.equal(await page.locator('nav [aria-current="page"]').innerText(), name);
+    const visible = await page.getByRole('navigation', { name: 'Main navigation' }).evaluate(nav => {
+      const active = nav.querySelector('[aria-current="page"]').getBoundingClientRect();
+      const bounds = nav.getBoundingClientRect();
+      return active.left >= bounds.left - 1 && active.right <= bounds.right + 1;
+    });
+    assert.equal(visible, true, name + ' must remain visible');
+    await noOverflow(page);
+  }
+});
+
+test('Help now stays inside the support footer at mobile and desktop sizes', async t => {
+  const page = await open(t); await onboard(page);
+  for (const width of [320, 390, 768, 1280]) {
+    await page.setViewportSize({ width, height: 844 });
+    for (const position of ['top', 'bottom']) {
+      await page.evaluate(position => window.scrollTo(0, position === 'top' ? 0 : document.body.scrollHeight), position);
+      const help = await button(page, /Help now -/).boundingBox();
+      const footer = await page.getByRole('contentinfo', { name: 'Support options' }).boundingBox();
+      assert.ok(help.x >= footer.x && help.x + help.width <= footer.x + footer.width + 1);
+      assert.ok(help.y >= footer.y && help.y + help.height <= footer.y + footer.height + 1);
+      await noOverflow(page);
+    }
+  }
+  await button(page, /Help now -/).click();
+  await page.getByRole('dialog').waitFor();
+});

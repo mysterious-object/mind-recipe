@@ -1,10 +1,23 @@
-import React from 'react';
+import React, { useLayoutEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { Home, Activity, BookOpen, Users, TrendingUp, Settings } from 'lucide-react';
 import type { Screen } from '../types';
 
 export function TopNav() {
   const { setScreen, screen, userProfile } = useApp();
+  const navRef = useRef<HTMLElement>(null);
+
+  useLayoutEffect(() => {
+    const nav = navRef.current;
+    const active = nav?.querySelector<HTMLElement>('[aria-current="page"]');
+    if (!nav || !active) return;
+    // Each screen mounts its own shell. Reveal the active tab without scrolling the page.
+    const viewport = nav.getBoundingClientRect();
+    const tab = active.getBoundingClientRect();
+    if (tab.left < viewport.left) nav.scrollLeft += tab.left - viewport.left;
+    else if (tab.right > viewport.right) nav.scrollLeft += tab.right - viewport.right;
+  }, [screen]);
+
   const displayName = userProfile.name || 'friend';
 
   const navItems = [
@@ -42,7 +55,7 @@ export function TopNav() {
         </div>
 
         {/* Navigation */}
-        <nav className="flex gap-2 overflow-x-auto scrollbar-hide -mx-2 px-2">
+        <nav ref={navRef} aria-label="Main navigation" className="flex gap-2 overflow-x-auto scrollbar-hide -mx-2 px-2">
           {navItems.map((item) => {
             const Icon = item.icon;
             const active = isActive(item.screen);

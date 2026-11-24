@@ -87,34 +87,33 @@ export function AppShell({
         {children}
       </div>
 
-      {/* Floating Help Now Button */}
-      <button
-        type="button"
-        onPointerDown={handleHelpPressStart}
-        onPointerUp={cancelHold}
-        onPointerCancel={cancelHold}
-        onPointerLeave={cancelHold}
-        onClick={handleHelpClick}
-        className="fixed bottom-36 right-6 z-50 text-white rounded-full px-5 py-3 shadow-2xl transition-all flex items-center gap-2 group overflow-hidden min-h-[48px]"
-        style={{
-          background: 'linear-gradient(135deg, rgba(251, 146, 60, 0.95) 0%, rgba(251, 113, 133, 0.9) 50%, rgba(244, 114, 182, 0.95) 100%)',
-          boxShadow: '0 12px 32px rgba(251, 146, 60, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.2)',
-        }}
-        aria-label="Help now - tap or press and hold"
-      >
-        <div 
-          className="absolute inset-0 bg-white/15 rounded-full pointer-events-none"
-          style={{ animation: 'soft-glow-pulse 3s ease-in-out infinite' }}
-        />
-        
-        <div className="relative z-10 flex items-center gap-1">
-          <span className="font-medium">Help now</span>
-        </div>
-      </button>
-
       {/* Bottom Crisis Strip - Sticky */}
-      <div className="sticky bottom-0 z-40 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 px-4 md:px-6 py-2 md:py-4 backdrop-blur-xl">
+      <footer aria-label="Support options" className="sticky bottom-0 z-40 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 px-4 md:px-6 py-2 md:py-4 backdrop-blur-xl">
         <div className="max-w-4xl mx-auto space-y-2">
+          {/* Help has its own row so it cannot cover page content. */}
+          <button
+            type="button"
+            onPointerDown={handleHelpPressStart}
+            onPointerUp={cancelHold}
+            onPointerCancel={cancelHold}
+            onPointerLeave={cancelHold}
+            onClick={handleHelpClick}
+            className="relative ml-auto text-white rounded-full px-5 py-3 shadow-2xl transition-all flex items-center gap-2 group overflow-hidden min-h-[48px]"
+            style={{
+              background: 'linear-gradient(135deg, rgba(251, 146, 60, 0.95) 0%, rgba(251, 113, 133, 0.9) 50%, rgba(244, 114, 182, 0.95) 100%)',
+              boxShadow: '0 12px 32px rgba(251, 146, 60, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.2)',
+            }}
+            aria-label="Help now - tap or press and hold"
+          >
+            <div
+              className="absolute inset-0 bg-white/15 rounded-full pointer-events-none"
+              style={{ animation: 'soft-glow-pulse 3s ease-in-out infinite' }}
+            />
+
+            <div className="relative z-10 flex items-center gap-1">
+              <span className="font-medium">Help now</span>
+            </div>
+          </button>
           {/* Crisis Buttons */}
           <div className="flex gap-2 md:gap-3">
             <button
@@ -171,7 +170,7 @@ export function AppShell({
             </p>
           </div>
         </div>
-      </div>
+      </footer>
 
       {/* Help Modal - "I've got you." */}
       <Sheet open={showHelpModal} onOpenChange={setShowHelpModal}>
