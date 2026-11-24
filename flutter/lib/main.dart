@@ -5,10 +5,6 @@ import 'package:flutter/material.dart';
 import 'account_gateway.dart';
 import 'app_services.dart';
 import 'clarity_experience.dart';
-import 'design_tokens.dart';
-import 'visual_theme.dart';
-
-const _themeLiveCheck = bool.fromEnvironment('MIND_RECIPE_THEME_LIVE_CHECK');
 
 void main() => runApp(const MindRecipeApp());
 
@@ -36,7 +32,8 @@ class _MindRecipeAppState extends State<MindRecipeApp> {
 
   Future<void> _initialize() async {
     try {
-      if (!appState.loaded) await appState.load();
+      if (!appState.loaded)
+        await appState.load(includeLegacyPreferences: false);
       final restored = appState.session;
       if (restored != null) {
         final restoredAccount = await api
@@ -56,13 +53,6 @@ class _MindRecipeAppState extends State<MindRecipeApp> {
         } else if (restoredAccount.status == AccountRestoreStatus.verified) {
           await appState.setSession(restoredAccount.session!);
         }
-      }
-      // The separately identified live-check package must remain testable
-      // when the staging identity service is unavailable. This flag is set
-      // only by its dedicated workflow; release APKs and IPAs never receive
-      // the local session.
-      if (_themeLiveCheck && appState.session == null) {
-        appState.useLocalDemo();
       }
     } finally {
       if (mounted) setState(() => _initializing = false);
@@ -84,41 +74,31 @@ class _MindRecipeAppState extends State<MindRecipeApp> {
 
   @override
   Widget build(BuildContext context) {
-    final themeMode = switch (appState.appearanceMode) {
-      'light' => ThemeMode.light,
-      'dark' => ThemeMode.dark,
-      _ => ThemeMode.system,
-    };
-    final visual = visualThemeFor(appState.visualThemeId);
-    final seed = visual.primary;
-    final secondary = visual.secondary;
-    final tertiary = visual.tertiary;
-    final scheme = ColorScheme.fromSeed(
-      seedColor: seed,
-      brightness: Brightness.light,
-    ).copyWith(primary: seed, secondary: secondary, tertiary: tertiary);
+    final scheme = ColorScheme.fromSeed(seedColor: const Color(0xff7c3aed))
+        .copyWith(primary: const Color(0xff7435cc), surface: Colors.white);
+    final border = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(16),
+      borderSide: const BorderSide(color: Color(0xffd7d4e2)),
+    );
     return MaterialApp(
       title: 'MindRecipe',
       theme: ThemeData(
         colorScheme: scheme,
         useMaterial3: true,
-        scaffoldBackgroundColor: Colors.transparent,
+        scaffoldBackgroundColor: const Color(0xfffaf9ff),
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: Colors.white,
+          border: border,
+          enabledBorder: border,
+        ),
+        filledButtonTheme: FilledButtonThemeData(
+          style: FilledButton.styleFrom(
+            minimumSize: const Size(0, 52),
+            shape: const StadiumBorder(),
+          ),
+        ),
       ),
-      darkTheme: ThemeData(
-        colorScheme:
-            ColorScheme.fromSeed(
-              seedColor: seed,
-              brightness: Brightness.dark,
-            ).copyWith(
-              primary: seed,
-              secondary: secondary,
-              tertiary: tertiary,
-              surface: MindRecipeTokens.surfaceBlack,
-            ),
-        useMaterial3: true,
-        scaffoldBackgroundColor: Colors.transparent,
-      ),
-      themeMode: themeMode,
       home: !appState.loaded || _initializing
           ? const Scaffold(body: Center(child: CircularProgressIndicator()))
           : appState.session == null

@@ -46,6 +46,7 @@ pipeline {
               --dart-define=MIND_RECIPE_API_BASE=${MIND_RECIPE_STAGING_API_URL}
           '''
         }
+        sh 'python3 ci/check_mobile_runtime.py flutter/build/app/outputs/flutter-apk/app-release.apk'
         stash(name: 'apk', includes: 'flutter/build/app/outputs/flutter-apk/app-release.apk')
         sh 'chmod +x ci/build_ios_in_tart.sh && ci/build_ios_in_tart.sh'
         stash(name: 'ipa', includes: 'flutter/build/ios/ipa/mind-recipe-ios-unsigned.ipa')

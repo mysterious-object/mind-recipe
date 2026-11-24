@@ -56,29 +56,6 @@ jobs:
         run: flutter build ios --release --no-codesign --dart-define=MIND_RECIPE_API_BASE=${MIND_RECIPE_STAGING_API_URL}
         working-directory: flutter
 
-      - name: Build and embed pinned private-AI runtime
-        run: |
-          set -o pipefail
-          chmod +x ci/build_llama_ios_framework.sh
-          ci/build_llama_ios_framework.sh flutter/build/ios/iphoneos/Runner.app 2>&1 | tee flutter/build/ios/llama-framework-build.log
-
-      - name: Preserve native-runtime diagnostics
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: mindrecipe-ios-native-runtime-log
-          path: flutter/build/ios/llama-framework-build.log
-          if-no-files-found: warn
-          retention-days: 3
-
-      - name: Verify Runner.app exists
-        run: |
-          test -d build/ios/iphoneos/Runner.app
-          test -x build/ios/iphoneos/Runner.app/Frameworks/llama.framework/llama
-          xcrun nm -gU build/ios/iphoneos/Runner.app/Frameworks/llama.framework/llama | grep _llama_model_load_from_file >/dev/null
-          ls -lh build/ios/iphoneos/Runner.app/Frameworks/llama.framework/llama
-        working-directory: flutter
-
       - name: Create unsigned .ipa
         run: |
           cd flutter
@@ -86,7 +63,7 @@ jobs:
           cp -R build/ios/iphoneos/Runner.app Payload/
           zip -r mind-recipe-ios-unsigned.ipa Payload
           ls -lh mind-recipe-ios-unsigned.ipa
-          unzip -l mind-recipe-ios-unsigned.ipa | head -n 20
+          python3 ../ci/check_mobile_runtime.py mind-recipe-ios-unsigned.ipa
 
       - uses: actions/upload-artifact@v4
         with:

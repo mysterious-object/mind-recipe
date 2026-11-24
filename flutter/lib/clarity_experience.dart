@@ -10,7 +10,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 
 import 'app_services.dart';
 import 'clarity_store.dart';
-import 'recipes_screen.dart';
+import 'clarity_library.dart';
 import 'voice_interface.dart';
 
 class ClarityExperience extends StatefulWidget {
@@ -35,7 +35,7 @@ class _ClarityExperienceState extends State<ClarityExperience>
   String _screen = 'welcome';
   bool _locked = false;
   bool _authenticating = false;
-  bool _lessonsOpen = false;
+  late final ClarityLibrary _library;
   OverlayEntry? _privacyCover;
   bool get _currentAccount =>
       mounted &&
@@ -48,6 +48,7 @@ class _ClarityExperienceState extends State<ClarityExperience>
     super.initState();
     _account = widget.appState.session!;
     _store = ClarityStore(_account.email);
+    _library = ClarityLibrary(_store, widget.api, _account);
     WidgetsBinding.instance.addObserver(this);
     unawaited(_initialize());
   }
@@ -221,29 +222,20 @@ class _ClarityExperienceState extends State<ClarityExperience>
           if (mounted) setState(() => _screen = payload as String);
         case 'authenticate':
           result = await _authenticate();
-        case 'openLessons':
-          if (_lessonsOpen) throw StateError('Lessons are already open.');
-          _lessonsOpen = true;
-          try {
-            if (!mounted) return;
-            await Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (context) => Scaffold(
-                  backgroundColor: Theme.of(context).colorScheme.surface,
-                  appBar: AppBar(title: const Text('Mind Recipe')),
-                  body: SafeArea(
-                    top: false,
-                    child: RecipesScreen(
-                      api: widget.api,
-                      appState: widget.appState,
-                    ),
-                  ),
-                ),
-              ),
-            );
-          } finally {
-            _lessonsOpen = false;
+        case 'importLibrary':
+          if (!await _authenticate() || !_currentAccount) {
+            throw StateError('Unlock this device to import its older library.');
           }
+          result = await _library.update('importLibrary', {});
+        case 'refreshLibrary':
+          result = await _library.refresh();
+        case 'loadLibrary':
+        case 'saveReflection':
+        case 'completeLesson':
+          result = await _library.update(
+            message['type'] as String,
+            payload as Map? ?? {},
+          );
         case 'openUrl':
           await _openExternal(payload as String);
         case 'share':
@@ -276,6 +268,8 @@ class _ClarityExperienceState extends State<ClarityExperience>
           }
         case 'signOut':
           await _store.flush();
+          _library.close();
+          await _library.flush();
           await widget.appState.signOut();
         default:
           throw StateError('Unknown app action.');
@@ -329,6 +323,7 @@ class _ClarityExperienceState extends State<ClarityExperience>
 
   @override
   void dispose() {
+    _library.close();
     _privacyCover?.remove();
     _privacyCover?.dispose();
     WidgetsBinding.instance.removeObserver(this);

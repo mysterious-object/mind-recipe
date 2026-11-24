@@ -97,7 +97,7 @@ class MindRecipeApiClient {
     final user = jsonDecode(response.body) as Map<String, dynamic>;
     return AccountSession(
       token: token,
-      displayName: user['display_name']?.toString() ?? 'Navigator',
+      displayName: user['display_name']?.toString() ?? 'friend',
       email: user['email']?.toString() ?? '',
       refreshToken: refreshToken,
       idToken: idToken,
@@ -1069,7 +1069,7 @@ class SecureAppState extends ChangeNotifier {
   Map<String, dynamic> onboardingDraft = {};
   Future<void> _onboardingWrite = Future<void>.value();
   String get memberDisplayName =>
-      (onboardingDraft['name'] as String?) ?? session?.displayName ?? 'Navigator';
+      (onboardingDraft['name'] as String?) ?? session?.displayName ?? 'friend';
   bool sessionTemporarilyUnverified = false;
   bool managedAiAvailable = false;
   bool cloudAiEnabled = true;
@@ -1108,81 +1108,90 @@ class SecureAppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> load() async {
+  Future<void> _restoreAccount() async {
+    final values = await Future.wait([
+      _storage.read(key: _tokenKey),
+      _storage.read(key: _nameKey),
+      _storage.read(key: _emailKey),
+      _storage.read(key: _refreshTokenKey),
+      _storage.read(key: _idTokenKey),
+      _storage.read(key: _tokenExpiryKey),
+    ]);
+    if ((values[0] ?? '').isNotEmpty) {
+      session = AccountSession(
+        token: values[0]!,
+        displayName: values[1] ?? 'friend',
+        email: values[2] ?? '',
+        refreshToken: values[3],
+        idToken: values[4],
+        accessTokenExpiresAt: DateTime.tryParse(values[5] ?? ''),
+      );
+    }
+  }
+
+  Future<void> load({bool includeLegacyPreferences = true}) async {
     try {
-      final values = await Future.wait([
-        _storage.read(key: _tokenKey),
-        _storage.read(key: _nameKey),
-        _storage.read(key: _emailKey),
-        _storage.read(key: _providerKey),
-        _storage.read(key: _assistantActivityKey),
-        _storage.read(key: _cloudAiEnabledKey),
-        _storage.read(key: _publicResearchEnabledKey),
-        _storage.read(key: _appearanceModeKey),
-        _storage.read(key: _visualThemeKey),
-        _storage.read(key: _legacyChimeraThemeKey),
-        _storage.read(key: _legacyChimeraVfxThemeKey),
-        _storage.read(key: _cloudModelKey),
-        _storage.read(key: _refreshTokenKey),
-        _storage.read(key: _idTokenKey),
-        _storage.read(key: _tokenExpiryKey),
-      ]);
-      if ((values[0] ?? '').isNotEmpty) {
-        session = AccountSession(
-          token: values[0]!,
-          displayName: values[1] ?? 'Navigator',
-          email: values[2] ?? '',
-          refreshToken: values[12],
-          idToken: values[13],
-          accessTokenExpiresAt: DateTime.tryParse(values[14] ?? ''),
-        );
-      }
-      openRouterKey = values[3] ?? '';
+      await _restoreAccount();
       onboardingComplete = await _readOnboarding(session);
       onboardingDraft = await _readOnboardingDraft(session);
-      if ((values[4] ?? '').isNotEmpty) {
-        final activity = jsonDecode(values[4]!) as Map<String, dynamic>;
-        _activityDate = activity['date']?.toString() ?? '';
-        _navigationSessions = activity['navigation_sessions'] as int? ?? 0;
-        _messagesSent = activity['messages_sent'] as int? ?? 0;
-        _aiReflections = activity['ai_reflections'] as int? ?? 0;
-        _lifetimeNavigationSessions =
-            activity['lifetime_navigation_sessions'] as int? ??
-            _navigationSessions;
-        _lifetimeNavigatorTurns =
-            activity['lifetime_navigator_turns'] as int? ?? _messagesSent;
-        _lifetimeAiReflections =
-            activity['lifetime_ai_reflections'] as int? ?? _aiReflections;
-        _lastAssistantActivityAt = DateTime.tryParse(
-          activity['last_activity_at']?.toString() ?? '',
-        );
-      }
-      cloudAiEnabled = values[5] != 'false';
-      publicResearchEnabled = values[6] == 'true';
-      appearanceMode = const {'system', 'light', 'dark'}.contains(values[7])
-          ? values[7]!
-          : 'system';
-      visualThemeId = migrateVisualTheme(values[8] ?? values[10] ?? values[9]);
-      selectedCloudModel = (values[11] ?? '').trim().isEmpty
-          ? 'openrouter/auto'
-          : values[11]!.trim();
-      await _storage.write(key: _visualThemeKey, value: visualThemeId);
-      for (final key in const [
-        _legacyChimeraThemeKey,
-        _legacyChimeraVfxThemeKey,
-        _legacyChimeraFxEnabledKey,
-        _legacyChimeraFxIntensityKey,
-        _legacyChimeraFxVariantKey,
-      ]) {
-        await _storage.delete(key: key);
-      }
+      if (includeLegacyPreferences) await _loadLegacyPreferences();
     } catch (_) {
-      // Secure storage can be unavailable in some test harnesses. The app stays fail-closed.
+      // A device with unavailable secure storage stays signed out.
     }
     loaded = true;
     notifyListeners();
   }
 
+  Future<void> _loadLegacyPreferences() async {
+    final values = await Future.wait([
+      _storage.read(key: _providerKey),
+      _storage.read(key: _assistantActivityKey),
+      _storage.read(key: _cloudAiEnabledKey),
+      _storage.read(key: _publicResearchEnabledKey),
+      _storage.read(key: _appearanceModeKey),
+      _storage.read(key: _visualThemeKey),
+      _storage.read(key: _legacyChimeraThemeKey),
+      _storage.read(key: _legacyChimeraVfxThemeKey),
+      _storage.read(key: _cloudModelKey),
+    ]);
+    openRouterKey = values[0] ?? '';
+    if ((values[1] ?? '').isNotEmpty) {
+      final activity = jsonDecode(values[1]!) as Map<String, dynamic>;
+      _activityDate = activity['date']?.toString() ?? '';
+      _navigationSessions = activity['navigation_sessions'] as int? ?? 0;
+      _messagesSent = activity['messages_sent'] as int? ?? 0;
+      _aiReflections = activity['ai_reflections'] as int? ?? 0;
+      _lifetimeNavigationSessions =
+          activity['lifetime_navigation_sessions'] as int? ??
+          _navigationSessions;
+      _lifetimeNavigatorTurns =
+          activity['lifetime_navigator_turns'] as int? ?? _messagesSent;
+      _lifetimeAiReflections =
+          activity['lifetime_ai_reflections'] as int? ?? _aiReflections;
+      _lastAssistantActivityAt = DateTime.tryParse(
+        activity['last_activity_at']?.toString() ?? '',
+      );
+    }
+    cloudAiEnabled = values[2] != 'false';
+    publicResearchEnabled = values[3] == 'true';
+    appearanceMode = const {'system', 'light', 'dark'}.contains(values[4])
+        ? values[4]!
+        : 'system';
+    visualThemeId = migrateVisualTheme(values[5] ?? values[7] ?? values[6]);
+    selectedCloudModel = (values[8] ?? '').trim().isEmpty
+        ? 'openrouter/auto'
+        : values[8]!.trim();
+    await _storage.write(key: _visualThemeKey, value: visualThemeId);
+    for (final key in const [
+      _legacyChimeraThemeKey,
+      _legacyChimeraVfxThemeKey,
+      _legacyChimeraFxEnabledKey,
+      _legacyChimeraFxIntensityKey,
+      _legacyChimeraFxVariantKey,
+    ]) {
+      await _storage.delete(key: key);
+    }
+  }
   Future<void> recordAssistantMessage({required bool startsSession}) async {
     _rollActivityDayIfNeeded();
     _messagesSent++;
@@ -1694,7 +1703,6 @@ class SecureAppState extends ChangeNotifier {
       _storage.delete(key: _refreshTokenKey),
       _storage.delete(key: _idTokenKey),
       _storage.delete(key: _tokenExpiryKey),
-      _storage.delete(key: _assistantActivityKey),
     ]);
     notifyListeners();
   }

@@ -110,7 +110,7 @@ test('native lesson and support actions use the bridge, and failures remain visi
     window.hostCalls = [];
     window.MindRecipeHost = { postMessage(raw) {
       const message = JSON.parse(raw); window.hostCalls.push(message);
-      if (message.type === 'openLessons') return;
+      if (message.type === 'loadLibrary') return;
       const value = message.type === 'load' ? { screen: 'home', onboardingComplete: true, profile: { name: 'Alex' } } : null;
       queueMicrotask(() => window.mindRecipeReply(message.id, true, value));
     } };
@@ -119,8 +119,8 @@ test('native lesson and support actions use the bridge, and failures remain visi
   await button(page, 'Call 988 Suicide and Crisis Lifeline').click();
   assert.equal(await page.evaluate(() => window.hostCalls.some(call => call.type === 'openUrl' && call.payload === 'tel:988')), true);
   await button(page, 'Mind Recipe').click();
-  assert.equal(await page.evaluate(() => window.hostCalls.some(call => call.type === 'openLessons')), true);
-  await page.evaluate(() => { const request = window.hostCalls.find(call => call.type === 'openLessons'); window.mindRecipeReply(request.id, false, 'Could not open lessons.'); });
+  assert.equal(await page.evaluate(() => window.hostCalls.some(call => call.type === 'loadLibrary')), true);
+  await page.evaluate(() => { const request = window.hostCalls.find(call => call.type === 'loadLibrary'); window.mindRecipeReply(request.id, false, 'Could not open lessons.'); });
   assert.match(await page.getByRole('alert').innerText(), /Could not open lessons/);
 });
 
@@ -209,4 +209,27 @@ test('Help now stays inside the support footer at mobile and desktop sizes', asy
   }
   await button(page, /Help now -/).click();
   await page.getByRole('dialog').waitFor();
+});
+
+test('learning search, favorites, completion and private reflection survive reload at cover width', async t => {
+  const page = await open(t);
+  await page.setViewportSize({ width: 320, height: 720 });
+  await page.evaluate(() => localStorage.setItem('mindrecipe-clarity-preview-v1',
+    JSON.stringify({ screen: 'learn', onboardingComplete: true, profile: {name: 'Alex'} })));
+  await page.reload();
+  await page.getByRole('textbox', { name: 'Search resources' }).fill('mindfulness');
+  await button(page, 'Favorite Mindfulness').click();
+  await button(page, 'Favorites').click();
+  await button(page, 'View Mindfulness').click();
+  await page.getByLabel('Private reflection').fill('An example reflection');
+  await button(page, 'Save reflection').click();
+  await page.getByText('Reflection saved on this device.').waitFor();
+  await button(page, 'Mark complete').click();
+  await button(page, 'Completed').waitFor();
+  await page.reload();
+  await button(page, 'Favorites').click();
+  await button(page, 'View Mindfulness').click();
+  assert.equal(await page.getByLabel('Private reflection').inputValue(), 'An example reflection');
+  assert.equal(await button(page, 'Completed').isDisabled(), true);
+  await noOverflow(page);
 });

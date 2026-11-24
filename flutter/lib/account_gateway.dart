@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
 
 import 'app_services.dart';
-import 'three_background.dart';
-import 'three_brand_mark.dart';
-import 'visual_theme.dart';
 
 class AccountGateway extends StatefulWidget {
   const AccountGateway({super.key, required this.api, required this.appState});
@@ -191,15 +188,18 @@ class _AccountGatewayState extends State<AccountGateway> {
     body: Stack(
       children: [
         Positioned.fill(
-          child: ThreeBackground(
-            variant: visualThemeFor(widget.appState.visualThemeId).composition,
-            progress: creating
-                ? .34
-                : resetting
-                ? .67
-                : .16,
-            intensity: .92,
-            theme: visualThemeFor(widget.appState.visualThemeId).engineTheme,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color(0xfff5f1ff),
+                  Color(0xfffafaff),
+                  Color(0xffedf1ff),
+                ],
+              ),
+            ),
           ),
         ),
         SafeArea(
@@ -209,21 +209,25 @@ class _AccountGatewayState extends State<AccountGateway> {
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 460),
                 child: Card(
-                  color: Theme.of(context).colorScheme.surface
-                      .withValues(alpha: 0.82),
+                  color: Colors.white.withValues(alpha: .9),
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(28),
+                  ),
                   child: Padding(
                     padding: const EdgeInsets.all(24),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        SizedBox(
-                          height: 196,
-                          child: ThreeBrandMark(
-                            variant: creating
-                                ? 4
-                                : resetting
-                                ? 8
-                                : 1,
+                        Center(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(20),
+                            child: Image.asset(
+                              'assets/branding/mind-recipe-mark.png',
+                              width: 80,
+                              height: 80,
+                              fit: BoxFit.cover,
+                            ),
                           ),
                         ),
                         const SizedBox(height: 18),
@@ -280,7 +284,6 @@ class _AccountGatewayState extends State<AccountGateway> {
                               decoration: const InputDecoration(
                                 labelText: 'Name',
                                 prefixIcon: Icon(Icons.person_outline),
-                                border: OutlineInputBorder(),
                               ),
                             ),
                           if (creating && !resetting)
@@ -293,7 +296,6 @@ class _AccountGatewayState extends State<AccountGateway> {
                             decoration: const InputDecoration(
                               labelText: 'Email',
                               prefixIcon: Icon(Icons.alternate_email),
-                              border: OutlineInputBorder(),
                             ),
                           ),
                           const SizedBox(height: 12),
@@ -307,7 +309,6 @@ class _AccountGatewayState extends State<AccountGateway> {
                                 helperText:
                                     'From the reset link or support message',
                                 prefixIcon: Icon(Icons.vpn_key_outlined),
-                                border: OutlineInputBorder(),
                               ),
                             ),
                           if (resetting && resetTokenStage)
@@ -327,7 +328,7 @@ class _AccountGatewayState extends State<AccountGateway> {
                                     ? '10 characters minimum'
                                     : null,
                                 prefixIcon: const Icon(Icons.lock_outline),
-                                border: const OutlineInputBorder(),
+
                                 suffixIcon: IconButton(
                                   onPressed: () =>
                                       setState(() => obscure = !obscure),
@@ -349,7 +350,6 @@ class _AccountGatewayState extends State<AccountGateway> {
                               decoration: const InputDecoration(
                                 labelText: 'Confirm password',
                                 prefixIcon: Icon(Icons.lock_reset_rounded),
-                                border: OutlineInputBorder(),
                               ),
                             ),
                           if (creating && !resetting)

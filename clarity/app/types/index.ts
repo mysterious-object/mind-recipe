@@ -29,6 +29,7 @@ export interface UserProfile {
   name: string;
   pronouns: Pronouns;
   customPronouns?: string;
+  favoriteResources?: string[];
   theme: Theme;
   vibe: Vibe;
   motion: boolean;

@@ -1,7 +1,7 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../hooks/useTheme';
-import { Heart } from 'lucide-react';
+import brandMark from '../../../../flutter/assets/branding/mind-recipe-mark.png';
 
 export function Welcome() {
   const { setScreen } = useApp();
@@ -48,11 +48,12 @@ export function Welcome() {
         {/* Logo / App Name */}
         <div className="text-center space-y-4">
           <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 mb-4 shadow-lg">
-            <Heart className="w-10 h-10 text-white" />
+            <img src={brandMark} alt="" className="w-full h-full rounded-full object-cover" />
           </div>
           <h1 className={`text-5xl tracking-tight ${getTextClasses()} transition-colors duration-700`}>
             Welcome to MindRecipe
           </h1>
+          <p className={getSubtextClasses()}>by Context Field</p>
         </div>
 
         {/* Main Content */}

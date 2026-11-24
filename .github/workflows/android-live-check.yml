@@ -41,7 +41,7 @@ jobs:
           flutter test --no-pub
           flutter build apk --release --target-platform android-arm64 --no-pub --dart-define=MIND_RECIPE_API_BASE=${MIND_RECIPE_STAGING_API_URL}
         working-directory: flutter
-      - run: test -s flutter/build/app/outputs/flutter-apk/app-release.apk
+      - run: python3 ci/check_mobile_runtime.py flutter/build/app/outputs/flutter-apk/app-release.apk
       - name: Record candidate identity and checksum
         shell: bash
         run: |

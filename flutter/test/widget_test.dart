@@ -10,33 +10,7 @@ import 'package:mind_recipe/clarity_experience.dart';
 import 'package:mind_recipe/daily_navigation_scan.dart';
 import 'package:mind_recipe/main.dart';
 import 'package:mind_recipe/navigator_agent.dart';
-import 'package:mind_recipe/on_device_inference.dart';
 import 'package:mind_recipe/three_intro_screen.dart';
-
-class FakeLocalInference implements LocalInference {
-  @override
-  LocalInferenceSnapshot get snapshot =>
-      const LocalInferenceSnapshot(OnDeviceStatus.notInstalled);
-
-  @override
-  Future<LocalInferenceSnapshot> refreshStatus() async => snapshot;
-
-  @override
-  Future<void> installModel({bool allowCellular = false}) async {}
-
-  @override
-  Future<String?> infer(
-    String userMessage, {
-    List<LocalConversationTurn> history = const [],
-    void Function(String token)? onToken,
-    String? rawMemberMessage,
-    String memberContext = '',
-    String routingGuidance = '',
-  }) async => null;
-
-  @override
-  Future<void> removeModel() async {}
-}
 
 class FakeMindRecipeApi extends MindRecipeApiClient {
   @override

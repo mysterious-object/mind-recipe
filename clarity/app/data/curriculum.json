@@ -1,0 +1,137 @@
+[
+  {
+    "id": "lesson-1",
+    "module": 1,
+    "number": 1,
+    "title": "Mindfulness",
+    "summary": "Notice thoughts, feelings, sensations, and surroundings without needing to fix them.",
+    "practice": "Pause and name one thing you notice in your body, mind, and environment.",
+    "source": "L1 Transcript"
+  },
+  {
+    "id": "lesson-2",
+    "module": 1,
+    "number": 2,
+    "title": "Emotional Data",
+    "summary": "Emotions can be useful information about needs, values, and conditions.",
+    "practice": "Name the emotion, where you feel it, and one gentle need it may point toward.",
+    "source": "L2 Transcript"
+  },
+  {
+    "id": "lesson-3",
+    "module": 1,
+    "number": 3,
+    "title": "Safety & Perception",
+    "summary": "A sense of safety shapes what the nervous system notices and how it responds.",
+    "practice": "Orient to the room: slowly notice five neutral or supportive details.",
+    "source": "L3 Transcript"
+  },
+  {
+    "id": "lesson-4",
+    "module": 1,
+    "number": 4,
+    "title": "Baselines",
+    "summary": "Patterns become clearer when you know what is typical for you.",
+    "practice": "Record a simple baseline: energy, tension, focus, and connection today.",
+    "source": "L4 Transcript"
+  },
+  {
+    "id": "lesson-5",
+    "module": 1,
+    "number": 5,
+    "title": "Your Zone",
+    "summary": "Your workable zone can widen through awareness, support, and pacing.",
+    "practice": "Choose one small action that helps you return toward a workable zone.",
+    "source": "L5 Transcript"
+  },
+  {
+    "id": "lesson-6",
+    "module": 2,
+    "number": 6,
+    "title": "Grounding",
+    "summary": "Grounding brings attention back to the present when things feel too much or too far away.",
+    "practice": "Try a sensory grounding practice and keep only what feels useful.",
+    "source": "L6 Transcript"
+  },
+  {
+    "id": "lesson-7",
+    "module": 2,
+    "number": 7,
+    "title": "Current Conditions",
+    "summary": "Current conditions include the body, environment, relationships, and demands around you.",
+    "practice": "Map one current condition that supports you and one that adds pressure.",
+    "source": "L7 Transcript"
+  },
+  {
+    "id": "lesson-8",
+    "module": 2,
+    "number": 8,
+    "title": "Background",
+    "summary": "Earlier experiences can become background influences without defining the whole person.",
+    "practice": "Notice a familiar pattern with curiosity; you do not need to analyze it deeply.",
+    "source": "L8 Transcript"
+  },
+  {
+    "id": "lesson-9",
+    "module": 2,
+    "number": 9,
+    "title": "Triggers",
+    "summary": "Triggers are signals that a situation has become activating, not a personal failure.",
+    "practice": "Identify one early cue and one grounding choice for when it appears.",
+    "source": "L9 Transcript"
+  },
+  {
+    "id": "lesson-10",
+    "module": 2,
+    "number": 10,
+    "title": "Survival Strategies",
+    "summary": "Strategies that once protected you may still show up; appreciation can come before change.",
+    "practice": "Thank a protective strategy, then consider one safer present-day option.",
+    "source": "L10 Transcript"
+  },
+  {
+    "id": "lesson-11",
+    "module": 3,
+    "number": 11,
+    "title": "Vision & Values",
+    "summary": "Values can offer direction when the next step is uncertain.",
+    "practice": "Choose one value and one small action that expresses it this week.",
+    "source": "L11 Transcript"
+  },
+  {
+    "id": "lesson-12",
+    "module": 3,
+    "number": 12,
+    "title": "Self-Talk & Beliefs",
+    "summary": "Inner language can be noticed, questioned, and made more supportive.",
+    "practice": "Rewrite one harsh thought into language that is honest and kind.",
+    "source": "L12 Transcript"
+  },
+  {
+    "id": "lesson-13",
+    "module": 3,
+    "number": 13,
+    "title": "Attachment & Communication",
+    "summary": "Connection patterns can be explored with curiosity, clarity, and consent.",
+    "practice": "Practice a simple “I notice / I need” statement privately or with support.",
+    "source": "L13 Transcript"
+  },
+  {
+    "id": "lesson-14",
+    "module": 3,
+    "number": 14,
+    "title": "Relationships & Boundaries",
+    "summary": "Boundaries clarify what supports respect, safety, and connection.",
+    "practice": "Draft one brief boundary that fits your current situation.",
+    "source": "L14 Transcript"
+  },
+  {
+    "id": "lesson-15",
+    "module": 3,
+    "number": 15,
+    "title": "SMART Goals",
+    "summary": "Specific, realistic goals can turn values into a next move.",
+    "practice": "Make one goal specific, measurable, achievable, relevant, and time-bound.",
+    "source": "L15 Transcript"
+  }
+]

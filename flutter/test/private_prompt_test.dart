@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mind_recipe/navigator_agent.dart';
-import 'package:mind_recipe/on_device_inference.dart';
+import 'package:mind_recipe/private_prompt.dart';
 
 void main() {
   for (final format in PrivatePromptFormat.values) {

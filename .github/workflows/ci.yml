@@ -2,7 +2,7 @@ name: MindRecipe checks
 
 on:
   push:
-    branches: [main, 'codex/mobile-build-*']
+    branches: [main, 'codex/mobile-build-*', 'codex/clarity-branded-app']
   pull_request:
 
 permissions:
@@ -53,8 +53,17 @@ jobs:
           grep -q 'Expected: false' "$RUNNER_TEMP/onboarding-2155-baseline.log"
       - run: flutter analyze --no-fatal-infos --no-fatal-warnings
         working-directory: flutter
-      - run: flutter test
+      - name: Test Flutter and capture account form states
         working-directory: flutter
+        run: |
+          mkdir -p "$RUNNER_TEMP/clarity-account"
+          MIND_RECIPE_SCREENSHOTS="$RUNNER_TEMP/clarity-account" flutter test
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: clarity-account-forms
+          path: ${{ runner.temp }}/clarity-account/
+          if-no-files-found: warn
 
   web:
     name: Web build
