@@ -242,7 +242,7 @@ test('learning search, favorites, completion and private reflection survive relo
   await noOverflow(page);
 });
 
-test('cover layout fits navigation, Connect segments and support actions on one row each', async t => {
+test('cover navigation keeps destination names legible and fits Connect and support controls', async t => {
   const page = await open(t);
   await onboard(page);
   for (const width of [320, 360, 390, 640]) {
@@ -253,6 +253,16 @@ test('cover layout fits navigation, Connect segments and support actions on one 
       if (width < 640) {
         assert.equal(await nav.getByRole('button').count(), 6);
         assert.ok(await nav.evaluate(el => el.scrollWidth <= el.clientWidth + 1));
+        const brokenWords = await nav.locator('button span').evaluateAll(labels => labels.flatMap(label => {
+          const node = label.firstChild;
+          return Array.from(node.textContent.matchAll(/\w+/g)).filter(match => {
+            const range = document.createRange();
+            range.setStart(node, match.index);
+            range.setEnd(node, match.index + match[0].length);
+            return range.getClientRects().length > 1;
+          }).map(match => match[0]);
+        }));
+        assert.deepEqual(brokenWords, []);
       }
       await button(page, 'Connect').click();
       const personal = button(page, 'Personal');

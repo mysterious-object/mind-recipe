@@ -50,7 +50,7 @@ export function TopNav() {
   };
 
   return (
-    <div className="sticky top-0 z-50 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 backdrop-blur-xl">
+    <div className="primary-navigation-shell sticky top-0 z-50 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 backdrop-blur-xl">
       <div className="max-w-7xl mx-auto px-3 py-2 sm:px-6 sm:py-4">
         {/* Branding */}
         <div className="mb-2 sm:mb-3">
@@ -63,7 +63,7 @@ export function TopNav() {
         </div>
 
         {/* Navigation */}
-        <nav ref={navRef} aria-label="Main navigation" className="grid grid-cols-6 gap-0.5 sm:flex sm:gap-2 sm:overflow-x-auto scrollbar-hide sm:-mx-2 sm:px-2">
+        <nav ref={navRef} aria-label="Main navigation" className="primary-navigation -mx-2 grid grid-cols-[repeat(6,minmax(min-content,1fr))] sm:flex sm:gap-2 sm:overflow-x-auto scrollbar-hide sm:-mx-2 sm:px-2">
           {navItems.map((item) => {
             const Icon = item.icon;
             const active = isActive(item.screen);
@@ -83,7 +83,7 @@ export function TopNav() {
                 aria-current={active ? 'page' : undefined}
               >
                 <Icon className="w-4 h-4 flex-shrink-0" />
-                <span className="text-xs leading-tight font-medium [overflow-wrap:anywhere] sm:text-base">{item.label}</span>
+                <span className="text-xs leading-tight font-medium sm:text-base">{item.label}</span>
               </button>
             );
           })}
