@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react';
 import type { UserProfile, CheckInEntry, Screen } from '../types';
-import { initialSnapshot, newDraft, hasData, withSavedCheckIn, type CurrentCheckIn, type Snapshot } from '../state';
+import { initialSnapshot, newDraft, hasData, withSavedCheckIn, withCompletedSession, type CurrentCheckIn, type Snapshot } from '../state';
 import { loadSnapshot, saveSnapshot, nativeRequest, isNative } from '../host';
 
 interface AppContextType {
@@ -13,6 +13,7 @@ interface AppContextType {
   resetCurrentCheckIn: () => void;
   checkInHistory: CheckInEntry[];
   saveCheckIn: (tags?: string[]) => void;
+  finishCheckIn: () => void;
   showCrisisModal: boolean;
   setShowCrisisModal: (show: boolean) => void;
   navigationStack: Screen[];
@@ -107,6 +108,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
         resetCurrentCheckIn: () => update(current => ({ ...current, draft: newDraft() })),
         checkInHistory: snapshot.history,
         saveCheckIn: tags => update(current => withSavedCheckIn(current, tags)),
+        finishCheckIn: () => {
+          update(withCompletedSession);
+          window.scrollTo(0, 0);
+        },
         showCrisisModal, setShowCrisisModal,
         navigationStack: snapshot.navigationStack,
         pushNavigation: screen => update(current => ({ ...current, navigationStack: [...current.navigationStack, screen] })),
