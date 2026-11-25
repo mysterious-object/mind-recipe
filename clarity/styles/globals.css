@@ -199,7 +199,3 @@ button { touch-action: manipulation; }
   transition-duration: 0.01ms !important;
   scroll-behavior: auto !important;
 }
-@media (max-width: 420px) {
-  .inline-flex.rounded-full { max-width: 100%; flex-wrap: wrap; }
-  .inline-flex.rounded-full > button { padding-left: .75rem; padding-right: .75rem; }
-}

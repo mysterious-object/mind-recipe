@@ -26,13 +26,14 @@ export function Connect() {
       onBack={() => setScreen('home')}
       backLabel="Home"
     >
-      <div className="max-w-2xl mx-auto px-6 py-8 pb-32 space-y-6">
+      <div className="max-w-2xl mx-auto px-4 py-5 sm:px-6 sm:py-8 sm:pb-32 space-y-6">
         {/* Segmented Control */}
-        <div className={`inline-flex ${getCardClasses()} rounded-full p-1.5 shadow-lg border backdrop-blur-xl transition-colors duration-700`}>
+        <div className={`inline-grid w-full grid-cols-[1fr_auto_1fr] sm:w-auto sm:grid-cols-3 ${getCardClasses()} rounded-full p-1 sm:p-1.5 shadow-lg border backdrop-blur-xl transition-colors duration-700`}>
           <button
             type="button"
             onClick={() => setActiveTab('personal')}
-            className={`px-6 py-2.5 rounded-full transition-all duration-300 ${
+            aria-pressed={activeTab === 'personal'}
+            className={`min-h-[44px] whitespace-nowrap px-1.5 py-2 text-sm sm:px-6 sm:py-2.5 sm:text-base rounded-full transition-all duration-300 ${
               activeTab === 'personal'
                 ? 'bg-gradient-to-r from-purple-500 to-indigo-500 text-white shadow-md'
                 : `${getSubtextClasses()} hover:opacity-70`
@@ -43,7 +44,8 @@ export function Connect() {
           <button
             type="button"
             onClick={() => setActiveTab('clarity')}
-            className={`px-6 py-2.5 rounded-full transition-all duration-300 ${
+            aria-pressed={activeTab === 'clarity'}
+            className={`min-h-[44px] whitespace-nowrap px-1.5 py-2 text-sm sm:px-6 sm:py-2.5 sm:text-base rounded-full transition-all duration-300 ${
               activeTab === 'clarity'
                 ? 'bg-gradient-to-r from-purple-500 to-indigo-500 text-white shadow-md'
                 : `${getSubtextClasses()} hover:opacity-70`
@@ -54,7 +56,8 @@ export function Connect() {
           <button
             type="button"
             onClick={() => setActiveTab('support')}
-            className={`px-6 py-2.5 rounded-full transition-all duration-300 ${
+            aria-pressed={activeTab === 'support'}
+            className={`min-h-[44px] whitespace-nowrap px-1.5 py-2 text-sm sm:px-6 sm:py-2.5 sm:text-base rounded-full transition-all duration-300 ${
               activeTab === 'support'
                 ? 'bg-gradient-to-r from-purple-500 to-indigo-500 text-white shadow-md'
                 : `${getSubtextClasses()} hover:opacity-70`

@@ -205,7 +205,7 @@ export function Insights() {
     <AppShell title="Insights">
       <div className="max-w-7xl mx-auto px-6 py-8 pb-32">
         {/* Header */}
-        <div className="mb-8 flex flex-col sm:flex-row gap-4 items-start justify-between">
+        <div className="mb-8 grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 sm:gap-4">
           <div>
             <h1 className={`text-3xl mb-2 ${getTextClasses()} transition-colors duration-700`}>
               Insights & Tracking
@@ -218,10 +218,10 @@ export function Insights() {
           <button
             type="button"
             onClick={handleExportData}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all min-h-[44px]"
+            className="flex items-center gap-1 px-2 py-2 sm:gap-2 sm:px-4 rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all min-h-[44px]"
           >
             <Share2 className="w-4 h-4" />
-            <span>Export Data</span>
+            <span className="max-w-[4em] text-sm leading-tight sm:max-w-none sm:text-base">Export Data</span>
           </button>
         </div>
 
@@ -285,7 +285,7 @@ export function Insights() {
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex gap-2 mb-8 overflow-x-auto border-b border-gray-200 dark:border-gray-700">
+        <div className="grid grid-cols-4 sm:flex sm:gap-2 mb-8 border-b border-gray-200 dark:border-gray-700">
           {tabs.map(tab => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -296,7 +296,7 @@ export function Insights() {
                 type="button"
                 onClick={() => void selectTab(tab.id)}
                 className={`
-                  flex items-center gap-2 px-4 py-3 border-b-2 transition-all min-h-[44px]
+                  flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-1 sm:px-4 py-2 sm:py-3 border-b-2 transition-all min-h-[44px]
                   ${isActive 
                     ? 'border-purple-600 text-purple-600 dark:text-purple-400' 
                     : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
@@ -304,7 +304,7 @@ export function Insights() {
                 `}
               >
                 <Icon className="w-4 h-4" />
-                <span className="font-medium">{tab.label}</span>
+                <span className="font-medium text-xs leading-tight sm:text-base">{tab.label}</span>
               </button>
             );
           })}
