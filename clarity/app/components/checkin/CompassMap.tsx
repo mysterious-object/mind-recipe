@@ -152,18 +152,16 @@ export function CompassMap() {
             High Energy
           </div>
 
-          <div className="relative flex items-center justify-center">
+          <div className="grid grid-cols-2 items-center gap-y-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,28rem)_minmax(0,1fr)]">
             {/* Horizontal axis labels */}
             <div 
-              className="absolute left-0 top-0 sm:top-1/2 sm:-translate-y-1/2 sm:-translate-x-full pr-4 text-sm text-gray-500 dark:text-gray-400 text-right"
-              style={{ width: '80px' }}
+              className="text-sm text-gray-500 dark:text-gray-400 sm:col-start-1 sm:row-start-1 sm:text-right sm:pr-1"
             >
               Connected
             </div>
             
             <div 
-              className="absolute right-0 top-0 sm:top-1/2 sm:-translate-y-1/2 sm:translate-x-full pl-4 text-sm text-gray-500 dark:text-gray-400"
-              style={{ width: '80px' }}
+              className="text-right text-sm text-gray-500 dark:text-gray-400 sm:col-start-3 sm:row-start-1 sm:text-left sm:pl-1"
             >
               Protective
             </div>
@@ -172,7 +170,7 @@ export function CompassMap() {
             <div
               ref={compassRef}
               onClick={handleCompassClick}
-              className="relative w-full aspect-square max-w-md cursor-crosshair"
+              className="relative col-span-2 justify-self-center w-full aspect-square max-w-md cursor-crosshair sm:col-span-1 sm:col-start-2 sm:row-start-1"
               style={{
                 background: 'radial-gradient(circle, rgba(139, 92, 246, 0.05) 0%, rgba(139, 92, 246, 0.02) 100%)',
               }}

@@ -265,10 +265,31 @@ test('cover layout fits navigation, Connect segments and support actions on one 
         const footer = page.getByRole('contentinfo', { name: 'Support options' });
         const buttons = await footer.getByRole('button').evaluateAll(els => els.map(el => ({ y: el.offsetTop, h: el.offsetHeight })));
         assert.ok(buttons.every(b => b.h >= 44 && b.y === buttons[0].y));
-        assert.ok((await footer.boundingBox()).height < 145);
+        const height = (await footer.boundingBox()).height;
+        // Allow the legal copy to wrap when the member enlarges text.
+        assert.ok(height <= (scale === 100 ? 120 : 170), width + 'px at ' + scale + '%: footer height ' + height);
       }
       await noOverflow(page);
       await button(page, 'Home').click();
+    }
+  }
+});
+
+test('assessment actions and Insights tabs fit the cover screen', async t => {
+  const page = await open(t);
+  await page.setViewportSize({ width: 320, height: 886 });
+  for (const [screen, names] of [
+    ['check-in-review', ['Show Recommendations', 'View All Options']],
+    ['insights', ['Overview', 'Calendar', 'Timeline', 'Journal']],
+  ]) {
+    await page.evaluate(({ key, screen }) => localStorage.setItem(key, JSON.stringify({
+      screen, onboardingComplete: true, profile: { name: 'Alex' },
+    })), { key, screen });
+    await page.reload();
+    await page.addStyleTag({ content: 'html { font-size: 125% !important; }' });
+    for (const name of names) {
+      const rect = await button(page, name).boundingBox();
+      assert.ok(rect && rect.x >= 0 && rect.x + rect.width <= 321 && rect.height >= 44, name);
     }
   }
 });
