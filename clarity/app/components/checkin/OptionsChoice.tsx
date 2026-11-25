@@ -5,7 +5,7 @@ import { Button } from '../ui/button';
 import { Wind, BookOpen, Sparkles, Users, Zap, Home, ArrowLeft } from 'lucide-react';
 
 export function OptionsChoice() {
-  const { setScreen, pushNavigation } = useApp();
+  const { setScreen, pushNavigation, finishCheckIn } = useApp();
   const { getBackgroundClasses, getTextClasses, getSubtextClasses, getCardClasses } = useTheme();
 
   const handleOption = (option: string) => {
@@ -136,9 +136,9 @@ export function OptionsChoice() {
       <div className={`fixed bottom-0 left-0 right-0 ${getCardClasses()} border-t p-6 shadow-lg backdrop-blur-xl`}>
         <div className="max-w-4xl mx-auto">
           <Button
-            onClick={() => setScreen('home')}
+            onClick={finishCheckIn}
             variant="outline"
-            className="w-full py-6 rounded-full text-lg"
+            className="w-full h-auto min-h-[44px] whitespace-normal px-4 py-3 text-base leading-tight rounded-full sm:py-4 sm:text-lg"
           >
             Complete Session & Return Home
           </Button>

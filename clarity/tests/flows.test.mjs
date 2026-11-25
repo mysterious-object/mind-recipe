@@ -101,6 +101,51 @@ test('compass path preserves position and saves a guided practice', async t => {
   assert.equal(state.history[0].activation, undefined);
 });
 
+test('complete session saves a compass check-in once and updates Insights after relaunch', async t => {
+  const page = await open(t);
+  await page.setViewportSize({ width: 320, height: 886 });
+  await onboard(page);
+  await button(page, 'Check-In').click();
+  await button(page, /Compass/).click();
+  await page.locator('.cursor-crosshair').click({ position: { x: 80, y: 80 } });
+  await button(page, 'Next').click();
+  await button(page, 'Head').click();
+  await button(page, 'Next').click();
+  await button(page, 'Physical').click();
+  await button(page, 'Continue').click();
+  await page.getByText('Compass check-in completion').waitFor();
+  await page.getByText('100%', {exact:true}).waitFor();
+  assert.equal(await page.getByText('Optional on the compass path').count(), 2);
+  await button(page, 'Show Recommendations').click();
+  const finish = button(page, 'Complete Session & Return Home');
+  for (const scale of [100, 125]) {
+    await page.evaluate(scale => document.documentElement.style.fontSize = scale + '%', scale);
+    assert.ok(await finish.evaluate(el => {
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      const bounds = el.getBoundingClientRect();
+      return bounds.height >= 44 && [...range.getClientRects()].every(line =>
+        line.left >= bounds.left + 8 && line.right <= bounds.right - 8);
+    }));
+  }
+  await finish.click();
+  await button(page, 'Insights').click();
+  await page.reload();
+  const state = await saved(page);
+  assert.equal(state.screen, 'insights');
+  assert.equal(state.history.length, 1);
+  const [entry] = state.history;
+  assert.ok(entry.compassQuadrant);
+  assert.deepEqual(entry.bodyZones, ['head']);
+  assert.deepEqual(entry.lifeDomains, ['physical']);
+  assert.equal(entry.activation, undefined);
+  assert.notEqual(state.draft.id, entry.id);
+  for (const label of ['Total Check-ins', 'Current Streak']) {
+    const card = page.getByText(label, {exact:true}).locator('../..');
+    await card.getByText('1', {exact:true}).waitFor();
+  }
+});
+
 test('Help Now opens once, logs a real moment, and does not erase a draft', async t => {
   const page = await open(t); await onboard(page);
   await button(page, /Help now -/).click();

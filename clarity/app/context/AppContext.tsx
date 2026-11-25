@@ -13,6 +13,7 @@ interface AppContextType {
   resetCurrentCheckIn: () => void;
   checkInHistory: CheckInEntry[];
   saveCheckIn: (tags?: string[]) => void;
+  finishCheckIn: () => void;
   showCrisisModal: boolean;
   setShowCrisisModal: (show: boolean) => void;
   navigationStack: Screen[];
@@ -107,6 +108,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
         resetCurrentCheckIn: () => update(current => ({ ...current, draft: newDraft() })),
         checkInHistory: snapshot.history,
         saveCheckIn: tags => update(current => withSavedCheckIn(current, tags)),
+        finishCheckIn: () => {
+          update(current => ({
+            ...(hasData(current.draft) ? withSavedCheckIn(current) : current),
+            screen: 'home', navigationStack: [],
+          }));
+          window.scrollTo(0, 0);
+        },
         showCrisisModal, setShowCrisisModal,
         navigationStack: snapshot.navigationStack,
         pushNavigation: screen => update(current => ({ ...current, navigationStack: [...current.navigationStack, screen] })),

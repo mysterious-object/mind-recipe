@@ -136,7 +136,7 @@ export function CheckInReview() {
         <div className={`${getCardClasses()} rounded-3xl p-6 bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20`}>
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <span className={`text-sm ${getSubtextClasses()}`}>Assessment Completion</span>
+              <span className={`text-sm ${getSubtextClasses()}`}>{currentCheckIn.compassQuadrant ? 'Compass check-in completion' : 'Assessment Completion'}</span>
               <span className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
                 {completion}%
               </span>
@@ -148,7 +148,7 @@ export function CheckInReview() {
               />
             </div>
             <p className={`text-xs ${getSubtextClasses()}`}>
-              More data provides better insights
+              {currentCheckIn.compassQuadrant ? 'Based on compass position, body zones and life domains.' : 'More data provides better insights'}
             </p>
           </div>
         </div>
@@ -180,7 +180,7 @@ export function CheckInReview() {
                 )}
               </div>
             ) : (
-              <p className={`text-sm ${getSubtextClasses()}`}>Not selected</p>
+              <p className={`text-sm ${getSubtextClasses()}`}>{currentCheckIn.compassQuadrant ? 'Optional on the compass path' : 'Not selected'}</p>
             )}
           </button>
 
@@ -205,7 +205,7 @@ export function CheckInReview() {
                 </p>
               </div>
             ) : (
-              <p className={`text-sm ${getSubtextClasses()}`}>Not selected</p>
+              <p className={`text-sm ${getSubtextClasses()}`}>{currentCheckIn.compassQuadrant ? 'Optional on the compass path' : 'Not selected'}</p>
             )}
           </button>
 
