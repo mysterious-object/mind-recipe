@@ -199,3 +199,10 @@ button { touch-action: manipulation; }
   transition-duration: 0.01ms !important;
   scroll-behavior: auto !important;
 }
+
+.primary-navigation-shell { container: primary-header / inline-size; }
+/* Allow large text to use two rows without splitting destination names. */
+@container primary-header (width < 19.8em) {
+  .primary-navigation { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .primary-navigation button { flex-direction: row; gap: .25em; }
+}

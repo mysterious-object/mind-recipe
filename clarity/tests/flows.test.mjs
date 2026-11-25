@@ -31,7 +31,17 @@ async function onboard(page) {
   await button(page, /do this later/i).click();
 }
 async function saved(page) { return page.evaluate(key => JSON.parse(localStorage.getItem(key)), key); }
-async function noOverflow(page) { assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)); }
+async function noOverflow(page) {
+  const layout = await page.evaluate(() => {
+    const width = document.documentElement.scrollWidth;
+    if (width <= innerWidth + 1) return null;
+    const outside = [...document.querySelectorAll('main *, header *, nav *, footer *')]
+      .filter(el => el.getBoundingClientRect().right > innerWidth + 1)
+      .map(el => [el.tagName, el.textContent.trim().slice(0, 32), Math.round(el.getBoundingClientRect().right)]);
+    return { viewport: innerWidth, width, outside };
+  });
+  assert.equal(layout, null, JSON.stringify(layout));
+}
 
 test('emotion check-in, zero activation, journal, and edit return survive reload', async t => {
   const page = await open(t); await onboard(page);
@@ -224,7 +234,9 @@ test('learning search, favorites, completion and private reflection survive relo
     const nav = document.querySelector('nav[aria-label="Main navigation"]');
     const viewport = nav.getBoundingClientRect();
     const tab = nav.querySelector('[aria-current="page"]').getBoundingClientRect();
-    return tab.left >= viewport.left - 1 && tab.right <= viewport.right + 1;
+    // Container layout can take a frame to respond to the new text size.
+    return document.documentElement.scrollWidth <= innerWidth + 1
+      && tab.left >= viewport.left - 1 && tab.right <= viewport.right + 1;
   });
   await noOverflow(page);
   await button(page, 'Favorites').click();
@@ -242,7 +254,7 @@ test('learning search, favorites, completion and private reflection survive relo
   await noOverflow(page);
 });
 
-test('cover layout fits navigation, Connect segments and support actions on one row each', async t => {
+test('cover navigation keeps destination names legible and fits Connect and support controls', async t => {
   const page = await open(t);
   await onboard(page);
   for (const width of [320, 360, 390, 640]) {
@@ -253,6 +265,16 @@ test('cover layout fits navigation, Connect segments and support actions on one 
       if (width < 640) {
         assert.equal(await nav.getByRole('button').count(), 6);
         assert.ok(await nav.evaluate(el => el.scrollWidth <= el.clientWidth + 1));
+        const brokenWords = await nav.locator('button span').evaluateAll(labels => labels.flatMap(label => {
+          const node = label.firstChild;
+          return Array.from(node.textContent.matchAll(/\w+/g)).filter(match => {
+            const range = document.createRange();
+            range.setStart(node, match.index);
+            range.setEnd(node, match.index + match[0].length);
+            return range.getClientRects().length > 1;
+          }).map(match => match[0]);
+        }));
+        assert.deepEqual(brokenWords, []);
       }
       await button(page, 'Connect').click();
       const personal = button(page, 'Personal');
