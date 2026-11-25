@@ -99,9 +99,9 @@ export function Home() {
 
   return (
     <AppShell title="Home" showBack={false}>
-      <div className="max-w-2xl mx-auto px-6 py-8 pb-32 space-y-8">
+      <div className="max-w-2xl mx-auto px-4 py-4 space-y-4 sm:px-6 sm:py-8 sm:pb-32 sm:space-y-8">
         {/* Hero Block with Greeting + Aura */}
-        <div className="relative min-h-[200px] flex items-center justify-center">
+        <div className="relative min-h-[7rem] sm:min-h-[200px] flex items-center justify-center">
           {/* Layered Organic Aura Background - respects motion preference */}
           <div className="absolute inset-0 overflow-hidden">
             {userProfile.motion ? (
@@ -190,22 +190,22 @@ export function Home() {
 
             setScreen('check-in-choice');
           }}
-          className={`w-full ${getCardClasses()} rounded-[1.25rem] p-8 shadow-lg border backdrop-blur-xl transition-all hover:shadow-xl hover:scale-[1.01] active:scale-[0.99] text-left`}
+          className={`w-full ${getCardClasses()} rounded-[1.25rem] p-5 sm:p-8 shadow-lg border backdrop-blur-xl transition-all hover:shadow-xl hover:scale-[1.01] active:scale-[0.99] text-left`}
         >
           {/* Soft body outline visual */}
-          <div className="flex items-start gap-6">
-            <div className="flex-shrink-0 w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-100 to-indigo-100 dark:from-purple-900/30 dark:to-indigo-900/30 flex items-center justify-center">
-              <Activity className="w-8 h-8 text-purple-600 dark:text-purple-400" />
+          <div className="grid grid-cols-[auto_1fr] items-center gap-x-3 gap-y-2 sm:flex sm:items-start sm:gap-6">
+            <div className="flex-shrink-0 w-10 h-10 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-purple-100 to-indigo-100 dark:from-purple-900/30 dark:to-indigo-900/30 flex items-center justify-center">
+              <Activity className="w-5 h-5 sm:w-8 sm:h-8 text-purple-600 dark:text-purple-400" />
             </div>
             
-            <div className="flex-1 space-y-2">
+            <div className="contents sm:block sm:flex-1 sm:space-y-2">
               <h3 className={`text-xl ${getTextClasses()} transition-colors duration-700`}>
                 Check in
               </h3>
-              <p className={`${getSubtextClasses()} transition-colors duration-700`}>
+              <p className={`col-span-2 ${getSubtextClasses()} transition-colors duration-700`}>
                 Let's check where you're at right now.
               </p>
-              <p className={`text-sm ${getSubtextClasses()} opacity-70 transition-colors duration-700 leading-relaxed`}>
+              <p className={`col-span-2 text-sm ${getSubtextClasses()} opacity-70 transition-colors duration-700 leading-relaxed`}>
                 We'll notice feelings, body signals, and what's weighing on you. You can stop to steady, shift, or log at any time.
               </p>
             </div>

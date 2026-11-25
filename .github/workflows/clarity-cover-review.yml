@@ -1,0 +1,31 @@
+name: Clarity cover layout verification
+on:
+  push:
+    branches: ['codex/clarity-layout-review-2162']
+permissions:
+  contents: read
+jobs:
+  review:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: clarity
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: clarity/package-lock.json
+      - run: cp ../flutter/assets/clarity/index.html "$RUNNER_TEMP/baseline.html"
+      - run: mv capture.mjs "$RUNNER_TEMP/capture.mjs"
+      - run: npm ci && npx playwright install --with-deps chromium
+      - run: npm run build
+      - run: cp "$RUNNER_TEMP/capture.mjs" . && node capture.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: clarity-layout-review
+          path: |
+            clarity/review
+            flutter/assets/clarity/index.html
+      - run: npm test

@@ -88,9 +88,9 @@ export function AppShell({
       </div>
 
       {/* Bottom Crisis Strip - Sticky */}
-      <footer aria-label="Support options" className="sticky bottom-0 z-40 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 px-4 md:px-6 py-2 md:py-4 backdrop-blur-xl">
-        <div className="max-w-4xl mx-auto space-y-2">
-          {/* Help has its own row so it cannot cover page content. */}
+      <footer aria-label="Support options" className="sticky bottom-0 z-40 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 px-2 sm:px-4 md:px-6 py-1 sm:py-2 md:py-4 backdrop-blur-xl">
+        <div className="max-w-4xl mx-auto space-y-1 sm:space-y-2">
+          <div className="grid grid-cols-3 items-stretch gap-1 sm:block sm:space-y-2">
           <button
             type="button"
             onPointerDown={handleHelpPressStart}
@@ -98,7 +98,7 @@ export function AppShell({
             onPointerCancel={cancelHold}
             onPointerLeave={cancelHold}
             onClick={handleHelpClick}
-            className="relative ml-auto text-white rounded-full px-5 py-3 shadow-2xl transition-all flex items-center gap-2 group overflow-hidden min-h-[48px]"
+            className="relative justify-center sm:ml-auto text-white rounded-full px-1 py-1 text-sm sm:px-5 sm:py-3 sm:text-base shadow-2xl transition-all flex items-center gap-2 group overflow-hidden min-h-[44px] sm:min-h-[48px]"
             style={{
               background: 'linear-gradient(135deg, rgba(251, 146, 60, 0.95) 0%, rgba(251, 113, 133, 0.9) 50%, rgba(244, 114, 182, 0.95) 100%)',
               boxShadow: '0 12px 32px rgba(251, 146, 60, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.2)',
@@ -115,7 +115,7 @@ export function AppShell({
             </div>
           </button>
           {/* Crisis Buttons */}
-          <div className="flex gap-2 md:gap-3">
+          <div className="contents sm:flex sm:gap-2 md:gap-3">
             <button
               type="button"
               onClick={() => {
@@ -142,6 +142,8 @@ export function AppShell({
             </button>
           </div>
 
+          </div>
+
           {/* Crisis Resources & Disclaimer - Compact on mobile */}
           <div className={`text-[10px] md:text-xs ${getSubtextClasses()} leading-relaxed transition-colors duration-700 text-center space-y-0.5 md:space-y-1`}>
             <p className="hidden md:block">
@@ -155,7 +157,7 @@ export function AppShell({
                 FindHelp.org
               </a>
             </p>
-            <p className="md:hidden">
+            <p className="text-xs leading-tight md:hidden">
               <strong>Crisis Text:</strong> 741741 | <a 
                 href="https://www.findhelp.org" onClick={event => { event.preventDefault(); void openExternal("https://www.findhelp.org").catch(reportError); }} 
                 target="_blank" 
@@ -165,7 +167,7 @@ export function AppShell({
                 FindHelp.org
               </a>
             </p>
-            <p className="text-[9px] md:text-xs opacity-75">
+            <p className="text-xs leading-tight opacity-75">
               Not a replacement for professional care. In crisis, contact emergency services.
             </p>
           </div>

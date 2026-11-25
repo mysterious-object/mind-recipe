@@ -241,3 +241,34 @@ test('learning search, favorites, completion and private reflection survive relo
   assert.equal(await button(page, 'Completed').isDisabled(), true);
   await noOverflow(page);
 });
+
+test('cover layout fits navigation, Connect segments and support actions on one row each', async t => {
+  const page = await open(t);
+  await onboard(page);
+  for (const width of [320, 360, 390, 640]) {
+    await page.setViewportSize({ width, height: 886 });
+    for (const scale of [100, 125]) {
+      await page.evaluate(scale => document.documentElement.style.fontSize = scale + '%', scale);
+      const nav = page.getByRole('navigation', { name: 'Main navigation' });
+      if (width < 640) {
+        assert.equal(await nav.getByRole('button').count(), 6);
+        assert.ok(await nav.evaluate(el => el.scrollWidth <= el.clientWidth + 1));
+      }
+      await button(page, 'Connect').click();
+      const personal = button(page, 'Personal');
+      const support = button(page, 'Support');
+      const boxes = await Promise.all([personal, button(page, 'MindRecipe'), support].map(el => el.boundingBox()));
+      assert.ok(boxes.every(box => box && Math.abs(box.y - boxes[0].y) <= 1 && box.height >= 44 && box.x >= 0 && box.x + box.width <= width + 1));
+      await support.click();
+      assert.equal(await support.getAttribute('aria-pressed'), 'true');
+      if (width < 640) {
+        const footer = page.getByRole('contentinfo', { name: 'Support options' });
+        const buttons = await footer.getByRole('button').evaluateAll(els => els.map(el => ({ y: el.offsetTop, h: el.offsetHeight })));
+        assert.ok(buttons.every(b => b.h >= 44 && b.y === buttons[0].y));
+        assert.ok((await footer.boundingBox()).height < 145);
+      }
+      await noOverflow(page);
+      await button(page, 'Home').click();
+    }
+  }
+});
