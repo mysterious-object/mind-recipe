@@ -31,7 +31,17 @@ async function onboard(page) {
   await button(page, /do this later/i).click();
 }
 async function saved(page) { return page.evaluate(key => JSON.parse(localStorage.getItem(key)), key); }
-async function noOverflow(page) { assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)); }
+async function noOverflow(page) {
+  const layout = await page.evaluate(() => {
+    const width = document.documentElement.scrollWidth;
+    if (width <= innerWidth + 1) return null;
+    const outside = [...document.querySelectorAll('main *, header *, nav *, footer *')]
+      .filter(el => el.getBoundingClientRect().right > innerWidth + 1)
+      .map(el => [el.tagName, el.textContent.trim().slice(0, 32), Math.round(el.getBoundingClientRect().right)]);
+    return { viewport: innerWidth, width, outside };
+  });
+  assert.equal(layout, null, JSON.stringify(layout));
+}
 
 test('emotion check-in, zero activation, journal, and edit return survive reload', async t => {
   const page = await open(t); await onboard(page);
