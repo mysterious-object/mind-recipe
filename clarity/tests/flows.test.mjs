@@ -234,7 +234,9 @@ test('learning search, favorites, completion and private reflection survive relo
     const nav = document.querySelector('nav[aria-label="Main navigation"]');
     const viewport = nav.getBoundingClientRect();
     const tab = nav.querySelector('[aria-current="page"]').getBoundingClientRect();
-    return tab.left >= viewport.left - 1 && tab.right <= viewport.right + 1;
+    // Container layout can take a frame to respond to the new text size.
+    return document.documentElement.scrollWidth <= innerWidth + 1
+      && tab.left >= viewport.left - 1 && tab.right <= viewport.right + 1;
   });
   await noOverflow(page);
   await button(page, 'Favorites').click();

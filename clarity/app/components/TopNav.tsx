@@ -74,7 +74,7 @@ export function TopNav() {
                 type="button"
                 onClick={() => setScreen(item.screen)}
                 className={`
-                  flex min-w-0 flex-col items-center justify-center gap-0.5 py-1 sm:flex-row sm:gap-2 sm:px-4 sm:py-2 rounded-lg sm:whitespace-nowrap transition-all duration-200 min-h-[44px]
+                  flex min-w-0 flex-col items-center justify-center gap-0.5 py-1 sm:flex-row sm:gap-2 sm:px-4 sm:py-2 rounded-lg sm:whitespace-nowrap transition-colors duration-200 min-h-[44px]
                   ${active 
                     ? 'bg-purple-600 text-white shadow-md' 
                     : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
