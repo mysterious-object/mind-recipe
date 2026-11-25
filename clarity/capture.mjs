@@ -41,5 +41,27 @@ for(const mode of ['prior','current']) {
   await p.close();
   if(errors.length) throw Error(errors.join('\n'));
 }
+const phone=await b.newPage({viewport:{width:320,height:886},reducedMotion:'reduce'});
+await phone.goto('http://127.0.0.1:'+server.address().port+'/current');
+await phone.evaluate(()=>localStorage.setItem('mindrecipe-clarity-preview-v1',JSON.stringify({
+ screen:'check-in-review',onboardingComplete:true,profile:{name:'Alex',motion:false},
+ draft:{id:'review-example',compassQuadrant:'high-open',bodyZones:['head'],lifeDomains:['physical']}
+})));
+await phone.reload();
+const snap=async name=>phone.screenshot({path:target+'/verified-'+name+'.png',animations:'disabled'});
+await phone.getByText('Compass check-in completion').waitFor();
+await snap('compass-review');
+await phone.getByText('Optional on the compass path').last().scrollIntoViewIfNeeded();
+await snap('compass-optional');
+await phone.getByRole('button',{name:'Show Recommendations'}).click();
+const finish=phone.getByRole('button',{name:'Complete Session & Return Home'});
+await finish.waitFor();
+await snap('complete-session');
+await finish.click();
+await phone.getByRole('button',{name:'Insights',exact:true}).click();
+await phone.reload();
+await phone.getByText('Total Check-ins',{exact:true}).scrollIntoViewIfNeeded();
+await snap('saved-insights');
+await phone.close();
 await writeFile(target+'/layout.json',JSON.stringify(results,null,2));
 } finally {await b.close();server.close();}

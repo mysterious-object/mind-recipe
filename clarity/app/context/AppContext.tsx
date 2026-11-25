@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react';
 import type { UserProfile, CheckInEntry, Screen } from '../types';
-import { initialSnapshot, newDraft, hasData, withSavedCheckIn, type CurrentCheckIn, type Snapshot } from '../state';
+import { initialSnapshot, newDraft, hasData, withSavedCheckIn, withCompletedSession, type CurrentCheckIn, type Snapshot } from '../state';
 import { loadSnapshot, saveSnapshot, nativeRequest, isNative } from '../host';
 
 interface AppContextType {
@@ -109,10 +109,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         checkInHistory: snapshot.history,
         saveCheckIn: tags => update(current => withSavedCheckIn(current, tags)),
         finishCheckIn: () => {
-          update(current => ({
-            ...(hasData(current.draft) ? withSavedCheckIn(current) : current),
-            screen: 'home', navigationStack: [],
-          }));
+          update(withCompletedSession);
           window.scrollTo(0, 0);
         },
         showCrisisModal, setShowCrisisModal,

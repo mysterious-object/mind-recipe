@@ -60,6 +60,11 @@ export function withSavedCheckIn(snapshot: Snapshot, tags?: string[]): Snapshot 
   };
 }
 
+export function withCompletedSession(snapshot: Snapshot): Snapshot {
+  const saved = hasData(snapshot.draft) ? withSavedCheckIn(snapshot) : snapshot;
+  return { ...saved, screen: 'home', navigationStack: [] };
+}
+
 export function dayOrdinal(timestamp: string): number {
   const date = new Date(timestamp);
   return Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / 86400000;
